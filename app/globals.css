@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.btn {
+  @apply inline-flex items-center justify-center text-[13px] font-medium px-4 py-2 rounded-full tracking-wide transition-colors;
+}
+.btn-primary {
+  @apply btn bg-ink text-white hover:bg-black;
+}
+.btn-danger {
+  @apply btn bg-white text-danger border border-danger hover:bg-danger hover:text-white;
+}
+.badge {
+  @apply inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full;
+}

@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Cycle de vie : nouvelle -> confirmee (colis créé sur Forcelog) ou annulee.
+// forcelogStatus stocke tel quel le statut brut renvoyé par Forcelog
+// (on ne connaît pas leur vocabulaire exact, donc pas de traduction figée ici).
+model Order {
+  id               String      @id @default(cuid())
+  shopifyOrderId   String      @unique
+  orderNumber      String
+  customerName     String
+  address          String
+  city             String
+  phone            String
+  totalPrice       Decimal     @db.Decimal(10, 2)
+  status           OrderStatus @default(NOUVELLE)
+
+  forcelogCode     String?     // code colis renvoyé par AddParcel
+  forcelogStatus   String?     // dernier statut brut connu (GetTracking/GetParcel)
+  forcelogError    String?     // dernière erreur Forcelog (ex: ville non reconnue)
+  forcelogSyncedAt DateTime?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  items            OrderItem[]
+
+  @@index([status])
+  @@index([forcelogCode])
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  title    String
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+}
+
+enum OrderStatus {
+  NOUVELLE
+  CONFIRMEE
+  ANNULEE
+}
