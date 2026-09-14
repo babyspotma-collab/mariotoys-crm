@@ -38,6 +38,9 @@ export default async function DashboardPage() {
           <a href="/parcels" className="text-sm text-muted hover:text-ink">
             Suivi Forcelog
           </a>
+          <a href="/products/new" className="text-sm text-muted hover:text-ink">
+            + Nouveau produit
+          </a>
           <a href="/orders/new" className="btn-primary">
             + Nouvelle commande
           </a>

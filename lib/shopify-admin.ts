@@ -117,12 +117,195 @@ export async function listProducts(searchTerm = ""): Promise<ShopifyProductSumma
 
 export type ShopifyCollection = { id: string; title: string };
 
-// TODO(Module 3) : cette liste renverra aussi les collections Babyspot
-// (même boutique partagée) — à filtrer sur les collections Mediva une
-// fois ce module construit, comme fait pour listProducts() ci-dessus.
+// Collections Mediva connues (voir mediva-automation/CLAUDE.md) — le
+// compte Shopify est partagé avec Babyspot, dont les collections
+// (Univers Bébé, Kidilo, Candide, etc.) ne doivent jamais apparaître ici.
+// Filtré par titre plutôt que par handle : plus robuste, et on ne connaît
+// pas les handles exacts de toutes ces collections historiques.
+const MEDIVA_COLLECTION_TITLES = [
+  "blouses",
+  "pantalons",
+  "vestes",
+  "tenues chirurgicales",
+  "accessoires",
+  "pyjamas infirmier",
+  "crocs",
+  "pyjama",
+];
+
 export async function listCollections(): Promise<ShopifyCollection[]> {
   const data = await gql<{ collections: { edges: { node: ShopifyCollection }[] } }>(
     `query { collections(first: 100) { edges { node { id title } } } }`
   );
-  return data.collections.edges.map((e) => e.node);
+  return data.collections.edges
+    .map((e) => e.node)
+    .filter((c) => MEDIVA_COLLECTION_TITLES.includes(c.title.trim().toLowerCase()));
+}
+
+// ─── Création de produit (Module 3) ───────────────────────────────────────────
+// Même flow que mediva-automation/create-product.js (productCreate ->
+// productOptionsCreate -> productVariantsBulkCreate/Update), mais les
+// images viennent de Vercel Blob (déjà des URLs HTTPS publiques) donc
+// productCreateMedia les prend directement en originalSource — pas
+// besoin du staged-upload nécessaire pour des fichiers locaux.
+
+export type CreateDraftProductInput = {
+  title: string;
+  descriptionHtml: string;
+  tags: string[];
+  sizes: string[]; // jamais vide
+  price: number;
+  compareAtPrice: number;
+  cost: number;
+  imageUrls: string[];
+  collectionId: string;
+};
+
+export type CreatedProduct = { id: string; adminUrl: string };
+
+export async function createDraftProduct(input: CreateDraftProductInput): Promise<CreatedProduct> {
+  const createData = await gql<{
+    productCreate: {
+      product: { id: string; variants: { edges: { node: { id: string } }[] } };
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(
+    `mutation ($input: ProductInput!) {
+      productCreate(input: $input) {
+        product { id variants(first: 1) { edges { node { id } } } }
+        userErrors { field message }
+      }
+    }`,
+    { input: { title: input.title, descriptionHtml: input.descriptionHtml, status: "DRAFT", tags: input.tags } }
+  );
+  if (createData.productCreate.userErrors.length > 0) {
+    throw new Error(`Création produit: ${JSON.stringify(createData.productCreate.userErrors)}`);
+  }
+  const productId = createData.productCreate.product.id;
+
+  const optData = await gql<{
+    productOptionsCreate: { userErrors: { field: string[]; message: string }[] };
+  }>(
+    `mutation ($productId: ID!, $options: [OptionCreateInput!]!) {
+      productOptionsCreate(productId: $productId, options: $options) {
+        userErrors { field message }
+      }
+    }`,
+    { productId, options: [{ name: "Taille", values: input.sizes.map((s) => ({ name: s })) }] }
+  );
+  if (optData.productOptionsCreate.userErrors.length > 0) {
+    throw new Error(`Création option Taille: ${JSON.stringify(optData.productOptionsCreate.userErrors)}`);
+  }
+
+  const details = await gql<{
+    product: {
+      options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+      variants: { edges: { node: { id: string; selectedOptions: { name: string; value: string }[] } }[] };
+    };
+  }>(
+    `query ($id: ID!) {
+      product(id: $id) {
+        options { id name optionValues { id name } }
+        variants(first: 20) { edges { node { id selectedOptions { name value } } } }
+      }
+    }`,
+    { id: productId }
+  );
+
+  const tailleOpt = details.product.options.find((o) => o.name === "Taille");
+  if (!tailleOpt) throw new Error('Option "Taille" introuvable après création');
+
+  const covered = new Set(
+    details.product.variants.edges.flatMap((e) =>
+      e.node.selectedOptions.filter((o) => o.name === "Taille").map((o) => o.value)
+    )
+  );
+  const missing = tailleOpt.optionValues.filter((ov) => !covered.has(ov.name));
+
+  if (missing.length > 0) {
+    const cvData = await gql<{
+      productVariantsBulkCreate: { userErrors: { field: string[]; message: string }[] };
+    }>(
+      `mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+        productVariantsBulkCreate(productId: $productId, variants: $variants) {
+          userErrors { field message }
+        }
+      }`,
+      {
+        productId,
+        variants: missing.map((ov) => ({
+          price: String(input.price),
+          compareAtPrice: String(input.compareAtPrice),
+          taxable: false,
+          inventoryItem: { cost: String(input.cost) },
+          optionValues: [{ optionId: tailleOpt.id, id: ov.id }],
+        })),
+      }
+    );
+    if (cvData.productVariantsBulkCreate.userErrors.length > 0) {
+      throw new Error(`Création variantes: ${JSON.stringify(cvData.productVariantsBulkCreate.userErrors)}`);
+    }
+  }
+
+  const existingIds = details.product.variants.edges.map((e) => e.node.id);
+  if (existingIds.length > 0) {
+    const upData = await gql<{
+      productVariantsBulkUpdate: { userErrors: { field: string[]; message: string }[] };
+    }>(
+      `mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+        productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+          userErrors { field message }
+        }
+      }`,
+      {
+        productId,
+        variants: existingIds.map((id) => ({
+          id,
+          price: String(input.price),
+          compareAtPrice: String(input.compareAtPrice),
+          taxable: false,
+          inventoryItem: { cost: String(input.cost) },
+        })),
+      }
+    );
+    if (upData.productVariantsBulkUpdate.userErrors.length > 0) {
+      throw new Error(`Mise à jour variantes: ${JSON.stringify(upData.productVariantsBulkUpdate.userErrors)}`);
+    }
+  }
+
+  if (input.imageUrls.length > 0) {
+    const mediaData = await gql<{
+      productCreateMedia: { mediaUserErrors: { field: string[]; message: string }[] };
+    }>(
+      `mutation ($productId: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $productId, media: $media) {
+          mediaUserErrors { field message }
+        }
+      }`,
+      {
+        productId,
+        media: input.imageUrls.map((url) => ({ originalSource: url, mediaContentType: "IMAGE" })),
+      }
+    );
+    if (mediaData.productCreateMedia.mediaUserErrors.length > 0) {
+      throw new Error(`Ajout images: ${JSON.stringify(mediaData.productCreateMedia.mediaUserErrors)}`);
+    }
+  }
+
+  const collData = await gql<{
+    collectionAddProducts: { userErrors: { field: string[]; message: string }[] };
+  }>(
+    `mutation ($id: ID!, $productIds: [ID!]!) {
+      collectionAddProducts(id: $id, productIds: $productIds) {
+        userErrors { field message }
+      }
+    }`,
+    { id: input.collectionId, productIds: [productId] }
+  );
+  if (collData.collectionAddProducts.userErrors.length > 0) {
+    throw new Error(`Ajout à la collection: ${JSON.stringify(collData.collectionAddProducts.userErrors)}`);
+  }
+
+  const numericId = productId.split("/").pop();
+  return { id: productId, adminUrl: `https://${STORE}/admin/products/${numericId}` };
 }

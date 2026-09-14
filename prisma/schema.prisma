@@ -66,3 +66,24 @@ enum OrderSource {
   SHOPIFY
   MANUEL
 }
+
+// Brouillon de fiche produit généré par l'IA (Module 3), en attente de
+// relecture/correction avant création réelle sur Shopify. Supprimé une
+// fois le produit créé (ou abandonné) — pas d'historique à conserver.
+model ProductDraft {
+  id               String   @id @default(cuid())
+  imageUrls        Json // string[] (URLs Vercel Blob)
+  cost             Decimal  @db.Decimal(10, 2)
+  title            String
+  about            String
+  features         Json // string[]
+  sizes            Json // string[]
+  tags             Json // string[]
+  brand            String?
+  price            Decimal  @db.Decimal(10, 2)
+  compareAtPrice   Decimal  @db.Decimal(10, 2)
+  collectionId     String? // gid Shopify, choisi ou confirmé par l'utilisateur
+  collectionTitle  String?
+  collectionAmbiguous Boolean @default(false)
+  createdAt        DateTime @default(now())
+}
