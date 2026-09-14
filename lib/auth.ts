@@ -5,7 +5,7 @@
 // Utilise Web Crypto (crypto.subtle) plutôt que le module "crypto" de
 // Node, pour rester compatible avec le runtime Edge du middleware.
 
-export const SESSION_COOKIE = "mediva_crm_session";
+export const SESSION_COOKIE = "mario_toys_crm_session";
 const SESSION_VALUE = "authenticated";
 
 async function hmac(secret: string, message: string): Promise<string> {

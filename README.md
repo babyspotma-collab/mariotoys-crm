@@ -1,12 +1,11 @@
-# Mediva CRM
+# Mario Toys CRM
 
-Dashboard interne : réception automatique des commandes Shopify Mediva,
+Dashboard interne : réception automatique des commandes Shopify Mario Toys,
 confirmation/annulation manuelle, création automatique du colis Forcelog,
 suivi de livraison.
 
-Projet séparé de `mediva` (le site) et `mediva-automation` (création de
-produits) — même boutique Shopify (`v5f0rs-mh.myshopify.com`), pas
-d'autre lien entre les trois.
+Boutique Shopify `cvkf4d-z4.myshopify.com`, compte non partagé avec une
+autre marque (contrairement à Mediva/Babyspot, dont ce projet est adapté).
 
 ## Architecture
 
@@ -31,11 +30,9 @@ d'autre lien entre les trois.
   (`GetParcels`), détail + historique, demande de retour
   (`Return/Request`), réclamations (`Claims/*`, types toujours chargés
   dynamiquement via `Claims/Types`, jamais codés en dur).
-- **Création produit assistée** (`app/products/new`) : upload photo
-  (Vercel Blob) → Google Gemini génère uniquement le titre et la
-  description (`lib/gemini.ts`) → collection/tailles/tags/prix restent
-  déterministes (choisis à l'upload ou calculés en code) → écran de
-  relecture obligatoire → brouillon créé sur Shopify.
+
+Pas de création produit dans ce CRM : côté Mario Toys, cette partie est
+gérée séparément par `mario-toys-automation`.
 
 ## Mise en place (étapes manuelles, à faire une fois)
 
@@ -46,8 +43,9 @@ Voici les étapes, dans l'ordre :
 
 ### 1. Importer le projet sur Vercel
 
-1. Sur [vercel.com/new](https://vercel.com/new), importer le repo
-   `babyspotma-collab/mediva-crm`.
+1. Sur [vercel.com/new](https://vercel.com/new), importer le repo GitHub
+   de ce projet (adapter le nom ci-dessous à celui que vous utilisez
+   réellement).
 2. Ne pas déployer tout de suite — d'abord ajouter les variables d'env
    (étape 3).
 
@@ -66,40 +64,17 @@ Voici les étapes, dans l'ordre :
 | `DATABASE_URL` | injectée automatiquement par l'étape 2 |
 | `DASHBOARD_PASSWORD` | le mot de passe de votre choix pour accéder au dashboard |
 | `SESSION_SECRET` | chaîne aléatoire longue — générez avec `openssl rand -hex 32` |
-| `SHOPIFY_STORE` | `v5f0rs-mh.myshopify.com` |
-| `SHOPIFY_CLIENT_ID` | même valeur que dans `mediva-automation/.env` |
-| `SHOPIFY_CLIENT_SECRET` | même valeur que dans `mediva-automation/.env` |
+| `SHOPIFY_STORE` | `cvkf4d-z4.myshopify.com` |
+| `SHOPIFY_CLIENT_ID` | identifiant OAuth de l'app Shopify Mario Toys (voir `.env` local) |
+| `SHOPIFY_CLIENT_SECRET` | secret OAuth de l'app Shopify Mario Toys (voir `.env` local) |
+| `SHOPIFY_API_VERSION` | `2026-07` |
 | `FORCELOG_API_KEY` | votre clé API Forcelog |
 | `CRON_SECRET` | chaîne aléatoire, ex. `openssl rand -hex 16` — la même valeur devra être ajoutée dans les GitHub Secrets du repo (étape 6) |
-| `BLOB_READ_WRITE_TOKEN` | injectée automatiquement — Storage → Create → **Blob** (Marketplace), même principe que Postgres |
-| `GEMINI_API_KEY` | votre clé Google Gemini — voir étape 3bis ci-dessous |
-
-### 3bis. Obtenir une clé Google Gemini (gratuite, sans carte bancaire)
-
-Utilisée uniquement pour générer le titre et la description des fiches
-produit (`/products/new`) — tout le reste (collection, tags, tailles,
-prix) reste géré par du code, pas par l'IA.
-
-1. Ouvrez [aistudio.google.com](https://aistudio.google.com) et connectez-vous avec
-   n'importe quel compte Google.
-2. Cliquez sur **Get API key** (en haut à gauche, ou dans le menu latéral).
-3. Cliquez sur **Create API key**, puis **Create API key in new project**
-   (AI Studio crée un projet Google Cloud minimal pour vous — pas besoin
-   d'en créer un manuellement, pas de compte de facturation à ajouter
-   pour l'usage gratuit).
-4. Copiez la clé générée (elle commence par `AIza...`) et collez-la dans
-   `GEMINI_API_KEY` sur Vercel.
-
-Le niveau gratuit de Gemini 2.5 Flash couvre largement l'usage prévu ici
-(quelques fiches produit par jour). Si vous dépassez un jour le quota
-gratuit, Google affiche une erreur explicite plutôt que de facturer
-automatiquement — aucun risque de facture surprise sans passer à un plan
-payant.
 
 ### 4. Déployer
 
 Une fois les variables ajoutées, déployer. Noter l'URL de production
-(ex: `https://mediva-crm.vercel.app`).
+(ex: `https://mario-toys-crm.vercel.app`).
 
 ### 5. Créer les tables (une fois, depuis votre machine)
 
@@ -113,8 +88,8 @@ npm run db:push
 
 Le suivi Forcelog est déclenché par un workflow GitHub Actions, pas par
 Vercel Cron (limité à 1x/jour sur le plan Hobby). Il faut ajouter deux
-éléments dans le repo GitHub, sur
-`https://github.com/babyspotma-collab/mediva-crm/settings/secrets/actions` :
+éléments dans le repo GitHub, sous
+`https://github.com/<votre-org>/<votre-repo>/settings/secrets/actions` :
 
 1. Onglet **Secrets** → **New repository secret**
    - Nom : `CRON_SECRET`
@@ -124,7 +99,7 @@ Vercel Cron (limité à 1x/jour sur le plan Hobby). Il faut ajouter deux
 
 2. Onglet **Variables** → **New repository variable**
    - Nom : `CRM_BASE_URL`
-   - Valeur : l'URL de production, ex. `https://mediva-crm.vercel.app`
+   - Valeur : l'URL de production, ex. `https://mario-toys-crm.vercel.app`
      (sans `/` final)
 
 Le workflow tourne ensuite automatiquement toutes les 2h (12x/jour). Pour
@@ -135,7 +110,7 @@ manuel, grâce à `workflow_dispatch`) → vérifier que le job passe au vert.
 ### 7. Enregistrer le webhook Shopify
 
 ```bash
-node scripts/register-webhook.js https://mediva-crm.vercel.app
+node scripts/register-webhook.js https://mario-toys-crm.vercel.app
 ```
 
 (nécessite `SHOPIFY_STORE`, `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`
@@ -161,11 +136,3 @@ npm run dev
   en pratique, cause inconnue côté Forcelog) — géré sans planter
   (`app/parcels/[code]/page.tsx` affiche un message plutôt qu'une
   erreur), mais à surveiller si ça persiste sur de vrais colis livrés.
-- `lib/shopify-admin.ts` filtre les collections Mediva par titre exact
-  (liste figée `MEDIVA_COLLECTION_TITLES`) pour ne jamais montrer les
-  collections Babyspot (même compte Shopify partagé) — à mettre à jour
-  si une nouvelle collection Mediva est créée.
-- Le champ "marque" (tag automatique si visible sur la photo) n'est plus
-  généré depuis le passage à Gemini en portée restreinte (texte
-  uniquement) — à ajouter manuellement sur l'écran de relecture si
-  besoin, ou à réintroduire dans `lib/gemini.ts` si utile.

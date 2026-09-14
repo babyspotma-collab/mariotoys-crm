@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "Mediva CRM",
-  description: "Gestion des commandes Mediva et expédition Forcelog",
+  title: "Mario Toys CRM",
+  description: "Gestion des commandes Mario Toys et expédition Forcelog",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

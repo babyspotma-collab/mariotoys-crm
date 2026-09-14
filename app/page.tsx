@@ -33,13 +33,10 @@ export default async function DashboardPage() {
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold">Mediva CRM — Commandes</h1>
+        <h1 className="text-xl font-semibold">Mario Toys CRM — Commandes</h1>
         <div className="flex items-center gap-4">
           <a href="/parcels" className="text-sm text-muted hover:text-ink">
             Suivi Forcelog
-          </a>
-          <a href="/products/new" className="text-sm text-muted hover:text-ink">
-            + Nouveau produit
           </a>
           <a href="/orders/new" className="btn-primary">
             + Nouvelle commande

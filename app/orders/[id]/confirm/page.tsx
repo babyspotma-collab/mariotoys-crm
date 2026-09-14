@@ -21,7 +21,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
   }
 
   const defaultProductNature =
-    order.items.map((i) => `${i.title} x${i.quantity}`).join(", ") || "Textile médical";
+    order.items.map((i) => `${i.title} x${i.quantity}`).join(", ") || "Jouet";
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10">

@@ -1,8 +1,8 @@
 import crypto from "crypto";
 
 // Vérifie la signature HMAC-SHA256 d'un webhook Shopify (header
-// X-Shopify-Hmac-Sha256), calculée avec le client secret de l'app —
-// le même que SHOPIFY_CLIENT_SECRET utilisé dans mediva-automation.
+// X-Shopify-Hmac-Sha256), calculée avec le client secret de l'app
+// (SHOPIFY_CLIENT_SECRET).
 export function verifyShopifyWebhook(rawBody: string, hmacHeader: string | null): boolean {
   const secret = process.env.SHOPIFY_CLIENT_SECRET;
   if (!secret || !hmacHeader) return false;

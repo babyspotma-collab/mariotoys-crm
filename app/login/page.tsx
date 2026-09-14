@@ -8,7 +8,7 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center px-6">
       <form action={login} className="w-full max-w-sm bg-white border border-line rounded-2xl p-8">
-        <h1 className="text-xl font-semibold mb-1">Mediva CRM</h1>
+        <h1 className="text-xl font-semibold mb-1">Mario Toys CRM</h1>
         <p className="text-sm text-muted mb-6">Accès réservé.</p>
 
         <label className="block text-sm font-medium mb-2" htmlFor="password">
