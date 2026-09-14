@@ -1,0 +1,26 @@
+name: Sync Forcelog tracking
+
+# Remplace le cron natif Vercel (limité à 1x/jour sur le plan Hobby) :
+# GitHub Actions n'a pas cette limite, donc on peut appeler l'endpoint
+# toutes les 2h (12x/jour) gratuitement.
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {} # permet de déclencher manuellement depuis l'onglet Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler /api/cron/sync-tracking
+        run: |
+          http_code=$(curl -s -o response.json -w "%{http_code}" \
+            -X GET "${{ vars.CRM_BASE_URL }}/api/cron/sync-tracking" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "Réponse HTTP $http_code :"
+          cat response.json
+          if [ "$http_code" -ge 400 ]; then
+            echo "::error::sync-tracking a échoué avec le code $http_code"
+            exit 1
+          fi

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getParcel } from "@/lib/forcelog";
 
-// Forcelog n'a pas de webhooks : ce cron (voir vercel.json, toutes les
-// 20 min) interroge leur API pour chaque commande confirmée et met à
-// jour le statut connu. Protégé par CRON_SECRET (Vercel l'envoie
-// automatiquement en Authorization: Bearer <secret> pour ses propres
-// cron jobs quand la variable d'env est définie).
+// Forcelog n'a pas de webhooks : ce statut est synchronisé par appel
+// périodique à cet endpoint. Déclenché par GitHub Actions toutes les 2h
+// (.github/workflows/sync-tracking.yml) plutôt que par le cron natif
+// Vercel, limité à 1x/jour sur le plan Hobby. Protégé par CRON_SECRET,
+// envoyé en Authorization: Bearer <secret> — peu importe l'appelant, la
+// vérification est la même.
 //
 // NB: le nom exact du champ de statut dans la réponse GetParcel n'est
 // pas garanti par la doc fournie — plusieurs variantes sont tentées.

@@ -17,10 +17,11 @@ d'autre lien entre les trois.
   Confirmer/Annuler.
 - **Confirmer** (`app/orders/actions.ts`) : crée le colis via l'API
   Forcelog (`AddParcel`), stocke le code colis renvoyé.
-- **Suivi Forcelog** : Forcelog n'a pas de webhooks → un cron Vercel
-  (`vercel.json`, toutes les 20 min) interroge `GetParcel` pour chaque
-  commande confirmée et met à jour le statut connu
-  (`app/api/cron/sync-tracking/route.ts`).
+- **Suivi Forcelog** : Forcelog n'a pas de webhooks → un workflow GitHub
+  Actions (`.github/workflows/sync-tracking.yml`, toutes les 2h — le
+  cron natif Vercel est limité à 1x/jour sur le plan Hobby) appelle
+  `/api/cron/sync-tracking`, qui interroge `GetParcel` pour chaque
+  commande confirmée et met à jour le statut connu.
 - **Auth** : mot de passe unique (usage solo), cookie de session signé
   HMAC — pas de table utilisateurs (`lib/auth.ts`, `middleware.ts`).
 
@@ -57,7 +58,7 @@ Voici les étapes, dans l'ordre :
 | `SHOPIFY_CLIENT_ID` | même valeur que dans `mediva-automation/.env` |
 | `SHOPIFY_CLIENT_SECRET` | même valeur que dans `mediva-automation/.env` |
 | `FORCELOG_API_KEY` | votre clé API Forcelog |
-| `CRON_SECRET` | chaîne aléatoire — Vercel l'envoie automatiquement au cron une fois définie |
+| `CRON_SECRET` | chaîne aléatoire, ex. `openssl rand -hex 16` — la même valeur devra être ajoutée dans les GitHub Secrets du repo (étape 6) |
 
 ### 4. Déployer
 
@@ -72,7 +73,30 @@ npm install
 npm run db:push
 ```
 
-### 6. Enregistrer le webhook Shopify
+### 6. Activer la synchronisation Forcelog (GitHub Actions)
+
+Le suivi Forcelog est déclenché par un workflow GitHub Actions, pas par
+Vercel Cron (limité à 1x/jour sur le plan Hobby). Il faut ajouter deux
+éléments dans le repo GitHub, sur
+`https://github.com/babyspotma-collab/mediva-crm/settings/secrets/actions` :
+
+1. Onglet **Secrets** → **New repository secret**
+   - Nom : `CRON_SECRET`
+   - Valeur : **exactement la même valeur** que celle définie dans les
+     variables d'environnement Vercel à l'étape 3 (sinon l'appel sera
+     rejeté avec une erreur 401).
+
+2. Onglet **Variables** → **New repository variable**
+   - Nom : `CRM_BASE_URL`
+   - Valeur : l'URL de production, ex. `https://mediva-crm.vercel.app`
+     (sans `/` final)
+
+Le workflow tourne ensuite automatiquement toutes les 2h (12x/jour). Pour
+vérifier qu'il fonctionne sans attendre : onglet **Actions** du repo →
+sélectionner "Sync Forcelog tracking" → **Run workflow** (déclenchement
+manuel, grâce à `workflow_dispatch`) → vérifier que le job passe au vert.
+
+### 7. Enregistrer le webhook Shopify
 
 ```bash
 node scripts/register-webhook.js https://mediva-crm.vercel.app
@@ -81,7 +105,7 @@ node scripts/register-webhook.js https://mediva-crm.vercel.app
 (nécessite `SHOPIFY_STORE`, `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`
 dans `.env` ou `.env.local` local)
 
-### 7. Se connecter
+### 8. Se connecter
 
 Ouvrir l'URL de production, entrer `DASHBOARD_PASSWORD`.
 
