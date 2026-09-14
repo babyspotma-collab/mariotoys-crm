@@ -318,6 +318,42 @@ export async function createDraftProduct(input: CreateDraftProductInput): Promis
     throw new Error(`Ajout à la collection: ${JSON.stringify(collData.collectionAddProducts.userErrors)}`);
   }
 
+  // Un produit DRAFT/ACTIVE n'est pas automatiquement visible sur le
+  // site : il faut aussi le publier explicitement sur le canal "Online
+  // Store" (Publication), sans quoi il reste invisible sur mediva même
+  // une fois passé en Active à la main. productPublish/publicationUpdate
+  // sont dépréciés en faveur de publishablePublish — vérifié par
+  // introspection du schéma réel avant d'écrire ce code.
+  const onlineStoreId = await getOnlineStorePublicationId();
+  const publishData = await gql<{
+    publishablePublish: { userErrors: { field: string[]; message: string }[] };
+  }>(
+    `mutation ($id: ID!, $input: [PublicationInput!]!) {
+      publishablePublish(id: $id, input: $input) {
+        userErrors { field message }
+      }
+    }`,
+    { id: productId, input: [{ publicationId: onlineStoreId }] }
+  );
+  if (publishData.publishablePublish.userErrors.length > 0) {
+    throw new Error(`Publication sur Online Store: ${JSON.stringify(publishData.publishablePublish.userErrors)}`);
+  }
+
   const numericId = productId.split("/").pop();
   return { id: productId, adminUrl: `https://${STORE}/admin/products/${numericId}` };
+}
+
+let cachedOnlineStorePublicationId: string | null = null;
+
+async function getOnlineStorePublicationId(): Promise<string> {
+  if (cachedOnlineStorePublicationId) return cachedOnlineStorePublicationId;
+
+  const data = await gql<{ publications: { edges: { node: { id: string; name: string } }[] } }>(
+    `query { publications(first: 10) { edges { node { id name } } } }`
+  );
+  const onlineStore = data.publications.edges.find((e) => e.node.name === "Online Store");
+  if (!onlineStore) throw new Error('Canal de publication "Online Store" introuvable');
+
+  cachedOnlineStorePublicationId = onlineStore.node.id;
+  return cachedOnlineStorePublicationId;
 }
