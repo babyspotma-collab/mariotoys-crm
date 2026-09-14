@@ -4,19 +4,21 @@
 // et le prix restent gérés par du code déterministe (voir
 // app/products/new/actions.ts et lib/pricing.ts), pas par l'IA.
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// Google a retiré generateContent au profit de l'Interactions API (GA
+// depuis juin 2026, https://ai.google.dev/gemini-api/docs/migrate-to-interactions)
+// et renommé le SDK Node (@google/generative-ai -> @google/genai) — donc
+// pas qu'un changement de nom de modèle, vérifié contre la doc officielle
+// avant d'écrire ce code (generateContent restait cité comme "toujours
+// supporté" mais l'Interactions API est désormais la voie recommandée).
+import { GoogleGenAI } from "@google/genai";
 import { readBlob } from "@/lib/blob";
 
 // Instancié à l'appel, pas au chargement du module : évite qu'une
 // GEMINI_API_KEY absente fasse planter toute page qui importe ce fichier
 // (même principe que lib/forcelog.ts pour FORCELOG_API_KEY).
-function getModel() {
+function getClient(): GoogleGenAI {
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY manquant");
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: { responseMimeType: "application/json" },
-  });
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 }
 
 const SYSTEM_PROMPT = `Tu rédiges le texte de fiches produit pour Mediva, une marque
@@ -35,30 +37,48 @@ export type ProductText = { title: string; about: string; features: string[] };
 
 // Store Blob privé : lecture via get() (lib/blob.ts), pas un fetch()
 // direct de l'URL (non publiquement accessible).
-async function imageToInlinePart(pathname: string) {
+async function imageToContentPart(pathname: string) {
   const { buffer, contentType } = await readBlob(pathname);
-  return { inlineData: { mimeType: contentType, data: buffer.toString("base64") } };
+  return { type: "image" as const, mime_type: contentType, data: buffer.toString("base64") };
 }
+
+const RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    about: { type: "string" },
+    features: { type: "array", items: { type: "string" } },
+  },
+  required: ["title", "about", "features"],
+};
 
 export async function generateProductText(
   imagePathnames: string[],
   sizes: string[],
   price: number
 ): Promise<ProductText> {
-  const imageParts = await Promise.all(imagePathnames.map(imageToInlinePart));
-  const model = getModel();
+  const imageParts = await Promise.all(imagePathnames.map(imageToContentPart));
+  const client = getClient();
 
-  const result = await model.generateContent([
-    SYSTEM_PROMPT,
-    ...imageParts,
-    `Tailles disponibles : ${sizes.join(", ")}. Prix de vente : ${price} DH. Génère le titre et la description pour ces photos.`,
-  ]);
+  const interaction = await client.interactions.create({
+    model: "gemini-3.6-flash",
+    system_instruction: SYSTEM_PROMPT,
+    input: [
+      ...imageParts,
+      {
+        type: "text",
+        text: `Tailles disponibles : ${sizes.join(", ")}. Prix de vente : ${price} DH. Génère le titre et la description pour ces photos.`,
+      },
+    ],
+    response_format: [{ type: "text", mime_type: "application/json", schema: RESPONSE_SCHEMA }],
+  });
 
+  const outputText = interaction.output_text ?? "";
   let parsed: Partial<ProductText>;
   try {
-    parsed = JSON.parse(result.response.text());
+    parsed = JSON.parse(outputText);
   } catch {
-    throw new Error(`Réponse Gemini non-JSON : ${result.response.text().slice(0, 300)}`);
+    throw new Error(`Réponse Gemini non-JSON : ${outputText.slice(0, 300)}`);
   }
 
   const title = String(parsed.title ?? "").trim();
