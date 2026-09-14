@@ -12,7 +12,10 @@ datasource db {
 // (on ne connaît pas leur vocabulaire exact, donc pas de traduction figée ici).
 model Order {
   id               String      @id @default(cuid())
-  shopifyOrderId   String      @unique
+  // Nul pour les commandes créées manuellement dans le CRM (Module 1) —
+  // Postgres autorise plusieurs NULL sous une contrainte unique.
+  shopifyOrderId   String?     @unique
+  source           OrderSource @default(SHOPIFY)
   orderNumber      String
   customerName     String
   address          String
@@ -28,11 +31,12 @@ model Order {
   comment          String?
   fragile          Boolean     @default(false)
 
-  forcelogCode          String? // code colis renvoyé par AddParcel
-  forcelogStatus        String? // dernier statut brut connu (GetTracking/GetParcel)
-  forcelogError         String? // dernière erreur Forcelog (ex: ville non reconnue)
-  forcelogProductNature String? // "PRODUCT_NATURE" effectivement envoyé à AddParcel
-  forcelogSyncedAt      DateTime?
+  forcelogCode            String? // code colis renvoyé par AddParcel
+  forcelogStatus          String? // dernier statut brut connu (GetTracking/GetParcel)
+  forcelogError           String? // dernière erreur Forcelog (ex: ville non reconnue)
+  forcelogProductNature   String? // "PRODUCT_NATURE" effectivement envoyé à AddParcel
+  forcelogTrackingHistory Json? // dernier historique GetTracking connu, mis à jour par le cron
+  forcelogSyncedAt        DateTime?
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -56,4 +60,9 @@ enum OrderStatus {
   NOUVELLE
   CONFIRMEE
   ANNULEE
+}
+
+enum OrderSource {
+  SHOPIFY
+  MANUEL
 }

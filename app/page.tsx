@@ -34,9 +34,14 @@ export default async function DashboardPage() {
     <main className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold">Mediva CRM — Commandes</h1>
-        <form action={logout}>
-          <button className="text-sm text-muted hover:text-ink">Se déconnecter</button>
-        </form>
+        <div className="flex items-center gap-4">
+          <a href="/orders/new" className="btn-primary">
+            + Nouvelle commande
+          </a>
+          <form action={logout}>
+            <button className="text-sm text-muted hover:text-ink">Se déconnecter</button>
+          </form>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-10">
@@ -65,6 +70,9 @@ export default async function DashboardPage() {
               <div>
                 <p className="font-medium">
                   #{order.orderNumber} — {order.customerName}
+                  {order.source === "MANUEL" && (
+                    <span className="badge bg-slate/20 text-slate ml-2 align-middle">Manuel</span>
+                  )}
                 </p>
                 <p className="text-sm text-muted">
                   {order.address}, {order.city} · {order.phone}
