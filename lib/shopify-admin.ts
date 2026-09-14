@@ -3,6 +3,8 @@
 // Utilisé pour : le sélecteur produit du Module 1 (commande manuelle) et
 // la création de fiche produit du Module 3.
 
+import { presignBlobForExternalFetch } from "@/lib/blob";
+
 const STORE = process.env.SHOPIFY_STORE;
 const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
@@ -144,10 +146,12 @@ export async function listCollections(): Promise<ShopifyCollection[]> {
 
 // ─── Création de produit (Module 3) ───────────────────────────────────────────
 // Même flow que mediva-automation/create-product.js (productCreate ->
-// productOptionsCreate -> productVariantsBulkCreate/Update), mais les
-// images viennent de Vercel Blob (déjà des URLs HTTPS publiques) donc
-// productCreateMedia les prend directement en originalSource — pas
-// besoin du staged-upload nécessaire pour des fichiers locaux.
+// productOptionsCreate -> productVariantsBulkCreate/Update). Le store
+// Blob est privé (https://vercel.com/docs/vercel-blob/private-storage) :
+// Shopify ne peut pas fetch nos pathnames directement, donc on génère une
+// URL signée temporaire (5 min, largement suffisant) juste avant l'appel
+// productCreateMedia plutôt que de passer par le staged-upload prévu pour
+// des fichiers locaux.
 
 export type CreateDraftProductInput = {
   title: string;
@@ -157,7 +161,7 @@ export type CreateDraftProductInput = {
   price: number;
   compareAtPrice: number;
   cost: number;
-  imageUrls: string[];
+  imagePathnames: string[];
   collectionId: string;
 };
 
@@ -273,7 +277,9 @@ export async function createDraftProduct(input: CreateDraftProductInput): Promis
     }
   }
 
-  if (input.imageUrls.length > 0) {
+  if (input.imagePathnames.length > 0) {
+    const signedUrls = await Promise.all(input.imagePathnames.map(presignBlobForExternalFetch));
+
     const mediaData = await gql<{
       productCreateMedia: { mediaUserErrors: { field: string[]; message: string }[] };
     }>(
@@ -284,7 +290,7 @@ export async function createDraftProduct(input: CreateDraftProductInput): Promis
       }`,
       {
         productId,
-        media: input.imageUrls.map((url) => ({ originalSource: url, mediaContentType: "IMAGE" })),
+        media: signedUrls.map((url) => ({ originalSource: url, mediaContentType: "IMAGE" })),
       }
     );
     if (mediaData.productCreateMedia.mediaUserErrors.length > 0) {

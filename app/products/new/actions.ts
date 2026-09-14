@@ -34,12 +34,15 @@ export async function generateDraft(
     return { error: "Choisissez une collection." };
   }
 
-  let imageUrls: string[];
+  // Store Blob configuré en accès privé (mediva-crm-app-blob) : les URLs
+  // renvoyées ne sont pas publiquement accessibles, on stocke le pathname
+  // et on relit via lib/blob.ts (get()) ou une URL signée (Shopify).
+  let imagePathnames: string[];
   try {
     const uploaded = await Promise.all(
-      files.map((file) => put(`products/${Date.now()}-${file.name}`, file, { access: "public" }))
+      files.map((file) => put(`products/${Date.now()}-${file.name}`, file, { access: "private" }))
     );
-    imageUrls = uploaded.map((u) => u.url);
+    imagePathnames = uploaded.map((u) => u.pathname);
   } catch (err) {
     return { error: `Échec de l'upload photo : ${err instanceof Error ? err.message : String(err)}` };
   }
@@ -49,7 +52,7 @@ export async function generateDraft(
 
   let text;
   try {
-    text = await generateProductText(imageUrls, sizes, price);
+    text = await generateProductText(imagePathnames, sizes, price);
   } catch (err) {
     return { error: `Échec de la génération du texte : ${err instanceof Error ? err.message : String(err)}` };
   }
@@ -59,7 +62,7 @@ export async function generateDraft(
 
   const draft = await prisma.productDraft.create({
     data: {
-      imageUrls,
+      imagePathnames,
       cost,
       title: text.title,
       about: text.about,

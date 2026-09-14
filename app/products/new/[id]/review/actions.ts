@@ -50,7 +50,7 @@ export async function createProduct(
       price,
       compareAtPrice,
       cost: Number(draft.cost),
-      imageUrls: draft.imageUrls as string[],
+      imagePathnames: draft.imagePathnames as string[],
       collectionId,
     });
     adminUrl = product.adminUrl;

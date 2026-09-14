@@ -27,9 +27,14 @@ export default async function ReviewPage({ params }: { params: { id: string } })
       </p>
 
       <div className="grid grid-cols-3 gap-2 mb-6">
-        {(draft.imageUrls as string[]).map((url) => (
+        {(draft.imagePathnames as string[]).map((pathname) => (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={url} src={url} alt="" className="aspect-square object-cover rounded-lg border border-line" />
+          <img
+            key={pathname}
+            src={`/api/blob?pathname=${encodeURIComponent(pathname)}`}
+            alt=""
+            className="aspect-square object-cover rounded-lg border border-line"
+          />
         ))}
       </div>
 

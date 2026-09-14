@@ -5,6 +5,7 @@
 // app/products/new/actions.ts et lib/pricing.ts), pas par l'IA.
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { readBlob } from "@/lib/blob";
 
 // Instancié à l'appel, pas au chargement du module : évite qu'une
 // GEMINI_API_KEY absente fasse planter toute page qui importe ce fichier
@@ -32,20 +33,19 @@ Règles strictes :
 
 export type ProductText = { title: string; about: string; features: string[] };
 
-async function imageToInlinePart(url: string) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Téléchargement image échoué (${res.status}): ${url}`);
-  const mimeType = res.headers.get("content-type") || "image/jpeg";
-  const buffer = Buffer.from(await res.arrayBuffer());
-  return { inlineData: { mimeType, data: buffer.toString("base64") } };
+// Store Blob privé : lecture via get() (lib/blob.ts), pas un fetch()
+// direct de l'URL (non publiquement accessible).
+async function imageToInlinePart(pathname: string) {
+  const { buffer, contentType } = await readBlob(pathname);
+  return { inlineData: { mimeType: contentType, data: buffer.toString("base64") } };
 }
 
 export async function generateProductText(
-  imageUrls: string[],
+  imagePathnames: string[],
   sizes: string[],
   price: number
 ): Promise<ProductText> {
-  const imageParts = await Promise.all(imageUrls.map(imageToInlinePart));
+  const imageParts = await Promise.all(imagePathnames.map(imageToInlinePart));
   const model = getModel();
 
   const result = await model.generateContent([
