@@ -24,6 +24,18 @@ d'autre lien entre les trois.
   commande confirmée et met à jour le statut connu.
 - **Auth** : mot de passe unique (usage solo), cookie de session signé
   HMAC — pas de table utilisateurs (`lib/auth.ts`, `middleware.ts`).
+- **Commande manuelle** (`app/orders/new`) : pour les commandes prises par
+  téléphone/WhatsApp, catalogue Shopify réel (`lib/shopify-admin.ts`),
+  rejoint ensuite le même workflow que les commandes Shopify.
+- **Suivi/retours/réclamations Forcelog** (`app/parcels`) : liste live
+  (`GetParcels`), détail + historique, demande de retour
+  (`Return/Request`), réclamations (`Claims/*`, types toujours chargés
+  dynamiquement via `Claims/Types`, jamais codés en dur).
+- **Création produit assistée** (`app/products/new`) : upload photo
+  (Vercel Blob) → Google Gemini génère uniquement le titre et la
+  description (`lib/gemini.ts`) → collection/tailles/tags/prix restent
+  déterministes (choisis à l'upload ou calculés en code) → écran de
+  relecture obligatoire → brouillon créé sur Shopify.
 
 ## Mise en place (étapes manuelles, à faire une fois)
 
@@ -59,6 +71,30 @@ Voici les étapes, dans l'ordre :
 | `SHOPIFY_CLIENT_SECRET` | même valeur que dans `mediva-automation/.env` |
 | `FORCELOG_API_KEY` | votre clé API Forcelog |
 | `CRON_SECRET` | chaîne aléatoire, ex. `openssl rand -hex 16` — la même valeur devra être ajoutée dans les GitHub Secrets du repo (étape 6) |
+| `BLOB_READ_WRITE_TOKEN` | injectée automatiquement — Storage → Create → **Blob** (Marketplace), même principe que Postgres |
+| `GEMINI_API_KEY` | votre clé Google Gemini — voir étape 3bis ci-dessous |
+
+### 3bis. Obtenir une clé Google Gemini (gratuite, sans carte bancaire)
+
+Utilisée uniquement pour générer le titre et la description des fiches
+produit (`/products/new`) — tout le reste (collection, tags, tailles,
+prix) reste géré par du code, pas par l'IA.
+
+1. Ouvrez [aistudio.google.com](https://aistudio.google.com) et connectez-vous avec
+   n'importe quel compte Google.
+2. Cliquez sur **Get API key** (en haut à gauche, ou dans le menu latéral).
+3. Cliquez sur **Create API key**, puis **Create API key in new project**
+   (AI Studio crée un projet Google Cloud minimal pour vous — pas besoin
+   d'en créer un manuellement, pas de compte de facturation à ajouter
+   pour l'usage gratuit).
+4. Copiez la clé générée (elle commence par `AIza...`) et collez-la dans
+   `GEMINI_API_KEY` sur Vercel.
+
+Le niveau gratuit de Gemini 2.5 Flash couvre largement l'usage prévu ici
+(quelques fiches produit par jour). Si vous dépassez un jour le quota
+gratuit, Google affiche une erreur explicite plutôt que de facturer
+automatiquement — aucun risque de facture surprise sans passer à un plan
+payant.
 
 ### 4. Déployer
 
@@ -120,15 +156,16 @@ npm run dev
 
 ## Limites connues / à ajuster avec l'usage réel
 
-- Les champs exacts requis par `Forcelog/AddParcel` au-delà de
-  `ORDER_NUM, RECEIVER, PHONE, CITY, ADDRESS, COD, PRODUCT_NATURE` ne
-  sont pas garantis (doc partielle) — en cas d'erreur de validation,
-  elle s'affiche sur la commande dans le dashboard (`forcelogError`)
-  pour ajustement du code.
-- Le nom du champ de statut dans la réponse `GetParcel` est deviné
-  (`STATUS`/`Status`/`status`/`PARCEL_STATUS`) — à confirmer avec une
-  vraie réponse et ajuster `extractStatus()` dans
-  `app/api/cron/sync-tracking/route.ts` si besoin.
-- Pas de mapping ville Shopify → code ville Forcelog : le nom de ville
-  brut de la commande est envoyé tel quel. Si `GetCities` exige un code
-  précis, il faudra ajouter une étape de correspondance.
+- `GetParcel`/`GetTracking` peuvent renvoyer "Parcel code Not Found"
+  même pour un colis valide tout juste listé par `GetParcels` (observé
+  en pratique, cause inconnue côté Forcelog) — géré sans planter
+  (`app/parcels/[code]/page.tsx` affiche un message plutôt qu'une
+  erreur), mais à surveiller si ça persiste sur de vrais colis livrés.
+- `lib/shopify-admin.ts` filtre les collections Mediva par titre exact
+  (liste figée `MEDIVA_COLLECTION_TITLES`) pour ne jamais montrer les
+  collections Babyspot (même compte Shopify partagé) — à mettre à jour
+  si une nouvelle collection Mediva est créée.
+- Le champ "marque" (tag automatique si visible sur la photo) n'est plus
+  généré depuis le passage à Gemini en portée restreinte (texte
+  uniquement) — à ajouter manuellement sur l'écran de relecture si
+  besoin, ou à réintroduire dans `lib/gemini.ts` si utile.

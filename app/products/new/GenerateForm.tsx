@@ -2,17 +2,18 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { generateDraft, type GenerateState } from "./actions";
+import type { ShopifyCollection } from "@/lib/shopify-admin";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="btn-primary" disabled={pending}>
-      {pending ? "Génération en cours… (peut prendre 10-20s)" : "Générer la fiche"}
+      {pending ? "Génération en cours…" : "Générer la fiche"}
     </button>
   );
 }
 
-export default function GenerateForm() {
+export default function GenerateForm({ collections }: { collections: ShopifyCollection[] }) {
   const initialState: GenerateState = { error: null };
   const [state, formAction] = useFormState(generateDraft, initialState);
 
@@ -27,14 +28,46 @@ export default function GenerateForm() {
         <label className="block text-sm font-medium mb-1" htmlFor="photos">
           Photos du produit
         </label>
-        <input
-          id="photos"
-          name="photos"
-          type="file"
-          accept="image/*"
-          multiple
+        <input id="photos" name="photos" type="file" accept="image/*" multiple required className="w-full text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1" htmlFor="collectionId">
+          Collection
+        </label>
+        <select
+          id="collectionId"
+          name="collectionId"
           required
-          className="w-full text-sm"
+          onChange={(e) => {
+            const opt = e.target.selectedOptions[0];
+            const hidden = document.getElementById("collectionTitle") as HTMLInputElement | null;
+            if (hidden) hidden.value = opt?.text ?? "";
+          }}
+          className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white"
+        >
+          <option value="" disabled selected>
+            {collections.length === 0 ? "Liste indisponible" : "Choisir une collection…"}
+          </option>
+          {collections.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+            </option>
+          ))}
+        </select>
+        <input type="hidden" id="collectionTitle" name="collectionTitle" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1" htmlFor="sizes">
+          Tailles disponibles <span className="text-muted font-normal">(séparées par des virgules)</span>
+        </label>
+        <input
+          id="sizes"
+          name="sizes"
+          required
+          defaultValue="S, M, L, XL"
+          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
         />
       </div>
 

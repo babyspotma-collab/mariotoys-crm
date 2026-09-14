@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { createDraftProduct } from "@/lib/shopify-admin";
-import { buildDescriptionHtml } from "@/lib/claude";
+import { buildDescriptionHtml } from "@/lib/gemini";
 
 export type ReviewState = { error: string | null };
 
