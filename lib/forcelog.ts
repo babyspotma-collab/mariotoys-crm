@@ -100,30 +100,81 @@ export function addParcel(input: AddParcelInput) {
   });
 }
 
+// Forme réelle confirmée : { "GET-PARCEL": { RESULT, ... } } — mêmes
+// champs que dans ParcelSummary ci-dessous côté succès. Note observée en
+// pratique : un colis tout juste renvoyé par GetParcels peut répondre
+// "Parcel code Not Found" ici (délai d'indexation côté Forcelog ?) — le
+// code appelant doit tolérer l'échec plutôt que le traiter comme fatal.
 export function getParcel(code: string) {
-  return request<Record<string, unknown>>(
+  return request<{ "GET-PARCEL": Record<string, unknown> }>(
     `/customer/Parcels/GetParcel?Code=${encodeURIComponent(code)}`
   );
 }
 
-export function getParcels(params: {
+export type ParcelSummary = {
+  code: string; // TRACKING_NUMBER
+  orderNum: string;
+  receiver: string;
+  phone: string;
+  cityName: string;
+  address: string;
+  price: number;
+  productNature: string;
+  status: string; // libellé FR, ex: "Attente De Ramassage"
+  statusCode: string; // ex: "WAITING_PICKUP"
+  situation: string; // ex: "Non Payé"
+  createdAt: string;
+};
+
+// Forme réelle confirmée : { "GET-PARCELS": { RESULT, TOTAL, PAGE, LIMIT,
+// PARCELS: [{ TRACKING_NUMBER, ORDER_NUM, RECEIVER, PHONE, CITY_NAME,
+// ADDRESS, PRICE, PRODUCT_NATURE, STATUS, STATUS_CODE, SITUATION,
+// CREATION_TIME, ... }] } }.
+export async function getParcels(params: {
   page?: number;
   limit?: number;
   status?: string;
   dateFrom?: string;
   dateTo?: string;
-}) {
+}): Promise<{ total: number; page: number; parcels: ParcelSummary[] }> {
   const qs = new URLSearchParams();
   if (params.page) qs.set("PAGE", String(params.page));
   if (params.limit) qs.set("LIMIT", String(params.limit));
   if (params.status) qs.set("STATUS", params.status);
   if (params.dateFrom) qs.set("DATE_FROM", params.dateFrom);
   if (params.dateTo) qs.set("DATE_TO", params.dateTo);
-  return request<Record<string, unknown>>(`/customer/Parcels/GetParcels?${qs.toString()}`);
+
+  const raw = await request<{
+    "GET-PARCELS": { TOTAL: number; PAGE: number; PARCELS: Record<string, any>[] };
+  }>(`/customer/Parcels/GetParcels?${qs.toString()}`);
+
+  const data = raw["GET-PARCELS"];
+  return {
+    total: data.TOTAL ?? 0,
+    page: data.PAGE ?? 1,
+    parcels: (data.PARCELS ?? []).map((p) => ({
+      code: String(p.TRACKING_NUMBER ?? ""),
+      orderNum: String(p.ORDER_NUM ?? ""),
+      receiver: String(p.RECEIVER ?? ""),
+      phone: String(p.PHONE ?? ""),
+      cityName: String(p.CITY_NAME ?? ""),
+      address: String(p.ADDRESS ?? ""),
+      price: parseFloat(p.PRICE ?? "0"),
+      productNature: String(p.PRODUCT_NATURE ?? ""),
+      status: String(p.STATUS ?? ""),
+      statusCode: String(p.STATUS_CODE ?? ""),
+      situation: String(p.SITUATION ?? ""),
+      createdAt: String(p.CREATION_TIME ?? ""),
+    })),
+  };
 }
 
+// Forme non confirmée au-delà de l'enveloppe "GET-TRACKING" (même
+// convention que les autres endpoints Parcels) — champ d'historique
+// deviné ("HISTORY"), à ajuster si besoin une fois un colis avec un vrai
+// historique disponible pour tester.
 export function getTracking(code: string) {
-  return request<{ history?: Array<{ status: string; date: string; [k: string]: unknown }> }>(
+  return request<{ "GET-TRACKING": { HISTORY?: Array<Record<string, unknown>> } }>(
     `/customer/Parcels/GetTracking?Code=${encodeURIComponent(code)}`
   );
 }
@@ -196,18 +247,11 @@ export type ClaimType = {
   needsOpenParcel: boolean;
 };
 
-// Forme exacte de la réponse non garantie au-delà de "liste de { ID,
-// LABEL, REQUIRES, CHANGES_PARCEL, NEEDS_OPEN_PARCEL }" — tableau direct
-// ou enveloppé toléré.
+// Forme réelle confirmée : { CLAIMS: { RESULT, COUNT, TYPES: [{ ID,
+// LABEL, REQUIRES, CHANGES_PARCEL, NEEDS_OPEN_PARCEL }] } }.
 export async function getClaimTypes(): Promise<ClaimType[]> {
-  const raw = await request<any>("/customer/Claims/Types");
-  const list: any[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray(raw?.TYPES)
-      ? raw.TYPES
-      : Array.isArray(raw?.DATA)
-        ? raw.DATA
-        : [];
+  const raw = await request<{ CLAIMS?: { TYPES?: any[] } }>("/customer/Claims/Types");
+  const list: any[] = raw.CLAIMS?.TYPES ?? [];
 
   return list
     .map((t) => ({

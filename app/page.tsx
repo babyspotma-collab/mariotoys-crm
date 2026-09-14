@@ -35,6 +35,9 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold">Mediva CRM — Commandes</h1>
         <div className="flex items-center gap-4">
+          <a href="/parcels" className="text-sm text-muted hover:text-ink">
+            Suivi Forcelog
+          </a>
           <a href="/orders/new" className="btn-primary">
             + Nouvelle commande
           </a>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getParcel } from "@/lib/forcelog";
+import { getParcel, getTracking } from "@/lib/forcelog";
 
 // Forcelog n'a pas de webhooks : ce statut est synchronisé par appel
 // périodique à cet endpoint. Déclenché par GitHub Actions toutes les 2h
@@ -8,16 +8,6 @@ import { getParcel } from "@/lib/forcelog";
 // Vercel, limité à 1x/jour sur le plan Hobby. Protégé par CRON_SECRET,
 // envoyé en Authorization: Bearer <secret> — peu importe l'appelant, la
 // vérification est la même.
-//
-// NB: le nom exact du champ de statut dans la réponse GetParcel n'est
-// pas garanti par la doc fournie — plusieurs variantes sont tentées.
-function extractStatus(parcel: Record<string, unknown>): string | null {
-  for (const key of ["STATUS", "Status", "status", "PARCEL_STATUS"]) {
-    const value = parcel[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return null;
-}
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -32,12 +22,25 @@ export async function GET(req: NextRequest) {
 
     const results = await Promise.allSettled(
       orders.map(async (order) => {
-        const parcel = await getParcel(order.forcelogCode!);
-        const status = extractStatus(parcel);
+        const code = order.forcelogCode!;
+        const [parcel, tracking] = await Promise.allSettled([getParcel(code), getTracking(code)]);
+
+        const status =
+          parcel.status === "fulfilled"
+            ? String(parcel.value["GET-PARCEL"]?.STATUS ?? "")
+            : null;
+        const history =
+          tracking.status === "fulfilled" ? tracking.value["GET-TRACKING"]?.HISTORY ?? null : null;
+
+        // Un échec ici (ex: "Parcel code Not Found", observé même sur des
+        // colis valides côté Forcelog) ne doit pas faire échouer tout le
+        // cron pour les autres commandes — on garde juste l'ancienne
+        // valeur connue dans ce cas.
         await prisma.order.update({
           where: { id: order.id },
           data: {
-            forcelogStatus: status ?? order.forcelogStatus,
+            forcelogStatus: status || order.forcelogStatus,
+            forcelogTrackingHistory: (history ?? order.forcelogTrackingHistory ?? undefined) as any,
             forcelogSyncedAt: new Date(),
           },
         });
