@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { logout } from "./actions";
-import { confirmOrder, cancelOrder } from "./orders/actions";
+import { cancelOrder } from "./orders/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -97,11 +97,9 @@ export default async function DashboardPage() {
 
             {order.status === "NOUVELLE" && (
               <div className="flex gap-2">
-                <form action={confirmOrder.bind(null, order.id)}>
-                  <button type="submit" className="btn-primary">
-                    Confirmer
-                  </button>
-                </form>
+                <a href={`/orders/${order.id}/confirm`} className="btn-primary">
+                  Confirmer
+                </a>
                 <form action={cancelOrder.bind(null, order.id)}>
                   <button type="submit" className="btn-danger">
                     Annuler
@@ -112,8 +110,8 @@ export default async function DashboardPage() {
 
             {order.status === "NOUVELLE" && order.forcelogError && (
               <p className="text-xs text-muted mt-2">
-                Le colis n&apos;a pas pu être créé — corrigez si besoin et cliquez de nouveau sur
-                Confirmer.
+                Le colis n&apos;a pas pu être créé — cliquez sur Confirmer pour corriger et
+                réessayer.
               </p>
             )}
           </div>

@@ -2,12 +2,12 @@
 // Pas de webhooks côté Forcelog : le suivi se fait par polling (voir
 // app/api/cron/sync-tracking).
 //
-// NB: la liste de champs d'AddParcel ci-dessous couvre ce qui a été
-// documenté (ORDER_NUM, RECEIVER, PHONE, CITY, ADDRESS, COD,
-// PRODUCT_NATURE) ; Forcelog peut exiger d'autres champs non listés
-// ("etc." dans la doc fournie) — si l'appel échoue avec une erreur de
-// validation, l'erreur brute est conservée dans Order.forcelogError
-// pour ajustement.
+// NB: la liste de champs d'AddParcel couvre ce qui a été documenté
+// (ORDER_NUM, RECEIVER, PHONE, CITY, ADDRESS, COD, PRODUCT_NATURE) ;
+// QUARTIER/COMMENT/FRAGILE sont des noms de champs supposés (non
+// confirmés par la doc, qui mentionnait juste "etc.") — si l'appel
+// échoue avec une erreur de validation, l'erreur brute est conservée
+// dans Order.forcelogError pour ajustement des noms exacts.
 
 const BASE_URL = "https://api.forcelog.ma";
 
@@ -46,10 +46,13 @@ export type AddParcelInput = {
   orderNum: string;
   receiver: string;
   phone: string;
-  city: string;
+  city: string; // code ville Forcelog (voir getCities), pas le nom libre
+  quartier?: string;
   address: string;
+  comment?: string;
   cod: number;
   productNature: string;
+  fragile?: boolean;
 };
 
 export type AddParcelResult = {
@@ -65,9 +68,12 @@ export function addParcel(input: AddParcelInput) {
       RECEIVER: input.receiver,
       PHONE: input.phone,
       CITY: input.city,
+      QUARTIER: input.quartier || undefined,
       ADDRESS: input.address,
+      COMMENT: input.comment || undefined,
       COD: input.cod,
       PRODUCT_NATURE: input.productNature,
+      FRAGILE: input.fragile ?? false,
     }),
   });
 }
@@ -104,6 +110,18 @@ export function getParcelLabelUrl(code: string) {
   return `${BASE_URL}/customer/Parcels/GetParcelLabel?Code=${encodeURIComponent(code)}`;
 }
 
-export function getCities() {
-  return request<Array<{ code: string; name: string }>>("/customer/Cities");
+export type ForcelogCity = { code: string; name: string };
+
+// Réponse réelle observée : { AUTH: {...}, Cities: { "1": { CODE, NAME,
+// D_FEES, D_FEES_SAME_CITY }, "2": {...}, ... } } — un objet indexé par
+// position, pas un tableau.
+export async function getCities(): Promise<ForcelogCity[]> {
+  const raw = await request<{ Cities?: Record<string, { CODE: string; NAME: string }> }>(
+    "/customer/Cities"
+  );
+
+  return Object.values(raw.Cities ?? {})
+    .map((c) => ({ code: String(c.CODE ?? ""), name: String(c.NAME ?? "") }))
+    .filter((c) => c.code && c.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

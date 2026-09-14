@@ -21,10 +21,18 @@ model Order {
   totalPrice       Decimal     @db.Decimal(10, 2)
   status           OrderStatus @default(NOUVELLE)
 
-  forcelogCode     String?     // code colis renvoyé par AddParcel
-  forcelogStatus   String?     // dernier statut brut connu (GetTracking/GetParcel)
-  forcelogError    String?     // dernière erreur Forcelog (ex: ville non reconnue)
-  forcelogSyncedAt DateTime?
+  // Champs modifiables sur l'écran de vérification avant envoi à Forcelog
+  // (voir app/orders/[id]/confirm) — conservés pour traçabilité une fois
+  // le colis créé.
+  quartier         String?
+  comment          String?
+  fragile          Boolean     @default(false)
+
+  forcelogCode          String? // code colis renvoyé par AddParcel
+  forcelogStatus        String? // dernier statut brut connu (GetTracking/GetParcel)
+  forcelogError         String? // dernière erreur Forcelog (ex: ville non reconnue)
+  forcelogProductNature String? // "PRODUCT_NATURE" effectivement envoyé à AddParcel
+  forcelogSyncedAt      DateTime?
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
