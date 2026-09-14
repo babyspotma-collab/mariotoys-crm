@@ -117,31 +117,37 @@ export async function listProducts(searchTerm = ""): Promise<ShopifyProductSumma
     }));
 }
 
-export type ShopifyCollection = { id: string; title: string };
+export type ShopifyCollection = { id: string; title: string; label: string };
 
-// Collections Mediva connues (voir mediva-automation/CLAUDE.md) — le
-// compte Shopify est partagé avec Babyspot, dont les collections
-// (Univers Bébé, Kidilo, Candide, etc.) ne doivent jamais apparaître ici.
-// Filtré par titre plutôt que par handle : plus robuste, et on ne connaît
-// pas les handles exacts de toutes ces collections historiques.
-const MEDIVA_COLLECTION_TITLES = [
-  "blouses",
-  "pantalons",
-  "vestes",
-  "tenues chirurgicales",
-  "accessoires",
-  "pyjamas infirmier",
-  "crocs",
-  "pyjama",
-];
+// Résolu par handle (collectionByHandle), pas par recherche/filtre de
+// titre — vérifié en pratique le 2026-09-15 contre la vraie boutique : il
+// existe TROIS collections dont le titre contient "pyjama"
+// ("Pyjamas infirmier", 6 produits · "Pyjama", 1 produit, doublon
+// historique), donc un filtre par titre listait les deux et rendait le
+// menu déroulant ambigu. Même méthode que productsInCollection()
+// ci-dessus pour listProducts() : une seule source de vérité
+// (MEDIVA_COLLECTION_HANDLES) pour les deux.
+//
+// "label" ajoute un synonyme reconnu à l'affichage (ex: Crocs = sabots
+// médicaux) sans toucher au titre/à l'id réels envoyés à Shopify.
+const COLLECTION_LABELS: Record<string, string> = {
+  crocs: "Crocs (sabots médicaux)",
+};
 
 export async function listCollections(): Promise<ShopifyCollection[]> {
-  const data = await gql<{ collections: { edges: { node: ShopifyCollection }[] } }>(
-    `query { collections(first: 100) { edges { node { id title } } } }`
+  const results = await Promise.all(
+    MEDIVA_COLLECTION_HANDLES.map(async (handle) => {
+      const data = await gql<{ collectionByHandle: { id: string; title: string } | null }>(
+        `query ($handle: String!) { collectionByHandle(handle: $handle) { id title } }`,
+        { handle }
+      );
+      return data.collectionByHandle;
+    })
   );
-  return data.collections.edges
-    .map((e) => e.node)
-    .filter((c) => MEDIVA_COLLECTION_TITLES.includes(c.title.trim().toLowerCase()));
+
+  return results
+    .filter((c): c is { id: string; title: string } => c !== null)
+    .map((c) => ({ ...c, label: COLLECTION_LABELS[c.title.toLowerCase()] ?? c.title }));
 }
 
 // ─── Création de produit (Module 3) ───────────────────────────────────────────

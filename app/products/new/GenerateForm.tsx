@@ -42,7 +42,7 @@ export default function GenerateForm({ collections }: { collections: ShopifyColl
           onChange={(e) => {
             const opt = e.target.selectedOptions[0];
             const hidden = document.getElementById("collectionTitle") as HTMLInputElement | null;
-            if (hidden) hidden.value = opt?.text ?? "";
+            if (hidden) hidden.value = opt?.dataset.title ?? "";
           }}
           className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white"
         >
@@ -50,8 +50,8 @@ export default function GenerateForm({ collections }: { collections: ShopifyColl
             {collections.length === 0 ? "Liste indisponible" : "Choisir une collection…"}
           </option>
           {collections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title}
+            <option key={c.id} value={c.id} data-title={c.title}>
+              {c.label}
             </option>
           ))}
         </select>

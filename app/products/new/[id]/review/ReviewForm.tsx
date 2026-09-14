@@ -92,7 +92,7 @@ export default function ReviewForm({
           </option>
           {collections.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.title}
+              {c.label}
             </option>
           ))}
         </select>
