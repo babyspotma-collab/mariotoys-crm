@@ -1,4 +1,6 @@
 import { getParcels } from "@/lib/forcelog";
+import AppHeader from "@/components/AppHeader";
+import ParcelsSubNav from "@/components/ParcelsSubNav";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +19,8 @@ export default async function ParcelsPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
-      <p className="text-xs text-muted mb-2">
-        <a href="/">← Retour au dashboard</a>
-      </p>
-      <h1 className="text-xl font-semibold mb-1">Suivi Forcelog</h1>
+      <AppHeader active="parcels" />
+      <ParcelsSubNav active="all" />
       <p className="text-sm text-muted mb-8">
         {total > 0 ? `${total} colis au total` : "Liste en direct depuis Forcelog."}
       </p>

@@ -32,16 +32,24 @@ export async function GET(req: NextRequest) {
         const history =
           tracking.status === "fulfilled" ? tracking.value["GET-TRACKING"]?.HISTORY ?? null : null;
 
-        // Un échec ici (ex: "Parcel code Not Found", observé même sur des
-        // colis valides côté Forcelog) ne doit pas faire échouer tout le
-        // cron pour les autres commandes — on garde juste l'ancienne
-        // valeur connue dans ce cas.
+        // "Échec" = l'appel GetParcel lui-même a levé une erreur (ex: "Parcel
+        // code Not Found", observé même sur des colis valides côté Forcelog).
+        // Compteur remis à 0 dès qu'un appel réussit, incrémenté sinon — sert
+        // à repérer les colis "bloqués" (voir /parcels/stuck).
+        const parcelFailed = parcel.status === "rejected";
+        // Changement réel de statut (couvre aussi le tout premier statut connu,
+        // puisque forcelogStatus démarre à null) : seul cas où on retimestampe
+        // forcelogStatusChangedAt — forcelogSyncedAt, lui, bouge à chaque run.
+        const statusChanged = Boolean(status) && status !== order.forcelogStatus;
+
         await prisma.order.update({
           where: { id: order.id },
           data: {
             forcelogStatus: status || order.forcelogStatus,
             forcelogTrackingHistory: (history ?? order.forcelogTrackingHistory ?? undefined) as any,
             forcelogSyncedAt: new Date(),
+            forcelogStatusChangedAt: statusChanged ? new Date() : order.forcelogStatusChangedAt,
+            forcelogSyncFailCount: parcelFailed ? { increment: 1 } : 0,
           },
         });
       })

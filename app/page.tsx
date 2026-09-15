@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/db";
-import { logout } from "./actions";
 import { cancelOrder } from "./orders/actions";
+import AppHeader from "@/components/AppHeader";
+import MonthFilter from "@/components/MonthFilter";
+import { monthRange } from "@/lib/date-range";
 
 export const dynamic = "force-dynamic";
+
+const ORDERS_SAFETY_LIMIT = 500;
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -18,33 +22,38 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${styles[status] ?? ""}`}>{labels[status] ?? status}</span>;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { month?: string };
+}) {
+  const { start, end, month } = monthRange(searchParams.month);
+
   const [orders, counts] = await Promise.all([
     prisma.order.findMany({
+      where: { createdAt: { gte: start, lt: end } },
       include: { items: true },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: ORDERS_SAFETY_LIMIT,
     }),
-    prisma.order.groupBy({ by: ["status"], _count: true }),
+    prisma.order.groupBy({
+      by: ["status"],
+      where: { createdAt: { gte: start, lt: end } },
+      _count: true,
+    }),
   ]);
 
   const countFor = (status: string) => counts.find((c) => c.status === status)?._count ?? 0;
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold">Mario Toys CRM — Commandes</h1>
-        <div className="flex items-center gap-4">
-          <a href="/parcels" className="text-sm text-muted hover:text-ink">
-            Suivi Forcelog
-          </a>
-          <a href="/orders/new" className="btn-primary">
-            + Nouvelle commande
-          </a>
-          <form action={logout}>
-            <button className="text-sm text-muted hover:text-ink">Se déconnecter</button>
-          </form>
-        </div>
+      <AppHeader active="orders" />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+        <MonthFilter month={month} action="/" />
+        <a href="/orders/new" className="btn-primary">
+          + Nouvelle commande
+        </a>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-10">
@@ -64,7 +73,7 @@ export default async function DashboardPage() {
 
       <div className="flex flex-col gap-4">
         {orders.length === 0 && (
-          <p className="text-sm text-muted">Aucune commande pour l&apos;instant.</p>
+          <p className="text-sm text-muted">Aucune commande pour ce mois.</p>
         )}
 
         {orders.map((order) => (

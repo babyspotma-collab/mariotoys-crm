@@ -36,7 +36,9 @@ model Order {
   forcelogError           String? // dernière erreur Forcelog (ex: ville non reconnue)
   forcelogProductNature   String? // "PRODUCT_NATURE" effectivement envoyé à AddParcel
   forcelogTrackingHistory Json? // dernier historique GetTracking connu, mis à jour par le cron
-  forcelogSyncedAt        DateTime?
+  forcelogSyncedAt        DateTime? // dernière TENTATIVE de sync (réussie ou non), mis à jour à chaque run du cron
+  forcelogStatusChangedAt DateTime? // mis à jour uniquement quand forcelogStatus a réellement changé de valeur
+  forcelogSyncFailCount   Int       @default(0) // remis à 0 dès qu'une sync réussit
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

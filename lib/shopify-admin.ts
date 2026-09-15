@@ -65,7 +65,8 @@ type ProductNode = {
 
 // Catalogue Mario Toys non partagé avec une autre marque : recherche directe
 // sur l'ensemble des produits (pas besoin de restreindre à des collections
-// précises comme le faisait mediva-crm pour exclure le catalogue Babyspot).
+// précises comme il faudrait le faire pour un compte Shopify partagé
+// entre plusieurs marques (non applicable ici).
 export async function listProducts(searchTerm = ""): Promise<ShopifyProductSummary[]> {
   const term = searchTerm.trim();
   const query = term ? `title:*${term}*` : undefined;

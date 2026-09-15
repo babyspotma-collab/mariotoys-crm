@@ -5,10 +5,10 @@
  * Enregistre le webhook Shopify orders/create une fois le projet déployé.
  *
  * Usage :
- *   node scripts/register-webhook.js https://mediva-crm.vercel.app
+ *   node scripts/register-webhook.js https://mario-toys-crm.vercel.app
  *
- * Réutilise les identifiants OAuth client-credentials déjà utilisés dans
- * mediva-automation/create-product.js (même boutique).
+ * Utilise les identifiants OAuth client-credentials Shopify (SHOPIFY_STORE,
+ * SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET) définis dans .env.
  */
 
 require('dotenv').config();

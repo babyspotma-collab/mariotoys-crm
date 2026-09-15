@@ -5,7 +5,7 @@ confirmation/annulation manuelle, création automatique du colis Forcelog,
 suivi de livraison.
 
 Boutique Shopify `cvkf4d-z4.myshopify.com`, compte non partagé avec une
-autre marque (contrairement à Mediva/Babyspot, dont ce projet est adapté).
+autre marque.
 
 ## Architecture
 
