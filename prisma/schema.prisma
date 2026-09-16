@@ -32,7 +32,8 @@ model Order {
   fragile          Boolean     @default(false)
 
   forcelogCode            String? // code colis renvoyé par AddParcel
-  forcelogStatus          String? // dernier statut brut connu (GetTracking/GetParcel)
+  forcelogStatus          String? // dernier libellé FR connu (ex: "Attente De Ramassage")
+  forcelogStatusCode      String? // dernier STATUS_CODE machine connu (ex: "WAITING_PICKUP") — utilisé pour le filtrage fiable des catégories, forcelogStatus reste pour l'affichage
   forcelogError           String? // dernière erreur Forcelog (ex: ville non reconnue)
   forcelogProductNature   String? // "PRODUCT_NATURE" effectivement envoyé à AddParcel
   forcelogTrackingHistory Json? // dernier historique GetTracking connu, mis à jour par le cron

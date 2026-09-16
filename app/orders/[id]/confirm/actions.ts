@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { addParcel } from "@/lib/forcelog";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export type ConfirmState = { error: string | null };
 
@@ -15,7 +16,7 @@ export async function createParcel(
   formData: FormData
 ): Promise<ConfirmState> {
   const receiver = String(formData.get("receiver") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());
   const city = String(formData.get("city") ?? "").trim();
   const quartier = String(formData.get("quartier") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();

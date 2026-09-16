@@ -233,6 +233,16 @@ export function requestReturn(input: ReturnRequestInput) {
   });
 }
 
+// Endpoint vérifié en direct contre l'API réelle (avec un code inexistant,
+// pour confirmer la route sans jamais relancer un vrai colis) : enveloppe
+// "RELAUNCH", même forme que Return/Request ({ PARCELS: string[] }).
+export function relaunchParcel(code: string) {
+  return request<{ RELAUNCH: { MESSAGE?: string } }>("/customer/Parcels/Relaunch", {
+    method: "POST",
+    body: JSON.stringify({ PARCELS: [code] }),
+  });
+}
+
 // ─── Réclamations ─────────────────────────────────────────────────────────────
 // Un colis ne peut avoir qu'une réclamation ouverte à la fois : toujours
 // appeler getClaim() d'abord (EXISTS) pour savoir s'il faut createClaim()

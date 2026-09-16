@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import AppHeader from "@/components/AppHeader";
 import ParcelsSubNav from "@/components/ParcelsSubNav";
+import RelaunchButton from "@/components/RelaunchButton";
+import { relaunch } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +77,9 @@ export default async function StuckPage() {
                     {order.forcelogSyncFailCount} échecs de sync
                   </p>
                 )}
+                <div className="mt-2">
+                  <RelaunchButton code={order.forcelogCode!} action={relaunch} />
+                </div>
               </div>
             </div>
           </a>

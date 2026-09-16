@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export type NewOrderState = { error: string | null };
 
@@ -12,7 +13,7 @@ export async function createManualOrder(
   formData: FormData
 ): Promise<NewOrderState> {
   const customerName = String(formData.get("customerName") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());
   const city = String(formData.get("city") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
   const itemsRaw = String(formData.get("items") ?? "[]");

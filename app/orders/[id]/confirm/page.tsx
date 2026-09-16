@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCities } from "@/lib/forcelog";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 import ConfirmForm from "./ConfirmForm";
 
 export default async function ConfirmOrderPage({ params }: { params: { id: string } }) {
@@ -47,7 +48,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
         cities={cities}
         initialValues={{
           receiver: order.customerName,
-          phone: order.phone,
+          phone: normalizeMoroccanPhone(order.phone),
           city: order.city,
           quartier: order.quartier ?? "",
           address: order.address,

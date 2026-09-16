@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyShopifyWebhook } from "@/lib/shopify-verify";
 import { prisma } from "@/lib/db";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 // Shopify webhook orders/create — reçoit CHAQUE nouvelle commande, sans
 // filtre (contrairement à une éventuelle automatisation qui ne traiterait
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
     "Client";
   const address = shippingAddress.address1 ?? "";
   const city = shippingAddress.city ?? "";
-  const phone = shippingAddress.phone ?? order.phone ?? order.customer?.phone ?? "";
+  const phone = normalizeMoroccanPhone(
+    shippingAddress.phone ?? order.phone ?? order.customer?.phone ?? ""
+  );
 
   const items = (order.line_items ?? []).map((li: any) => ({
     title: li.title as string,

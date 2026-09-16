@@ -75,10 +75,6 @@ export default function ConfirmForm({
           defaultValue={initialValues.phone}
           className="w-full border border-line rounded-lg px-3 py-2 text-sm"
         />
-        <p className="text-xs text-muted mt-1">
-          Vérifiez le format (Shopify renvoie parfois un indicatif international, ex. +212, à
-          retirer si besoin).
-        </p>
       </div>
 
       <div>

@@ -1,4 +1,5 @@
 import { getParcel, getTracking } from "@/lib/forcelog";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function ParcelDetailPage({ params }: { params: { code: str
             <dt className="text-muted">Destinataire</dt>
             <dd>{String(parcel?.RECEIVER ?? "—")}</dd>
             <dt className="text-muted">Téléphone</dt>
-            <dd>{String(parcel?.PHONE ?? "—")}</dd>
+            <dd>{parcel?.PHONE ? normalizeMoroccanPhone(String(parcel.PHONE)) : "—"}</dd>
             <dt className="text-muted">Ville</dt>
             <dd>{String(parcel?.CITY_NAME ?? "—")}</dd>
             <dt className="text-muted">Adresse</dt>

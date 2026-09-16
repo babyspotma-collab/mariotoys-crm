@@ -3,6 +3,7 @@ import { cancelOrder } from "./orders/actions";
 import AppHeader from "@/components/AppHeader";
 import MonthFilter from "@/components/MonthFilter";
 import { monthRange } from "@/lib/date-range";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -28,22 +29,36 @@ export default async function DashboardPage({
   searchParams: { month?: string };
 }) {
   const { start, end, month } = monthRange(searchParams.month);
+  const dateFilter = { createdAt: { gte: start, lt: end } };
 
-  const [orders, counts] = await Promise.all([
+  const [orders, counts, shopifyRevenue, forcelogStats] = await Promise.all([
     prisma.order.findMany({
-      where: { createdAt: { gte: start, lt: end } },
+      where: dateFilter,
       include: { items: true },
       orderBy: { createdAt: "desc" },
       take: ORDERS_SAFETY_LIMIT,
     }),
+    prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
+    prisma.order.aggregate({
+      where: { ...dateFilter, source: "SHOPIFY" },
+      _sum: { totalPrice: true },
+    }),
     prisma.order.groupBy({
-      by: ["status"],
-      where: { createdAt: { gte: start, lt: end } },
+      by: ["forcelogStatusCode"],
+      where: { ...dateFilter, forcelogCode: { not: null } },
       _count: true,
+      _sum: { totalPrice: true },
     }),
   ]);
 
   const countFor = (status: string) => counts.find((c) => c.status === status)?._count ?? 0;
+  const totalOrders = counts.reduce((sum, c) => sum + c._count, 0);
+  const confirmationRate = totalOrders > 0 ? Math.round((countFor("CONFIRMEE") / totalOrders) * 100) : 0;
+
+  const totalShipped = forcelogStats.reduce((sum, s) => sum + s._count, 0);
+  const delivered = forcelogStats.find((s) => s.forcelogStatusCode === "DELIVERED");
+  const deliveryRate = totalShipped > 0 ? Math.round(((delivered?._count ?? 0) / totalShipped) * 100) : 0;
+  const forcelogRevenue = Number(delivered?._sum.totalPrice ?? 0);
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
@@ -71,6 +86,25 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      <div className="grid grid-cols-4 gap-4 mb-10">
+        <div className="bg-white border border-line rounded-2xl p-5">
+          <p className="text-xs text-muted mb-1">CA Shopify</p>
+          <p className="text-2xl font-semibold">{Number(shopifyRevenue._sum.totalPrice ?? 0)} DH</p>
+        </div>
+        <div className="bg-white border border-line rounded-2xl p-5">
+          <p className="text-xs text-muted mb-1">Taux de confirmation</p>
+          <p className="text-2xl font-semibold">{confirmationRate}%</p>
+        </div>
+        <div className="bg-white border border-line rounded-2xl p-5">
+          <p className="text-xs text-muted mb-1">Taux de livraison Forcelog</p>
+          <p className="text-2xl font-semibold">{deliveryRate}%</p>
+        </div>
+        <div className="bg-white border border-line rounded-2xl p-5">
+          <p className="text-xs text-muted mb-1">CA Forcelog (estimation)</p>
+          <p className="text-2xl font-semibold">{forcelogRevenue} DH</p>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4">
         {orders.length === 0 && (
           <p className="text-sm text-muted">Aucune commande pour ce mois.</p>
@@ -87,7 +121,7 @@ export default async function DashboardPage({
                   )}
                 </p>
                 <p className="text-sm text-muted">
-                  {order.address}, {order.city} · {order.phone}
+                  {order.address}, {order.city} · {normalizeMoroccanPhone(order.phone)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
