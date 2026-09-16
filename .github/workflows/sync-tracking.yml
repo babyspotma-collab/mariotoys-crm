@@ -24,3 +24,36 @@ jobs:
             echo "::error::sync-tracking a échoué avec le code $http_code"
             exit 1
           fi
+
+      # Complète le sync ci-dessus pour les statuts que l'API publique ne
+      # permet pas d'atteindre de façon fiable (pagination/filtre cassés,
+      # vérifié en pratique) : passe par le dashboard web Forcelog à la
+      # place. Doit tourner ici (GitHub Actions), jamais sur Vercel —
+      # Playwright n'y est pas adapté (pas de Chromium préinstallé,
+      # contraintes serverless).
+      - name: Checkout
+        if: always()
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer les dépendances
+        if: always()
+        run: npm ci
+
+      - name: Installer Chromium (Playwright)
+        if: always()
+        run: npx playwright install --with-deps chromium
+
+      - name: Synchroniser via le dashboard web Forcelog (colis + CRBT)
+        if: always()
+        env:
+          FORCELOG_WEB_EMAIL: ${{ secrets.FORCELOG_WEB_EMAIL }}
+          FORCELOG_WEB_PASSWORD: ${{ secrets.FORCELOG_WEB_PASSWORD }}
+          CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/sync-forcelog-web.js

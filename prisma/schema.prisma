@@ -69,3 +69,20 @@ enum OrderSource {
   SHOPIFY
   MANUEL
 }
+
+// Factures CRBT (bordereaux de règlement/virement) — synchronisées depuis
+// le dashboard web Forcelog (customer.forcelog.ma/index/CRBT/Json),
+// aucun endpoint équivalent n'existant sur l'API publique. Voir
+// scripts/sync-forcelog-web.js.
+model CrbtInvoice {
+  ref          String    @id // ex: CRBT-161533-100926-8836-66
+  cDate        DateTime
+  payDate      DateTime?
+  statut       String // libellé nettoyé : "Payé" / "Enregistré" / "Demande Virement"
+  parcelsCount Int
+  fees         Int
+  feesAmount   Decimal   @db.Decimal(10, 2)
+  balance      Decimal   @db.Decimal(10, 2)
+  amount       Decimal   @db.Decimal(10, 2)
+  syncedAt     DateTime  @updatedAt
+}
