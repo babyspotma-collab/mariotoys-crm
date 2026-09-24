@@ -2,41 +2,35 @@ import { prisma } from "@/lib/db";
 import AppHeader from "@/components/AppHeader";
 import ParcelsSubNav from "@/components/ParcelsSubNav";
 import RelaunchButton from "@/components/RelaunchButton";
+import { categoryById } from "@/lib/parcel-categories";
+import { getParcelCategoryCounts } from "@/lib/parcel-category-counts";
 import { relaunch } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Statut Forcelog exact "Pas de réponse" (deux STATUS_CODE partagent ce
-// libellé côté Forcelog) — trouvé dans le <select id="f_statut"> réel de
-// leur dashboard web, synchronisé par scripts/sync-forcelog-web.js
-// (l'API publique ne permet pas de filtrer par statut de façon fiable).
-const NO_ANSWER_CODES = ["NO_ANSWER", "NO_ANSWER_SMS"];
+const CATEGORY = categoryById("noAnswer");
 
-export default async function StuckPage() {
-  const orders = await prisma.order.findMany({
-    where: { status: "CONFIRMEE", forcelogStatusCode: { in: NO_ANSWER_CODES } },
-    orderBy: { forcelogStatusChangedAt: "desc" },
-  });
+export default async function NoAnswerPage() {
+  const [orders, counts] = await Promise.all([
+    prisma.order.findMany({
+      where: { status: "CONFIRMEE", forcelogStatusCode: { in: CATEGORY.codes } },
+      orderBy: { forcelogStatusChangedAt: "desc" },
+    }),
+    getParcelCategoryCounts(),
+  ]);
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
       <AppHeader active="parcels" />
-      <ParcelsSubNav active="stuck" />
-
-      <p className="text-sm text-muted mb-8">
-        Colis dont le statut Forcelog exact est "Pas de réponse".
-      </p>
+      <ParcelsSubNav active="noAnswer" counts={counts} />
 
       {orders.length === 0 && (
-        <p className="text-sm text-muted">Aucun colis "Pas de réponse" pour l&apos;instant.</p>
+        <p className="text-sm text-muted">Aucun colis sans réponse pour l&apos;instant.</p>
       )}
 
       <div className="flex flex-col gap-2">
         {orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-white border border-line rounded-2xl p-4"
-          >
+          <div key={order.id} className="bg-white border border-line rounded-2xl p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <a
                 href={`/parcels/${encodeURIComponent(order.forcelogCode!)}`}

@@ -1,6 +1,7 @@
 import { getParcels } from "@/lib/forcelog";
 import AppHeader from "@/components/AppHeader";
 import ParcelsSubNav from "@/components/ParcelsSubNav";
+import { getParcelCategoryCounts } from "@/lib/parcel-category-counts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,12 @@ export default async function ParcelsPage() {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const counts = await getParcelCategoryCounts();
+
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
       <AppHeader active="parcels" />
-      <ParcelsSubNav active="all" />
+      <ParcelsSubNav active="all" counts={counts} />
       <p className="text-sm text-muted mb-8">
         {total > 0 ? `${total} colis au total` : "Liste en direct depuis Forcelog."}
       </p>

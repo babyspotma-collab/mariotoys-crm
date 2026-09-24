@@ -1,24 +1,24 @@
-export type ParcelsSubTab =
-  | "all"
-  | "newParcel"
-  | "waitingPickup"
-  | "inProgress"
-  | "stuck"
-  | "returns";
+import { PARCEL_CATEGORIES, type ParcelCategoryId } from "@/lib/parcel-categories";
+import type { ParcelCategoryCounts } from "@/lib/parcel-category-counts";
 
-const SUB_TABS: { id: ParcelsSubTab; label: string; href: string }[] = [
-  { id: "all", label: "Tous les colis", href: "/parcels" },
-  { id: "newParcel", label: "Nouveau colis", href: "/parcels/new-parcel" },
-  { id: "waitingPickup", label: "Attente de ramassage", href: "/parcels/waiting-pickup" },
-  { id: "inProgress", label: "Livraison en cours", href: "/parcels/in-progress" },
-  { id: "stuck", label: "Pas de réponse", href: "/parcels/stuck" },
-  { id: "returns", label: "Annulé / Refusé / Retour", href: "/parcels/returns" },
-];
+export type ParcelsSubTab = ParcelCategoryId | "all" | "other";
 
-export default function ParcelsSubNav({ active }: { active: ParcelsSubTab }) {
+export default function ParcelsSubNav({
+  active,
+  counts,
+}: {
+  active: ParcelsSubTab;
+  counts: ParcelCategoryCounts;
+}) {
+  const tabs = [
+    { id: "all" as const, label: "Tous les colis", href: "/parcels", count: counts.all },
+    ...PARCEL_CATEGORIES.map((c) => ({ id: c.id, label: c.label, href: c.href, count: counts[c.id] })),
+    { id: "other" as const, label: "Autre", href: "/parcels/other", count: counts.other },
+  ];
+
   return (
     <div className="flex items-center gap-2 mb-6 flex-wrap">
-      {SUB_TABS.map((tab) => (
+      {tabs.map((tab) => (
         <a
           key={tab.id}
           href={tab.href}
@@ -26,7 +26,7 @@ export default function ParcelsSubNav({ active }: { active: ParcelsSubTab }) {
             active === tab.id ? "bg-ink text-white" : "bg-stone text-muted hover:text-ink"
           }`}
         >
-          {tab.label}
+          {tab.label} ({tab.count})
         </a>
       ))}
     </div>

@@ -31,9 +31,25 @@ const {
 } = process.env;
 
 // STATUS_CODE réels confirmés via le <select id="f_statut"> de la page
-// "Liste des Colis" du dashboard (pas une supposition) : les deux
-// libellés "Pas de réponse" et les deux "Annulé" + "Refusé".
-const PARCEL_STATUS_CODES = ["NO_ANSWER", "NO_ANSWER_SMS", "CANCELED", "DOESNT_ORDER", "REFUSE"];
+// "Liste des Colis" du dashboard (pas une supposition) — union des codes
+// couvrant les 5 catégories affichées par app/parcels/* (voir
+// lib/parcel-categories.ts, source de vérité côté app ; dupliqué ici car
+// ce script Node CommonJS autonome ne peut pas importer ce module
+// ESM/TS). Tout code Forcelog non listé ici tombe dans la catégorie
+// "Autre" côté app — c'est voulu, ce ne sont pas des statuts qu'on a
+// besoin de synchroniser activement.
+const PARCEL_STATUS_CODES = [
+  // Colis expédié
+  "PICKED_UP", "PICKED_UP_1", "SENT", "RECEIVED",
+  // Colis en cours de livraison
+  "DISTRIBUTION", "IN_PROGRESS", "TRAVELLING",
+  // Colis refusé ou annulé
+  "CANCELED", "DOESNT_ORDER", "REFUSE", "CANCELED_TEAM", "RETURNED", "PREPAR_RETURN", "RERETURN",
+  // Colis sans réponse
+  "NO_ANSWER", "NO_ANSWER_SMS", "NO_ANSWER_TEAM", "NOANSWER3", "UNREACHABLE", "UNREACHABLE_TEAM", "VOICEMAIL", "NUMBERERROR",
+  // Colis hors zone
+  "OUT_OF_AREA",
+];
 
 const PAGE_LENGTH = 100;
 

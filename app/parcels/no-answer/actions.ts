@@ -11,6 +11,6 @@ export async function relaunch(code: string): Promise<RelaunchState> {
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err), success: false };
   }
-  revalidatePath("/parcels/stuck");
+  revalidatePath("/parcels/no-answer");
   return { error: null, success: true };
 }
