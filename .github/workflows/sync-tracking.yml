@@ -18,8 +18,15 @@ jobs:
           CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          set -x
-          echo "DEBUG url=[${CRM_BASE_URL}/api/cron/sync-tracking] url_len=${#CRM_BASE_URL} secret_len=${#CRON_SECRET}"
+          # Nettoyage défensif : une variable/secret GitHub Actions copié-
+          # collé depuis un champ web peut embarquer un \r ou \n invisible
+          # en fin de valeur (vécu en pratique : CRM_BASE_URL faisait 38
+          # caractères pour une URL de 36, cassant le parsing de curl avec
+          # "URL malformée"). On force donc CRM_BASE_URL/CRON_SECRET
+          # propres avant tout usage plutôt que de dépendre d'une saisie
+          # parfaite côté GitHub.
+          CRM_BASE_URL=$(printf '%s' "$CRM_BASE_URL" | tr -d '\r\n')
+          CRON_SECRET=$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')
           http_code=$(curl -s -o response.json -w "%{http_code}" \
             -X GET "$CRM_BASE_URL/api/cron/sync-tracking" \
             -H "Authorization: Bearer $CRON_SECRET")
