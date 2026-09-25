@@ -1,0 +1,8 @@
+# Force LF endings for workflow/shell files : les fins de ligne CRLF (ajoutées
+# automatiquement par git/éditeurs sous Windows) cassent les continuations `\`
+# dans les blocs `run: |` multi-lignes de GitHub Actions (runner Linux) — bug
+# vécu concrètement sur .github/workflows/sync-tracking.yml (curl échouait
+# avec "URL malformée").
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf

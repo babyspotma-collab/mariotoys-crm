@@ -18,6 +18,8 @@ jobs:
           CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          set -x
+          echo "DEBUG url=[${CRM_BASE_URL}/api/cron/sync-tracking] url_len=${#CRM_BASE_URL} secret_len=${#CRON_SECRET}"
           http_code=$(curl -s -o response.json -w "%{http_code}" \
             -X GET "$CRM_BASE_URL/api/cron/sync-tracking" \
             -H "Authorization: Bearer $CRON_SECRET")
