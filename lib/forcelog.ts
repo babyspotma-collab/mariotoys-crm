@@ -79,11 +79,44 @@ export type AddParcelInput = {
 
 export type AddParcelResult = {
   code: string; // code colis Forcelog
-  [key: string]: unknown;
+  raw: unknown;
 };
 
-export function addParcel(input: AddParcelInput) {
-  return request<AddParcelResult>("/customer/Parcels/AddParcel", {
+// Le nom exact de l'enveloppe et du champ code n'a JAMAIS été confirmé par
+// une vraie réponse de succès (contrairement à GetParcel/GetParcels/Return/
+// Relaunch/Claims, dont la forme a été vérifiée en direct) — le code
+// d'origine lisait `parcel.code` (minuscule, sans enveloppe), qui ne
+// correspond à aucune convention observée ailleurs chez Forcelog (champs en
+// MAJUSCULES, souvent enveloppés sous une clé nommée d'après l'action).
+// Résultat en prod : 3 colis au moins ont été réellement créés côté
+// Forcelog (vérifiés via leur dashboard, ex. F-AGA15HDVEQ5S) sans que leur
+// code soit jamais enregistré ici — `parcel.code` valait `undefined`, que
+// Prisma ignore silencieusement dans un `update`, laissant la commande
+// passer en CONFIRMEE avec forcelogCode toujours null.
+//
+// On essaie donc plusieurs conventions plausibles (racine ou premier
+// niveau d'enveloppe, CODE/TRACKING_NUMBER/Code/code) et, si aucune ne
+// correspond, on échoue bruyamment avec la réponse brute plutôt que de
+// silencieusement perdre le code — ça garde la commande en NOUVELLE au
+// lieu d'un faux CONFIRMEE, et la réponse brute conservée dans
+// forcelogError permettra de corriger la forme exacte dès le prochain essai.
+function extractParcelCode(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const candidates: Record<string, unknown>[] = [json as Record<string, unknown>];
+  for (const value of Object.values(json as Record<string, unknown>)) {
+    if (value && typeof value === "object") candidates.push(value as Record<string, unknown>);
+  }
+  for (const obj of candidates) {
+    for (const key of ["CODE", "TRACKING_NUMBER", "Code", "code"]) {
+      const v = obj[key];
+      if (typeof v === "string" && v) return v;
+    }
+  }
+  return null;
+}
+
+export async function addParcel(input: AddParcelInput): Promise<AddParcelResult> {
+  const json = await request<Record<string, unknown>>("/customer/Parcels/AddParcel", {
     method: "POST",
     body: JSON.stringify({
       ORDER_NUM: input.orderNum,
@@ -98,6 +131,14 @@ export function addParcel(input: AddParcelInput) {
       FRAGILE: input.fragile ?? false,
     }),
   });
+
+  const code = extractParcelCode(json);
+  if (!code) {
+    throw new Error(
+      `Forcelog AddParcel — code colis introuvable dans la réponse (forme non confirmée). Réponse brute: ${JSON.stringify(json).slice(0, 500)}`
+    );
+  }
+  return { code, raw: json };
 }
 
 // Forme réelle confirmée : { "GET-PARCEL": { RESULT, ... } } — mêmes

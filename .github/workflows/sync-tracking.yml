@@ -14,10 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Appeler /api/cron/sync-tracking
+        env:
+          CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           http_code=$(curl -s -o response.json -w "%{http_code}" \
-            -X GET "${{ vars.CRM_BASE_URL }}/api/cron/sync-tracking" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+            -X GET "$CRM_BASE_URL/api/cron/sync-tracking" \
+            -H "Authorization: Bearer $CRON_SECRET")
           echo "Réponse HTTP $http_code :"
           cat response.json
           if [ "$http_code" -ge 400 ]; then
