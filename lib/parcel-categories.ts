@@ -24,31 +24,31 @@ export const PARCEL_CATEGORIES: ParcelCategory[] = [
   {
     id: "shipped",
     label: "Colis expédié",
-    href: "/parcels/shipped",
+    href: "/parcels/forcelog/shipped",
     codes: ["PICKED_UP", "PICKED_UP_1", "SENT", "RECEIVED"],
   },
   {
     id: "delivering",
     label: "Colis en cours de livraison",
-    href: "/parcels/delivering",
+    href: "/parcels/forcelog/delivering",
     codes: ["DISTRIBUTION", "IN_PROGRESS", "TRAVELLING"],
   },
   {
     id: "cancelled",
     label: "Colis refusé ou annulé",
-    href: "/parcels/cancelled",
+    href: "/parcels/forcelog/cancelled",
     codes: ["CANCELED", "DOESNT_ORDER", "REFUSE", "CANCELED_TEAM", "RETURNED", "PREPAR_RETURN", "RERETURN"],
   },
   {
     id: "noAnswer",
     label: "Colis sans réponse",
-    href: "/parcels/no-answer",
+    href: "/parcels/forcelog/no-answer",
     codes: ["NO_ANSWER", "NO_ANSWER_SMS", "NO_ANSWER_TEAM", "NOANSWER3", "UNREACHABLE", "UNREACHABLE_TEAM", "VOICEMAIL", "NUMBERERROR"],
   },
   {
     id: "outOfZone",
     label: "Colis hors zone",
-    href: "/parcels/out-of-zone",
+    href: "/parcels/forcelog/out-of-zone",
     codes: ["OUT_OF_AREA"],
   },
 ];

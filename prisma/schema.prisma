@@ -24,9 +24,16 @@ model Order {
   totalPrice       Decimal     @db.Decimal(10, 2)
   status           OrderStatus @default(NOUVELLE)
 
-  // Champs modifiables sur l'écran de vérification avant envoi à Forcelog
-  // (voir app/orders/[id]/confirm) — conservés pour traçabilité une fois
-  // le colis créé.
+  // Transporteur choisi à la confirmation (voir app/orders/[id]/confirm) —
+  // Forcelog et Ozon Express sont deux intégrations totalement
+  // indépendantes (vocabulaires de statut différents, pas de champ
+  // commun), ce champ dit juste lequel des deux blocs de champs
+  // ci-dessous est pertinent pour cette commande.
+  carrier          Carrier     @default(FORCELOG)
+
+  // Champs modifiables sur l'écran de vérification avant envoi au
+  // transporteur (voir app/orders/[id]/confirm) — conservés pour
+  // traçabilité une fois le colis créé.
   quartier         String?
   comment          String?
   fragile          Boolean     @default(false)
@@ -41,6 +48,17 @@ model Order {
   forcelogStatusChangedAt DateTime? // mis à jour uniquement quand forcelogStatus a réellement changé de valeur
   forcelogSyncFailCount   Int       @default(0) // remis à 0 dès qu'une sync réussit
 
+  // Ozon Express n'expose pas de code machine séparé du statut (pas de
+  // STATUS_CODE comme Forcelog) : ozonStatus sert à la fois à l'affichage
+  // ET de clé de catégorisation (voir lib/ozon-categories.ts).
+  ozonCode            String? // TRACKING-NUMBER renvoyé par add-parcel
+  ozonStatus          String? // dernier libellé de statut connu (ex: "Mise en distribution")
+  ozonError           String? // dernière erreur Ozon (ex: ville non reconnue)
+  ozonTrackingHistory Json? // dernier historique tracking connu, mis à jour par le cron
+  ozonSyncedAt        DateTime? // dernière TENTATIVE de sync (réussie ou non)
+  ozonStatusChangedAt DateTime? // mis à jour uniquement quand ozonStatus a réellement changé de valeur
+  ozonSyncFailCount   Int       @default(0)
+
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -48,6 +66,7 @@ model Order {
 
   @@index([status])
   @@index([forcelogCode])
+  @@index([ozonCode])
 }
 
 model OrderItem {
@@ -68,6 +87,11 @@ enum OrderStatus {
 enum OrderSource {
   SHOPIFY
   MANUEL
+}
+
+enum Carrier {
+  FORCELOG
+  OZON
 }
 
 // Factures CRBT (bordereaux de règlement/virement) — synchronisées depuis

@@ -1,6 +1,6 @@
 import type { Order } from "@prisma/client";
 
-export default function OrderParcelList({
+export default function OzonParcelList({
   orders,
   emptyMessage,
 }: {
@@ -16,7 +16,7 @@ export default function OrderParcelList({
       {orders.map((order) => (
         <a
           key={order.id}
-          href={`/parcels/forcelog/${encodeURIComponent(order.forcelogCode!)}`}
+          href={`/parcels/ozon/${encodeURIComponent(order.ozonCode!)}`}
           className="block bg-white border border-line rounded-2xl p-4 hover:border-sage-dark transition-colors"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -25,13 +25,11 @@ export default function OrderParcelList({
                 #{order.orderNumber} — {order.customerName}
               </p>
               <p className="text-xs text-muted">
-                {order.city} · <span className="font-mono">{order.forcelogCode}</span>
+                {order.city} · <span className="font-mono">{order.ozonCode}</span>
               </p>
             </div>
             <div className="text-right">
-              <span className="badge bg-slate/20 text-slate">
-                {order.forcelogStatus || "Statut inconnu"}
-              </span>
+              <span className="badge bg-slate/20 text-slate">{order.ozonStatus || "Statut inconnu"}</span>
               <p className="text-sm font-semibold mt-1">{Number(order.totalPrice)} DH</p>
             </div>
           </div>

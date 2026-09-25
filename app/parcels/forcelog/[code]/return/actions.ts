@@ -29,5 +29,5 @@ export async function submitReturn(
     return { error: err instanceof Error ? err.message : String(err) };
   }
 
-  redirect(`/parcels/${encodeURIComponent(code)}?return=success`);
+  redirect(`/parcels/forcelog/${encodeURIComponent(code)}?return=success`);
 }

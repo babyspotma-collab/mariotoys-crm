@@ -33,7 +33,7 @@ export default async function NoAnswerPage() {
           <div key={order.id} className="bg-white border border-line rounded-2xl p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <a
-                href={`/parcels/${encodeURIComponent(order.forcelogCode!)}`}
+                href={`/parcels/forcelog/${encodeURIComponent(order.forcelogCode!)}`}
                 className="hover:opacity-70 transition-opacity"
               >
                 <p className="text-sm font-medium">

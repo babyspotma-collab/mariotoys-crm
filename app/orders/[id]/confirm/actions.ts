@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { addParcel } from "@/lib/forcelog";
+import { addParcel as addForcelogParcel } from "@/lib/forcelog";
+import { addParcel as addOzonParcel } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export type ConfirmState = { error: string | null };
@@ -15,19 +16,20 @@ export async function createParcel(
   _prevState: ConfirmState,
   formData: FormData
 ): Promise<ConfirmState> {
+  const carrier = String(formData.get("carrier") ?? "FORCELOG").trim();
   const receiver = String(formData.get("receiver") ?? "").trim();
   const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());
-  const city = String(formData.get("city") ?? "").trim();
-  const quartier = String(formData.get("quartier") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
   const comment = String(formData.get("comment") ?? "").trim();
   const productNature = String(formData.get("productNature") ?? "").trim();
   const priceRaw = String(formData.get("price") ?? "");
   const fragile = formData.get("fragile") === "on";
-
   const price = Number(priceRaw);
 
-  if (!receiver || !phone || !city || !address || !productNature) {
+  if (carrier !== "FORCELOG" && carrier !== "OZON") {
+    return { error: "Transporteur invalide." };
+  }
+  if (!receiver || !phone || !address || !productNature) {
     return { error: "Tous les champs obligatoires doivent être remplis." };
   }
   if (!Number.isFinite(price) || price <= 0) {
@@ -37,42 +39,83 @@ export async function createParcel(
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 
   try {
-    const parcel = await addParcel({
-      orderNum: order.orderNumber,
-      receiver,
-      phone,
-      city, // code Forcelog choisi dans la liste déroulante
-      quartier: quartier || undefined,
-      address,
-      comment: comment || undefined,
-      cod: price,
-      productNature,
-      fragile,
-    });
+    if (carrier === "FORCELOG") {
+      const city = String(formData.get("forcelogCity") ?? "").trim();
+      const quartier = String(formData.get("quartier") ?? "").trim();
+      if (!city) return { error: "La ville est obligatoire." };
 
-    await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: "CONFIRMEE",
-        forcelogCode: parcel.code,
-        forcelogError: null,
-        forcelogProductNature: productNature,
-        customerName: receiver,
+      const parcel = await addForcelogParcel({
+        orderNum: order.orderNumber,
+        receiver,
         phone,
-        city,
-        quartier: quartier || null,
+        city, // code Forcelog choisi dans la liste déroulante
+        quartier: quartier || undefined,
         address,
-        comment: comment || null,
+        comment: comment || undefined,
+        cod: price,
+        productNature,
         fragile,
-        totalPrice: price,
-      },
-    });
+      });
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: "CONFIRMEE",
+          carrier: "FORCELOG",
+          forcelogCode: parcel.code,
+          forcelogError: null,
+          forcelogProductNature: productNature,
+          customerName: receiver,
+          phone,
+          city,
+          quartier: quartier || null,
+          address,
+          comment: comment || null,
+          fragile,
+          totalPrice: price,
+        },
+      });
+    } else {
+      const cityId = String(formData.get("ozonCity") ?? "").trim();
+      if (!cityId) return { error: "La ville est obligatoire." };
+
+      const parcel = await addOzonParcel({
+        receiver,
+        phone,
+        cityId, // ID ville Ozon choisi dans la liste déroulante
+        address,
+        note: comment || undefined,
+        price,
+        nature: productNature,
+        fragile,
+      });
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: "CONFIRMEE",
+          carrier: "OZON",
+          ozonCode: parcel.code,
+          ozonError: null,
+          customerName: receiver,
+          phone,
+          city: cityId,
+          address,
+          comment: comment || null,
+          fragile,
+          totalPrice: price,
+        },
+      });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Gardée en NOUVELLE : l'utilisateur reste sur l'écran pour corriger
     // et réessayer, sans rien perdre de ses modifications (formulaire non
     // contrôlé, ses valeurs restent affichées côté navigateur).
-    await prisma.order.update({ where: { id: orderId }, data: { forcelogError: message } });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: carrier === "FORCELOG" ? { forcelogError: message } : { ozonError: message },
+    });
     return { error: message };
   }
 

@@ -27,15 +27,15 @@ export default async function ParcelDetailPage({ params }: { params: { code: str
   return (
     <main className="max-w-2xl mx-auto px-6 py-10">
       <p className="text-xs text-muted mb-2">
-        <a href="/parcels">← Retour aux colis</a>
+        <a href="/parcels/forcelog">← Retour aux colis</a>
       </p>
       <h1 className="text-xl font-semibold mb-1 font-mono">{code}</h1>
 
       <div className="flex gap-2 mb-8">
-        <a href={`/parcels/${encodeURIComponent(code)}/return`} className="btn-danger">
+        <a href={`/parcels/forcelog/${encodeURIComponent(code)}/return`} className="btn-danger">
           Demander un retour
         </a>
-        <a href={`/parcels/${encodeURIComponent(code)}/claim`} className="btn-primary">
+        <a href={`/parcels/forcelog/${encodeURIComponent(code)}/claim`} className="btn-primary">
           Réclamation
         </a>
       </div>

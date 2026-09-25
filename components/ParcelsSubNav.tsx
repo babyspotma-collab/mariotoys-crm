@@ -11,9 +11,9 @@ export default function ParcelsSubNav({
   counts: ParcelCategoryCounts;
 }) {
   const tabs = [
-    { id: "all" as const, label: "Tous les colis", href: "/parcels", count: counts.all },
+    { id: "all" as const, label: "Tous les colis", href: "/parcels/forcelog", count: counts.all },
     ...PARCEL_CATEGORIES.map((c) => ({ id: c.id, label: c.label, href: c.href, count: counts[c.id] })),
-    { id: "other" as const, label: "Autre", href: "/parcels/other", count: counts.other },
+    { id: "other" as const, label: "Autre", href: "/parcels/forcelog/other", count: counts.other },
   ];
 
   return (

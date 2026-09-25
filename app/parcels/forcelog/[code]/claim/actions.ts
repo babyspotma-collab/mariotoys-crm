@@ -32,7 +32,7 @@ export async function submitCreateClaim(
     return { error: err instanceof Error ? err.message : String(err) };
   }
 
-  revalidatePath(`/parcels/${code}/claim`);
+  revalidatePath(`/parcels/forcelog/${code}/claim`);
   return { error: null };
 }
 
@@ -50,6 +50,6 @@ export async function submitReply(
     return { error: err instanceof Error ? err.message : String(err) };
   }
 
-  revalidatePath(`/parcels/${code}/claim`);
+  revalidatePath(`/parcels/forcelog/${code}/claim`);
   return { error: null };
 }

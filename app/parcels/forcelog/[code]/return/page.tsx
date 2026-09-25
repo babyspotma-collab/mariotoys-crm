@@ -23,7 +23,7 @@ export default async function ReturnPage({ params }: { params: { code: string } 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10">
       <p className="text-xs text-muted mb-2">
-        <a href={`/parcels/${encodeURIComponent(code)}`}>← Retour au colis</a>
+        <a href={`/parcels/forcelog/${encodeURIComponent(code)}`}>← Retour au colis</a>
       </p>
       <h1 className="text-xl font-semibold mb-1 font-mono">Retour — {code}</h1>
       <p className="text-sm text-muted mb-8">
