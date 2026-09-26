@@ -3,25 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { readProductPhoto } from "@/lib/gemini-vision";
+import { computeCompareAtPrice, computeSellPrice } from "@/lib/pricing";
 
-export type UploadState = { error: string | null; skipped: string[] };
-
-// Le prix (= coût d'achat, voir REGLES_PRODUIT.md du worker
-// mariotoys-images-automation) est le dernier groupe de chiffres du nom
-// de fichier, juste avant l'extension — ex: "299.jpg" ou
-// "voiture-police_299.jpg" -> 299. Convention partagée avec le worker :
-// lui ne parse rien, le champ "cost" du job vient d'ici.
-//
-// Le groupe de chiffres doit être précédé du début du nom ou d'un
-// séparateur (_ - espace) : sans ça, un export WhatsApp comme
-// "WhatsApp Image 2026-08-04 at 14.34.44.jpeg" ferait lire "44" (fragment
-// de l'heure) comme un prix — faux positif bien pire qu'un fichier ignoré.
-function parsePriceFromFilename(filename: string): number | null {
-  const match = filename.match(/(?:^|[_\-\s])(\d+)(?=\.[^.]+$)/);
-  if (!match) return null;
-  const value = parseInt(match[1], 10);
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
+export type UploadState = { error: string | null };
 
 export async function uploadProductPhotos(
   _prevState: UploadState,
@@ -30,43 +15,74 @@ export async function uploadProductPhotos(
   const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
 
   if (files.length === 0) {
-    return { error: "Sélectionnez au moins une photo.", skipped: [] };
+    return { error: "Sélectionnez au moins une photo." };
   }
 
-  const skipped: string[] = [];
+  const failures: string[] = [];
 
   for (const file of files) {
-    const cost = parsePriceFromFilename(file.name);
-    if (cost === null) {
-      // Règle du worker : pas de prix dans le nom -> on met de côté et on
-      // signale, jamais de traitement à l'aveugle.
-      skipped.push(file.name);
-      continue;
-    }
-
+    // Le nom du fichier (ex: export WhatsApp) est aléatoire et n'est
+    // JAMAIS utilisé pour en déduire une donnée produit — uniquement
+    // gardé pour affichage/traçabilité. Tout (prix d'achat, référence)
+    // est lu sur la photo elle-même.
     const blob = await put(`product-jobs/uploads/${file.name}`, file, {
       access: "public",
       addRandomSuffix: true,
     });
 
-    await prisma.productJob.create({
-      data: {
-        originalPhotoUrl: blob.url,
-        originalFilename: file.name,
-        cost,
-        status: "EN_ATTENTE",
-      },
-    });
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const reading = await readProductPhoto(buffer, file.type || "image/jpeg");
+
+      if (!reading) {
+        await prisma.productJob.create({
+          data: {
+            originalPhotoUrl: blob.url,
+            originalFilename: file.name,
+            status: "ERREUR",
+            errorMessage: "Aucun prix d'achat lisible sur la photo — vérifiez qu'il est bien visible.",
+            completedAt: new Date(),
+          },
+        });
+        continue;
+      }
+
+      const sellPrice = computeSellPrice(reading.cost);
+      const compareAtPrice = computeCompareAtPrice(sellPrice);
+
+      await prisma.productJob.create({
+        data: {
+          originalPhotoUrl: blob.url,
+          originalFilename: file.name,
+          cost: reading.cost,
+          sku: reading.sku,
+          sellPrice,
+          compareAtPrice,
+          status: "EN_ATTENTE",
+        },
+      });
+    } catch (err) {
+      // Échec technique de la lecture (API Gemini indisponible, quota...) —
+      // le job existe quand même (photo déjà uploadée), en erreur, plutôt
+      // que de perdre la photo silencieusement.
+      await prisma.productJob.create({
+        data: {
+          originalPhotoUrl: blob.url,
+          originalFilename: file.name,
+          status: "ERREUR",
+          errorMessage: err instanceof Error ? err.message : String(err),
+          completedAt: new Date(),
+        },
+      });
+      failures.push(file.name);
+    }
   }
 
   revalidatePath("/product-jobs");
 
-  if (skipped.length > 0) {
-    return {
-      error: `Prix introuvable dans le nom de fichier, ignoré(s) : ${skipped.join(", ")}`,
-      skipped,
-    };
+  if (failures.length > 0) {
+    return { error: `Échec de lecture pour : ${failures.join(", ")} (voir statut "Erreur" dans la liste).` };
   }
 
-  return { error: null, skipped: [] };
+  return { error: null };
 }

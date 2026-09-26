@@ -14,7 +14,7 @@ function SubmitButton() {
 }
 
 export default function UploadPhotosForm() {
-  const initialState: UploadState = { error: null, skipped: [] };
+  const initialState: UploadState = { error: null };
   const [state, formAction] = useFormState(uploadProductPhotos, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -31,9 +31,9 @@ export default function UploadPhotosForm() {
         Photos produit
       </label>
       <p className="text-xs text-muted mb-3">
-        Le prix (coût d&apos;achat) doit être à la fin du nom de fichier, ex :{" "}
-        <span className="font-mono">299.jpg</span> ou{" "}
-        <span className="font-mono">voiture-police_299.jpg</span>.
+        Le nom du fichier n&apos;a pas d&apos;importance (export WhatsApp, etc.) — le prix
+        d&apos;achat et la référence (si présente) sont lus automatiquement sur la
+        photo elle-même. Assurez-vous qu&apos;ils y sont bien visibles.
       </p>
       <input
         id="photos"

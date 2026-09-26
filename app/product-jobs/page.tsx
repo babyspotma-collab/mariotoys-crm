@@ -33,8 +33,10 @@ export default async function ProductJobsPage() {
       <AppHeader active="productJobs" />
       <h1 className="text-xl font-semibold mb-1">Création produits</h1>
       <p className="text-sm text-muted mb-8">
-        Dépose des photos produit ci-dessous — le worker sur PC génère les visuels via Gemini,
-        puis la création du produit Shopify (fiche + brouillon) se fait dans une session à part.
+        Dépose des photos produit ci-dessous — le prix d&apos;achat et la référence
+        sont lus automatiquement sur chaque photo, puis le worker sur PC génère
+        les visuels via Gemini ; la création du produit Shopify (fiche + brouillon)
+        se fait dans une session à part.
       </p>
 
       <UploadPhotosForm />
@@ -48,7 +50,10 @@ export default async function ProductJobsPage() {
               <div>
                 <p className="font-medium">{job.originalFilename}</p>
                 <p className="text-sm text-muted">
-                  Coût : {job.cost ? `${Number(job.cost)} DH` : "—"} ·{" "}
+                  Coût : {job.cost ? `${Number(job.cost)} DH` : "—"}
+                  {job.sellPrice ? ` · Prix de vente : ${Number(job.sellPrice)} DH` : ""}
+                  {job.compareAtPrice ? ` (barré ${Number(job.compareAtPrice)} DH)` : ""}
+                  {job.sku ? ` · Réf. ${job.sku}` : ""} ·{" "}
                   {job.createdAt.toLocaleString("fr-FR", {
                     day: "2-digit",
                     month: "short",

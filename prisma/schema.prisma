@@ -138,8 +138,11 @@ model ProductJob {
   status   ProductJobStatus @default(EN_ATTENTE)
 
   originalPhotoUrl String // Vercel Blob — photo déposée par l'utilisateur
-  originalFilename String // conservé pour affichage/traçabilité
-  cost             Decimal? @db.Decimal(10, 2) // extrait du nom de fichier (prix = coût d'achat, voir REGLES_PRODUIT.md du worker) ; null si non trouvé
+  originalFilename String // conservé pour affichage/traçabilité UNIQUEMENT (nom aléatoire type export WhatsApp) — jamais utilisé pour en déduire une donnée produit
+  cost             Decimal? @db.Decimal(10, 2) // prix d'achat lu sur la photo elle-même (IA vision, voir lib/gemini-vision.ts) ; null si illisible -> ERREUR
+  sku              String?  @db.VarChar(100) // référence lue sur la photo si visible, sinon null (jamais dans la description, voir REGLES_PRODUIT.md)
+  sellPrice        Decimal? @db.Decimal(10, 2) // prix de vente calculé : coût x 2,1, arrondi au multiple de 50 supérieur, -1 DH
+  compareAtPrice   Decimal? @db.Decimal(10, 2) // prix barré affiché : entier se terminant par 9, remise 10-30% vs sellPrice
 
   generatedImageUrls Json? // array de Vercel Blob URLs, rempli par le worker une fois les visuels générés
 

@@ -1,14 +1,24 @@
-// Règles de prix : prix de vente = coût arrondi au multiple de 50 DH
-// supérieur, puis -1 DH (jamais un prix rond). Prix de comparaison =
-// remise aléatoire affichée entre 10% et 30% (comparePrice tel que
-// price = comparePrice * (1 - remise)).
+// Règles de prix Mario Toys (méthode photos) — voir
+// mariotoys-images-automation/REGLES_PRODUIT.md, section "Prix, coût et
+// remise". Partagées ici pour que la page Création produits affiche déjà
+// les prix calculés, sans attendre l'étape de création Shopify.
 
-export function computeSalePrice(cost: number): number {
-  const roundedUp = Math.ceil(cost / 50) * 50;
-  return roundedUp - 1;
+// Prix de vente = coût x 2,1, arrondi au multiple de 50 DH supérieur, -1 DH
+// (jamais un prix qui finit par 0). Ex : coût 60 -> 126 -> 150 -> 149.
+export function computeSellPrice(cost: number): number {
+  return Math.ceil((cost * 2.1) / 50) * 50 - 1;
 }
 
-export function computeCompareAtPrice(price: number): number {
-  const discount = 0.1 + Math.random() * 0.2; // entre 10% et 30%
-  return Math.round(price / (1 - discount));
+// Prix de comparaison (affiché barré) : entier se terminant par 9, choisi
+// aléatoirement parmi les valeurs donnant une remise affichée entre 10 %
+// et 30 % par rapport au prix de vente.
+export function computeCompareAtPrice(sellPrice: number): number {
+  const candidates: number[] = [];
+  for (let c = sellPrice; c <= sellPrice * 1.5; c++) {
+    if (c % 10 !== 9) continue;
+    const discount = (c - sellPrice) / c;
+    if (discount >= 0.1 && discount <= 0.3) candidates.push(c);
+  }
+  if (candidates.length === 0) return sellPrice;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
