@@ -8,11 +8,12 @@ import { logout } from "@/app/actions";
 const LOGO_URL =
   "https://cdn.shopify.com/s/files/1/0668/6579/1069/files/Logo_Mario_Toys_Brillant.png?v=1773845006";
 
-export type NavTab = "orders" | "parcels" | "billing" | "stats";
+export type NavTab = "orders" | "parcels" | "billing" | "stats" | "productJobs";
 
 const TABS: { id: NavTab; label: string; href: string }[] = [
   { id: "orders", label: "Commandes", href: "/" },
   { id: "parcels", label: "Colis", href: "/parcels" },
+  { id: "productJobs", label: "Création produits", href: "/product-jobs" },
   { id: "billing", label: "Facturation", href: "/billing" },
   { id: "stats", label: "Statistiques", href: "/stats" },
 ];

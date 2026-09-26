@@ -122,6 +122,49 @@ model Parcel {
   @@index([orderId])
 }
 
+// File d'attente de génération de visuels produit (voir
+// app/product-jobs) — alimentée par l'upload de photos dans le CRM,
+// traitée par le worker externe (projet mariotoys-images-automation, sur
+// le PC de l'utilisateur, jamais sur Vercel — Playwright/Chrome n'y sont
+// pas adaptés, même raisonnement que pour Forcelog/Ozon).
+//
+// Cycle : EN_ATTENTE (photo uploadée) -> EN_COURS (worker a récupéré le
+// job) -> IMAGES_PRETES (visuels Gemini générés et uploadés, prêts à être
+// examinés) -> CREE (produit Shopify créé en brouillon, après rédaction
+// de la fiche — étape humaine/Claude, PAS automatisée par le worker) ;
+// ERREUR à tout moment, avec errorMessage.
+model ProductJob {
+  id       String           @id @default(cuid())
+  status   ProductJobStatus @default(EN_ATTENTE)
+
+  originalPhotoUrl String // Vercel Blob — photo déposée par l'utilisateur
+  originalFilename String // conservé pour affichage/traçabilité
+  cost             Decimal? @db.Decimal(10, 2) // extrait du nom de fichier (prix = coût d'achat, voir REGLES_PRODUIT.md du worker) ; null si non trouvé
+
+  generatedImageUrls Json? // array de Vercel Blob URLs, rempli par le worker une fois les visuels générés
+
+  shopifyProductId  String? // gid://shopify/Product/... une fois créé
+  shopifyProductUrl String? // lien admin direct, pour l'affichage
+
+  errorMessage String?
+
+  claimedAt   DateTime? // quand le worker a récupéré le job
+  completedAt DateTime? // quand IMAGES_PRETES ou ERREUR a été atteint
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+enum ProductJobStatus {
+  EN_ATTENTE
+  EN_COURS
+  IMAGES_PRETES
+  CREE
+  ERREUR
+}
+
 // Factures CRBT (bordereaux de règlement/virement) — synchronisées depuis
 // le dashboard web Forcelog (customer.forcelog.ma/index/CRBT/Json),
 // aucun endpoint équivalent n'existant sur l'API publique. Voir
