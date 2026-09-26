@@ -1,7 +1,7 @@
 import { PARCEL_CATEGORIES, type ParcelCategoryId } from "@/lib/parcel-categories";
 import type { ParcelCategoryCounts } from "@/lib/parcel-category-counts";
 
-export type ParcelsSubTab = ParcelCategoryId | "all" | "other";
+export type ParcelsSubTab = ParcelCategoryId | "all" | "uncategorized";
 
 export default function ParcelsSubNav({
   active,
@@ -13,7 +13,12 @@ export default function ParcelsSubNav({
   const tabs = [
     { id: "all" as const, label: "Tous les colis", href: "/parcels/forcelog", count: counts.all },
     ...PARCEL_CATEGORIES.map((c) => ({ id: c.id, label: c.label, href: c.href, count: counts[c.id] })),
-    { id: "other" as const, label: "Autre", href: "/parcels/forcelog/other", count: counts.other },
+    {
+      id: "uncategorized" as const,
+      label: "Non catégorisé",
+      href: "/parcels/forcelog/uncategorized",
+      count: counts.uncategorized,
+    },
   ];
 
   return (

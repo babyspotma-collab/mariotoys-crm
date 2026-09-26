@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { PARCEL_CATEGORIES, ALL_CATEGORIZED_CODES, type ParcelCategoryId } from "./parcel-categories";
 
-export type ParcelCategoryCounts = Record<ParcelCategoryId | "all" | "other", number>;
+export type ParcelCategoryCounts = Record<ParcelCategoryId | "all" | "uncategorized", number>;
 
 /** Un seul groupBy sur Parcel.statusCode (carrier FORCELOG), réparti ensuite entre les catégories — utilisé pour les compteurs affichés sur chaque onglet. */
 export async function getParcelCategoryCounts(): Promise<ParcelCategoryCounts> {
@@ -17,7 +17,7 @@ export async function getParcelCategoryCounts(): Promise<ParcelCategoryCounts> {
       .filter((r) => r.statusCode && cat.codes.includes(r.statusCode))
       .reduce((sum, r) => sum + r._count, 0);
   }
-  counts.other = rows
+  counts.uncategorized = rows
     .filter((r) => !r.statusCode || !ALL_CATEGORIZED_CODES.includes(r.statusCode))
     .reduce((sum, r) => sum + r._count, 0);
   counts.all = rows.reduce((sum, r) => sum + r._count, 0);

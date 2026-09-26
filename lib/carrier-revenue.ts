@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { categoryById } from "@/lib/parcel-categories";
+import { ozonCategoryById } from "@/lib/ozon-categories";
 
 // "Depuis le 1er septembre 2026" — même borne que les scripts de sync
 // (voir scripts/sync-forcelog-web.js / sync-ozon-web.js), calculé
@@ -6,15 +8,12 @@ import { prisma } from "@/lib/db";
 // commandes du CRM) plutôt que sur Order.
 const SINCE = new Date("2026-09-01T00:00:00Z");
 
-const FORCELOG_DELIVERED_CODES = ["DELIVERED", "DELIVERED_INVOICED", "DELIVERED_NOT_INVOICED"];
-const OZON_DELIVERED_STATUS = "Livré";
-
 export async function getCarrierRevenue(): Promise<{ forcelog: number; ozon: number }> {
   const [forcelogAgg, ozonAgg] = await Promise.all([
     prisma.parcel.aggregate({
       where: {
         carrier: "FORCELOG",
-        statusCode: { in: FORCELOG_DELIVERED_CODES },
+        statusCode: { in: categoryById("delivered").codes },
         carrierCreatedAt: { gte: SINCE },
       },
       _sum: { price: true },
@@ -22,7 +21,7 @@ export async function getCarrierRevenue(): Promise<{ forcelog: number; ozon: num
     prisma.parcel.aggregate({
       where: {
         carrier: "OZON",
-        status: OZON_DELIVERED_STATUS,
+        status: { in: ozonCategoryById("delivered").statuses },
         carrierCreatedAt: { gte: SINCE },
       },
       _sum: { price: true },

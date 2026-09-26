@@ -1,7 +1,7 @@
 import { OZON_CATEGORIES, type OzonCategoryId } from "@/lib/ozon-categories";
 import type { OzonCategoryCounts } from "@/lib/ozon-category-counts";
 
-export type OzonParcelsSubTab = OzonCategoryId | "all" | "other";
+export type OzonParcelsSubTab = OzonCategoryId | "all" | "uncategorized";
 
 export default function OzonParcelsSubNav({
   active,
@@ -13,7 +13,12 @@ export default function OzonParcelsSubNav({
   const tabs = [
     { id: "all" as const, label: "Tous les colis", href: "/parcels/ozon", count: counts.all },
     ...OZON_CATEGORIES.map((c) => ({ id: c.id, label: c.label, href: c.href, count: counts[c.id] })),
-    { id: "other" as const, label: "Autre", href: "/parcels/ozon/other", count: counts.other },
+    {
+      id: "uncategorized" as const,
+      label: "Non catégorisé",
+      href: "/parcels/ozon/uncategorized",
+      count: counts.uncategorized,
+    },
   ];
 
   return (
