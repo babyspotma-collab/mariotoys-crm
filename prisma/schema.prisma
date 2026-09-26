@@ -122,27 +122,32 @@ model Parcel {
   @@index([orderId])
 }
 
-// File d'attente de génération de visuels produit (voir
-// app/product-jobs) — alimentée par l'upload de photos dans le CRM,
-// traitée par le worker externe (projet mariotoys-images-automation, sur
-// le PC de l'utilisateur, jamais sur Vercel — Playwright/Chrome n'y sont
-// pas adaptés, même raisonnement que pour Forcelog/Ozon).
+// File d'attente produit (voir app/product-jobs) — le CRM ne fait QUE
+// stocker la photo et créer le job ; le worker externe (projet
+// mariotoys-images-automation, sur le PC de l'utilisateur, jamais sur
+// Vercel — Playwright/Chrome n'y sont pas adaptés, même raisonnement que
+// pour Forcelog/Ozon) fait TOUT le reste via Gemini web : lecture des
+// infos sur la photo (prix, référence...), génération des visuels,
+// création du produit Shopify en brouillon. Aucune donnée produit n'est
+// jamais déduite du nom de fichier (photos = exports WhatsApp aléatoires).
 //
 // Cycle : EN_ATTENTE (photo uploadée) -> EN_COURS (worker a récupéré le
-// job) -> IMAGES_PRETES (visuels Gemini générés et uploadés, prêts à être
-// examinés) -> CREE (produit Shopify créé en brouillon, après rédaction
-// de la fiche — étape humaine/Claude, PAS automatisée par le worker) ;
-// ERREUR à tout moment, avec errorMessage.
+// job) -> CREE (produit Shopify créé en brouillon, toutes les infos
+// lues) ou CREE_A_COMPLETER (créé quand même, mais prix et/ou référence
+// illisibles sur la photo — voir missingFields, tag "À compléter" côté
+// Shopify) ; ERREUR à tout moment (échec technique réel), avec errorMessage.
 model ProductJob {
   id       String           @id @default(cuid())
   status   ProductJobStatus @default(EN_ATTENTE)
 
   originalPhotoUrl String // Vercel Blob — photo déposée par l'utilisateur
   originalFilename String // conservé pour affichage/traçabilité UNIQUEMENT (nom aléatoire type export WhatsApp) — jamais utilisé pour en déduire une donnée produit
-  cost             Decimal? @db.Decimal(10, 2) // prix d'achat lu sur la photo elle-même (IA vision, voir lib/gemini-vision.ts) ; null si illisible -> ERREUR
+  cost             Decimal? @db.Decimal(10, 2) // prix d'achat lu par le worker sur la photo elle-même ; null si illisible (voir missingFields)
   sku              String?  @db.VarChar(100) // référence lue sur la photo si visible, sinon null (jamais dans la description, voir REGLES_PRODUIT.md)
-  sellPrice        Decimal? @db.Decimal(10, 2) // prix de vente calculé : coût x 2,1, arrondi au multiple de 50 supérieur, -1 DH
+  sellPrice        Decimal? @db.Decimal(10, 2) // prix de vente calculé par le worker : coût x 2,1, arrondi au multiple de 50 supérieur, -1 DH
   compareAtPrice   Decimal? @db.Decimal(10, 2) // prix barré affiché : entier se terminant par 9, remise 10-30% vs sellPrice
+  missingFields    String[] @default([]) // ex: ["cost","sku"] — infos non lisibles sur la photo, produit créé quand même en CREE_A_COMPLETER
+  note             String? // signal non bloquant du worker (ex: Gemini a refusé de générer un visuel, photo originale recadrée utilisée à la place)
 
   generatedImageUrls Json? // array de Vercel Blob URLs, rempli par le worker une fois les visuels générés
 
@@ -152,7 +157,7 @@ model ProductJob {
   errorMessage String?
 
   claimedAt   DateTime? // quand le worker a récupéré le job
-  completedAt DateTime? // quand IMAGES_PRETES ou ERREUR a été atteint
+  completedAt DateTime? // quand CREE/CREE_A_COMPLETER/ERREUR a été atteint
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -163,8 +168,9 @@ model ProductJob {
 enum ProductJobStatus {
   EN_ATTENTE
   EN_COURS
-  IMAGES_PRETES
+  IMAGES_PRETES // plus émis depuis le nouveau pipeline (le worker enchaîne directement jusqu'à CREE/CREE_A_COMPLETER) — gardé pour éviter une migration destructive de l'enum Postgres
   CREE
+  CREE_A_COMPLETER
   ERREUR
 }
 

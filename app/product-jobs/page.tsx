@@ -8,15 +8,15 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     EN_ATTENTE: "bg-slate/20 text-slate",
     EN_COURS: "bg-sage/20 text-sage-dark",
-    IMAGES_PRETES: "bg-sage/20 text-sage-dark",
     CREE: "bg-sage/20 text-sage-dark",
+    CREE_A_COMPLETER: "bg-amber-100 text-amber-800",
     ERREUR: "bg-danger/10 text-danger",
   };
   const labels: Record<string, string> = {
     EN_ATTENTE: "En attente",
     EN_COURS: "En cours",
-    IMAGES_PRETES: "Visuels prêts",
     CREE: "Créé",
+    CREE_A_COMPLETER: "Créé – à compléter",
     ERREUR: "Erreur",
   };
   return <span className={`badge ${styles[status] ?? ""}`}>{labels[status] ?? status}</span>;
@@ -33,10 +33,10 @@ export default async function ProductJobsPage() {
       <AppHeader active="productJobs" />
       <h1 className="text-xl font-semibold mb-1">Création produits</h1>
       <p className="text-sm text-muted mb-8">
-        Dépose des photos produit ci-dessous — le prix d&apos;achat et la référence
-        sont lus automatiquement sur chaque photo, puis le worker sur PC génère
-        les visuels via Gemini ; la création du produit Shopify (fiche + brouillon)
-        se fait dans une session à part.
+        Dépose des photos produit ci-dessous — le worker sur PC lit le prix
+        et la référence sur chaque photo, génère les visuels via Gemini, puis
+        crée directement le produit Shopify en brouillon. Tout s&apos;enchaîne
+        automatiquement, sans étape manuelle intermédiaire.
       </p>
 
       <UploadPhotosForm />
@@ -85,7 +85,7 @@ export default async function ProductJobsPage() {
                 ))}
             </div>
 
-            {job.status === "CREE" && job.shopifyProductUrl && (
+            {(job.status === "CREE" || job.status === "CREE_A_COMPLETER") && job.shopifyProductUrl && (
               <a
                 href={job.shopifyProductUrl}
                 target="_blank"
@@ -94,6 +94,16 @@ export default async function ProductJobsPage() {
               >
                 Voir le produit Shopify →
               </a>
+            )}
+
+            {job.status === "CREE_A_COMPLETER" && job.missingFields.length > 0 && (
+              <p className="text-xs text-amber-800 bg-amber-100 rounded-lg p-3 mt-3">
+                À compléter : {job.missingFields.join(", ")}
+              </p>
+            )}
+
+            {job.note && (
+              <p className="text-xs text-muted bg-slate/10 rounded-lg p-3 mt-3">{job.note}</p>
             )}
 
             {job.status === "ERREUR" && job.errorMessage && (

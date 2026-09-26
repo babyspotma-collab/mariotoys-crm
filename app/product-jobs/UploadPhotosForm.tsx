@@ -31,9 +31,9 @@ export default function UploadPhotosForm() {
         Photos produit
       </label>
       <p className="text-xs text-muted mb-3">
-        Le nom du fichier n&apos;a pas d&apos;importance (export WhatsApp, etc.) — le prix
-        d&apos;achat et la référence (si présente) sont lus automatiquement sur la
-        photo elle-même. Assurez-vous qu&apos;ils y sont bien visibles.
+        Le nom du fichier n&apos;a pas d&apos;importance (export WhatsApp, etc.). Dépose
+        juste les photos — le worker sur PC s&apos;occupe de tout le reste
+        (lecture du prix/référence, visuels, création du produit).
       </p>
       <input
         id="photos"
