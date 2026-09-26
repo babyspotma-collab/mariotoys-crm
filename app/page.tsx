@@ -131,6 +131,15 @@ export default async function DashboardPage({
                 <p className="text-sm text-muted">
                   {order.address}, {order.city} · {normalizeMoroccanPhone(order.phone)}
                 </p>
+                <p className="text-xs text-muted mt-1">
+                  {order.createdAt.toLocaleString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={order.status} />
