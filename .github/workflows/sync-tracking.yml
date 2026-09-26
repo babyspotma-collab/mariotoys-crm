@@ -69,3 +69,16 @@ jobs:
           CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node scripts/sync-forcelog-web.js
+
+      # Ozon Express n'a aucun endpoint API pour lister tous les colis
+      # (uniquement recherche par numéro de suivi) — même contournement
+      # que Forcelog ci-dessus, via leur dashboard web
+      # (client.ozoneexpress.ma).
+      - name: Synchroniser via le dashboard web Ozon Express
+        if: always()
+        env:
+          OZON_WEB_EMAIL: ${{ secrets.OZON_WEB_EMAIL }}
+          OZON_WEB_PASSWORD: ${{ secrets.OZON_WEB_PASSWORD }}
+          CRM_BASE_URL: ${{ vars.CRM_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/sync-ozon-web.js

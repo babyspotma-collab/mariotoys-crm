@@ -10,10 +10,11 @@ export const dynamic = "force-dynamic";
 const CATEGORY = ozonCategoryById("delivering");
 
 export default async function OzonDeliveringPage() {
-  const [orders, counts] = await Promise.all([
-    prisma.order.findMany({
-      where: { status: "CONFIRMEE", carrier: "OZON", ozonStatus: { in: CATEGORY.statuses } },
-      orderBy: { ozonStatusChangedAt: "desc" },
+  const [parcels, counts] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "OZON", status: { in: CATEGORY.statuses } },
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
     }),
     getOzonCategoryCounts(),
   ]);
@@ -22,7 +23,7 @@ export default async function OzonDeliveringPage() {
     <main className="max-w-5xl mx-auto px-6 py-10">
       <AppHeader active="parcels" />
       <OzonParcelsSubNav active="delivering" counts={counts} />
-      <OzonParcelList orders={orders} emptyMessage="Aucun colis en cours de livraison pour l'instant." />
+      <OzonParcelList parcels={parcels} emptyMessage="Aucun colis en cours de livraison pour l'instant." />
     </main>
   );
 }

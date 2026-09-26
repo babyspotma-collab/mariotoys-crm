@@ -8,15 +8,11 @@ import { getOzonCategoryCounts } from "@/lib/ozon-category-counts";
 export const dynamic = "force-dynamic";
 
 export default async function OzonOtherPage() {
-  const [orders, counts] = await Promise.all([
-    prisma.order.findMany({
-      where: {
-        status: "CONFIRMEE",
-        carrier: "OZON",
-        ozonCode: { not: null },
-        ozonStatus: { not: null, notIn: ALL_OZON_CATEGORIZED_STATUSES },
-      },
-      orderBy: { ozonStatusChangedAt: "desc" },
+  const [parcels, counts] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "OZON", status: { notIn: ALL_OZON_CATEGORIZED_STATUSES } },
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
     }),
     getOzonCategoryCounts(),
   ]);
@@ -29,7 +25,7 @@ export default async function OzonOtherPage() {
         Statuts Ozon ne correspondant à aucune des 5 catégories ci-dessus
         (ex : Nouveau Colis, Attente De Ramassage, Reporté, Livré...).
       </p>
-      <OzonParcelList orders={orders} emptyMessage="Aucun colis dans cette catégorie pour l'instant." />
+      <OzonParcelList parcels={parcels} emptyMessage="Aucun colis dans cette catégorie pour l'instant." />
     </main>
   );
 }

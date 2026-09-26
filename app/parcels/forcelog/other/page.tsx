@@ -8,14 +8,14 @@ import { getParcelCategoryCounts } from "@/lib/parcel-category-counts";
 export const dynamic = "force-dynamic";
 
 export default async function OtherPage() {
-  const [orders, counts] = await Promise.all([
-    prisma.order.findMany({
+  const [parcels, counts] = await Promise.all([
+    prisma.parcel.findMany({
       where: {
-        status: "CONFIRMEE",
-        forcelogCode: { not: null },
-        forcelogStatusCode: { not: null, notIn: ALL_CATEGORIZED_CODES },
+        carrier: "FORCELOG",
+        OR: [{ statusCode: null }, { statusCode: { notIn: ALL_CATEGORIZED_CODES } }],
       },
-      orderBy: { forcelogStatusChangedAt: "desc" },
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
     }),
     getParcelCategoryCounts(),
   ]);
@@ -28,7 +28,7 @@ export default async function OtherPage() {
         Statuts Forcelog ne correspondant à aucune des 5 catégories ci-dessus
         (ex : Livré, Reporté, Relancer...).
       </p>
-      <OrderParcelList orders={orders} emptyMessage="Aucun colis dans cette catégorie pour l'instant." />
+      <OrderParcelList parcels={parcels} emptyMessage="Aucun colis dans cette catégorie pour l'instant." />
     </main>
   );
 }

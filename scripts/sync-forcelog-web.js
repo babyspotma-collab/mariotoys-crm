@@ -8,6 +8,11 @@
  * dont les endpoints JSON internes (DataTables) ont, eux, une pagination
  * et un filtrage réellement fonctionnels.
  *
+ * Récupère TOUS les colis depuis le 1er septembre 2026 (pas seulement ceux
+ * déjà liés à une commande du CRM) — la vraie liste côté Forcelog, y
+ * compris les colis créés en dehors du CRM. Voir prisma/schema.prisma
+ * (modèle Parcel) et app/api/cron/sync-forcelog-web/route.ts.
+ *
  * Ne tourne QUE dans GitHub Actions (voir .github/workflows/sync-tracking.yml)
  * — jamais sur Vercel, qui n'est pas un environnement adapté à Playwright
  * (pas de Chromium préinstallé, contraintes serverless). Playwright ne
@@ -30,26 +35,54 @@ const {
   CRON_SECRET,
 } = process.env;
 
-// STATUS_CODE réels confirmés via le <select id="f_statut"> de la page
-// "Liste des Colis" du dashboard (pas une supposition) — union des codes
-// couvrant les 5 catégories affichées par app/parcels/* (voir
-// lib/parcel-categories.ts, source de vérité côté app ; dupliqué ici car
-// ce script Node CommonJS autonome ne peut pas importer ce module
-// ESM/TS). Tout code Forcelog non listé ici tombe dans la catégorie
-// "Autre" côté app — c'est voulu, ce ne sont pas des statuts qu'on a
-// besoin de synchroniser activement.
-const PARCEL_STATUS_CODES = [
-  // Colis expédié
-  "PICKED_UP", "PICKED_UP_1", "SENT", "RECEIVED",
-  // Colis en cours de livraison
-  "DISTRIBUTION", "IN_PROGRESS", "TRAVELLING",
-  // Colis refusé ou annulé
-  "CANCELED", "DOESNT_ORDER", "REFUSE", "CANCELED_TEAM", "RETURNED", "PREPAR_RETURN", "RERETURN",
-  // Colis sans réponse
-  "NO_ANSWER", "NO_ANSWER_SMS", "NO_ANSWER_TEAM", "NOANSWER3", "UNREACHABLE", "UNREACHABLE_TEAM", "VOICEMAIL", "NUMBERERROR",
-  // Colis hors zone
-  "OUT_OF_AREA",
-];
+const SYNC_SINCE = "2026-09-01 00:00";
+
+// Table CODE -> libellé FR extraite en direct du <select id="f_statut"> de
+// la page "Liste des Colis" (pas devinée) — utilisée en sens inverse
+// (libellé -> code) puisque le tableau de colis lui-même n'expose que le
+// libellé, pas le code machine. Plusieurs codes peuvent partager un même
+// libellé affiché (ex: CANCELED et DOESNT_ORDER -> "Annulé") ; comme
+// lib/parcel-categories.ts regroupe déjà ces codes dans les mêmes
+// catégories, n'importe lequel des deux convient pour la classification.
+const LABEL_TO_CODE = {
+  "Reçu Hub": "PICKED_UP",
+  "Expédié vers la ville": "SENT",
+  "Reçu ville": "RECEIVED",
+  "En cours de livraison": "DISTRIBUTION",
+  "En cours": "IN_PROGRESS",
+  "Retourné": "RETURNED",
+  "Livré": "DELIVERED",
+  "Reporté": "POSTPONED",
+  "Pas de réponse": "NO_ANSWER",
+  "Injoignable": "UNREACHABLE",
+  "Hors-zone": "OUT_OF_AREA",
+  "Annulé": "CANCELED",
+  "Refusé": "REFUSE",
+  "En Voyage": "TRAVELLING",
+  "Relancer": "RELAUNCH",
+  "Relancer vers un nouveau client": "RELAUNCH_NEW",
+  "Pas de réponse ( Suivi )": "NO_ANSWER_TEAM",
+  "Injoignable ( Suivi )": "UNREACHABLE_TEAM",
+  "Reporté ( Suivi )": "POSTPONED_TEAM",
+  "Annulé ( Suivi )": "CANCELED_TEAM",
+  "Boîte vocale": "VOICEMAIL",
+  "Préparation retour": "PREPAR_RETURN",
+  "Attente Confirmation": "ATT_CONF",
+  "Confirmé par forcelog": "CONF",
+  "Traitement Suivi en cours": "TSUIVI",
+  "En cours de traitement par Forcelog": "SUIVI_TEAM",
+  "Colis dêja préparer": "PREPAREDCOLIS",
+  "Colis Non Reçu - Hub casablanca": "NOREC",
+  "Relancer vers une nouvelle ville (Meme zone)": "RELAUNCH_NEW_CITY",
+  "Eligible pour relancer vers nouvelle ville meme Zone": "EL_REZ",
+  "Programmé": "PROGRAMMED",
+  "Demande de retour (Par client)": "RERETURN",
+  "Aucune réponse depuis 3 jours": "NOANSWER3",
+  "Numéro invalide": "NUMBERERROR",
+  "Ramassé": "PICKED_UP_1",
+  "Livré - Facturé": "DELIVERED_INVOICED",
+  "Livré - Non Facturé": "DELIVERED_NOT_INVOICED",
+};
 
 const PAGE_LENGTH = 100;
 
@@ -63,6 +96,14 @@ function stripHtml(html) {
 function parseMoneyDh(text) {
   const n = parseFloat(String(text ?? "").replace(/[^\d.,-]/g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
+}
+
+function normPhone(raw) {
+  let d = String(raw ?? "").replace(/\D/g, "");
+  if (d.startsWith("212")) d = "0" + d.slice(3);
+  else if (d.startsWith("00212")) d = "0" + d.slice(5);
+  else if (d.length === 9 && !d.startsWith("0")) d = "0" + d;
+  return d;
 }
 
 async function login(browser) {
@@ -146,38 +187,50 @@ async function fetchAllPages(cookieHeader, url, baseParams, columns) {
 }
 
 async function collectParcels(cookieHeader) {
-  const parcelsByCode = new Map();
+  const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const rows = await fetchAllPages(
+    cookieHeader,
+    "https://customer.forcelog.ma/index/Parcels/Json",
+    {
+      f_city: "0",
+      f_situation: "0",
+      f_statut: "0",
+      f_parcel_type: "",
+      f_date: "C_DATE",
+      f_return: "",
+      f_claim: "",
+      f_product: "0",
+      f_cstmr_staff: "0",
+      f_time_s: SYNC_SINCE,
+      f_time_e: nowStr,
+    },
+    ["CODE", "PROD", "DATE", "RECEIVER", "SITUATION", "STATUT", "DAGENT", "D_DATE", "CITY", "PRICE", "CLAIM", "ACTIONS", "NOTES"]
+  );
 
-  for (const statusCode of PARCEL_STATUS_CODES) {
-    const rows = await fetchAllPages(
-      cookieHeader,
-      "https://customer.forcelog.ma/index/Parcels/Json",
-      {
-        f_city: "0",
-        f_situation: "0",
-        f_statut: statusCode,
-        f_parcel_type: "",
-        f_date: "C_DATE",
-        f_return: "",
-        f_claim: "",
-        f_product: "0",
-        f_cstmr_staff: "0",
-        f_time_s: "2020-01-01 00:00",
-        f_time_e: "2030-12-31 23:59",
-      },
-      ["CODE", "PROD", "DATE", "RECEIVER", "SITUATION", "STATUT", "DAGENT", "D_DATE", "CITY", "PRICE", "CLAIM", "ACTIONS", "NOTES"]
-    );
+  const parcels = [];
+  for (const row of rows) {
+    const code = (stripHtml(row.CODE).match(/^\S+/) || [])[0] ?? "";
+    if (!code) continue;
 
-    for (const row of rows) {
-      const code = stripHtml(row.CODE).trim();
-      if (!code) continue;
-      const status = stripHtml(row.STATUT);
-      parcelsByCode.set(code, { code, statusCode, status });
-    }
-    console.log(`  ${statusCode}: ${rows.length} colis trouvés`);
+    const receiverParts = String(row.RECEIVER ?? "").split("<br/>");
+    const receiver = stripHtml(receiverParts[0] ?? "");
+    const phone = normPhone(stripHtml(receiverParts[1] ?? ""));
+
+    const status = stripHtml(row.STATUT);
+    const statusCode = LABEL_TO_CODE[status] ?? null;
+
+    parcels.push({
+      code,
+      receiver,
+      phone,
+      cityName: stripHtml(row.CITY),
+      price: parseMoneyDh(row.PRICE),
+      status,
+      statusCode,
+      carrierCreatedAt: row.DATE || null,
+    });
   }
-
-  return [...parcelsByCode.values()];
+  return parcels;
 }
 
 async function collectInvoices(cookieHeader) {
@@ -221,9 +274,9 @@ async function main() {
   }
   console.log("Connecté.");
 
-  console.log("Récupération des colis (Pas de réponse / Annulé / Refusé)...");
+  console.log(`Récupération de tous les colis depuis le ${SYNC_SINCE}...`);
   const parcels = await collectParcels(cookieHeader);
-  console.log(`Total colis uniques: ${parcels.length}`);
+  console.log(`Total colis: ${parcels.length}`);
 
   console.log("Récupération des factures CRBT...");
   const invoices = await collectInvoices(cookieHeader);

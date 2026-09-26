@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { addParcel as addForcelogParcel } from "@/lib/forcelog";
-import { addParcel as addOzonParcel } from "@/lib/ozon";
+import { addParcel as addForcelogParcel, getCities as getForcelogCities } from "@/lib/forcelog";
+import { addParcel as addOzonParcel, getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export type ConfirmState = { error: string | null };
@@ -75,6 +75,26 @@ export async function createParcel(
           totalPrice: price,
         },
       });
+
+      // Créé tout de suite (pas besoin d'attendre le prochain sync de 2h,
+      // voir scripts/sync-forcelog-web.js) — ce dernier mettra à jour le
+      // statut réel dès son prochain passage.
+      const cities = await getForcelogCities().catch(() => []);
+      const cityName = cities.find((c) => c.code === city)?.name ?? city;
+      await prisma.parcel.upsert({
+        where: { carrier_code: { carrier: "FORCELOG", code: parcel.code } },
+        create: {
+          carrier: "FORCELOG",
+          code: parcel.code,
+          orderId,
+          receiver,
+          phone,
+          cityName,
+          price,
+          status: "Nouveau",
+        },
+        update: { orderId, receiver, phone, cityName, price },
+      });
     } else {
       const cityId = String(formData.get("ozonCity") ?? "").trim();
       if (!cityId) return { error: "La ville est obligatoire." };
@@ -105,6 +125,23 @@ export async function createParcel(
           fragile,
           totalPrice: price,
         },
+      });
+
+      const cities = await getOzonCities().catch(() => []);
+      const cityName = cities.find((c) => c.id === cityId)?.name ?? cityId;
+      await prisma.parcel.upsert({
+        where: { carrier_code: { carrier: "OZON", code: parcel.code } },
+        create: {
+          carrier: "OZON",
+          code: parcel.code,
+          orderId,
+          receiver,
+          phone,
+          cityName,
+          price,
+          status: "Nouveau Colis",
+        },
+        update: { orderId, receiver, phone, cityName, price },
       });
     }
   } catch (err) {

@@ -1,4 +1,5 @@
-import { getParcel, getTracking } from "@/lib/forcelog";
+import { prisma } from "@/lib/db";
+import { getTracking } from "@/lib/forcelog";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
@@ -6,16 +7,15 @@ export const dynamic = "force-dynamic";
 export default async function ParcelDetailPage({ params }: { params: { code: string } }) {
   const code = decodeURIComponent(params.code);
 
-  let parcel: Record<string, unknown> | null = null;
-  let parcelError: string | null = null;
-  try {
-    const raw = await getParcel(code);
-    parcel = raw["GET-PARCEL"];
-  } catch (err) {
-    parcelError = err instanceof Error ? err.message : String(err);
-  }
+  // Les détails viennent de Parcel (synchronisé toutes les 2h) plutôt que
+  // de GetParcel (API publique) : ce dernier échoue quasi systématiquement
+  // en pratique ("Parcel code Not Found", vérifié sur un échantillon de 20
+  // colis réels) — voir lib/forcelog.ts.
+  const parcel = await prisma.parcel.findUnique({
+    where: { carrier_code: { carrier: "FORCELOG", code } },
+  });
 
-  let history: Array<Record<string, unknown>> = [];
+  let history: Array<{ STATUS?: unknown; DATE?: unknown }> = [];
   let trackingError: string | null = null;
   try {
     const raw = await getTracking(code);
@@ -42,26 +42,22 @@ export default async function ParcelDetailPage({ params }: { params: { code: str
 
       <section className="bg-white border border-line rounded-2xl p-6 mb-6">
         <h2 className="text-sm font-semibold mb-4">Détails du colis</h2>
-        {parcelError ? (
+        {!parcel ? (
           <p className="text-sm text-danger">
-            Indisponible pour l&apos;instant : {parcelError}
+            Pas encore synchronisé — réessayez après le prochain passage du sync (toutes les 2h).
           </p>
         ) : (
           <dl className="grid grid-cols-2 gap-y-2 text-sm">
             <dt className="text-muted">Destinataire</dt>
-            <dd>{String(parcel?.RECEIVER ?? "—")}</dd>
+            <dd>{parcel.receiver || "—"}</dd>
             <dt className="text-muted">Téléphone</dt>
-            <dd>{parcel?.PHONE ? normalizeMoroccanPhone(String(parcel.PHONE)) : "—"}</dd>
+            <dd>{parcel.phone ? normalizeMoroccanPhone(parcel.phone) : "—"}</dd>
             <dt className="text-muted">Ville</dt>
-            <dd>{String(parcel?.CITY_NAME ?? "—")}</dd>
-            <dt className="text-muted">Adresse</dt>
-            <dd>{String(parcel?.ADDRESS ?? "—")}</dd>
+            <dd>{parcel.cityName || "—"}</dd>
             <dt className="text-muted">Montant COD</dt>
-            <dd>{String(parcel?.PRICE ?? "—")} DH</dd>
+            <dd>{Number(parcel.price)} DH</dd>
             <dt className="text-muted">Statut</dt>
-            <dd>{String(parcel?.STATUS ?? "—")}</dd>
-            <dt className="text-muted">Situation</dt>
-            <dd>{String(parcel?.SITUATION ?? "—")}</dd>
+            <dd>{parcel.status || "—"}</dd>
           </dl>
         )}
       </section>
@@ -76,9 +72,9 @@ export default async function ParcelDetailPage({ params }: { params: { code: str
           <ol className="flex flex-col gap-3">
             {history.map((event, i) => (
               <li key={i} className="text-sm border-l-2 border-line pl-3">
-                <p className="font-medium">{String(event.STATUS ?? event.status ?? "—")}</p>
+                <p className="font-medium">{String((event as any).STATUS ?? (event as any).status ?? "—")}</p>
                 <p className="text-xs text-muted">
-                  {String(event.DATE ?? event.date ?? event.CREATION_TIME ?? "")}
+                  {String((event as any).DATE ?? (event as any).date ?? (event as any).CREATION_TIME ?? "")}
                 </p>
               </li>
             ))}

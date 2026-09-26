@@ -4,6 +4,7 @@ import AppHeader from "@/components/AppHeader";
 import MonthFilter from "@/components/MonthFilter";
 import { monthRange } from "@/lib/date-range";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { getCarrierRevenue } from "@/lib/carrier-revenue";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function DashboardPage({
   const { start, end, month } = monthRange(searchParams.month);
   const dateFilter = { createdAt: { gte: start, lt: end } };
 
-  const [orders, counts, shopifyRevenue, forcelogStats] = await Promise.all([
+  const [orders, counts, shopifyRevenue, forcelogStats, carrierRevenue] = await Promise.all([
     prisma.order.findMany({
       where: dateFilter,
       include: { items: true },
@@ -49,6 +50,7 @@ export default async function DashboardPage({
       _count: true,
       _sum: { totalPrice: true },
     }),
+    getCarrierRevenue(),
   ]);
 
   const countFor = (status: string) => counts.find((c) => c.status === status)?._count ?? 0;
@@ -58,7 +60,6 @@ export default async function DashboardPage({
   const totalShipped = forcelogStats.reduce((sum, s) => sum + s._count, 0);
   const delivered = forcelogStats.find((s) => s.forcelogStatusCode === "DELIVERED");
   const deliveryRate = totalShipped > 0 ? Math.round(((delivered?._count ?? 0) / totalShipped) * 100) : 0;
-  const forcelogRevenue = Number(delivered?._sum.totalPrice ?? 0);
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10">
@@ -86,7 +87,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="bg-white border border-line rounded-2xl p-5">
           <p className="text-xs text-muted mb-1">CA Shopify</p>
           <p className="text-2xl font-semibold">{Number(shopifyRevenue._sum.totalPrice ?? 0)} DH</p>
@@ -99,9 +100,16 @@ export default async function DashboardPage({
           <p className="text-xs text-muted mb-1">Taux de livraison Forcelog</p>
           <p className="text-2xl font-semibold">{deliveryRate}%</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-10">
         <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">CA Forcelog (estimation)</p>
-          <p className="text-2xl font-semibold">{forcelogRevenue} DH</p>
+          <p className="text-xs text-muted mb-1">CA Forcelog (colis livrés depuis le 1er sept.)</p>
+          <p className="text-2xl font-semibold">{carrierRevenue.forcelog} DH</p>
+        </div>
+        <div className="bg-white border border-line rounded-2xl p-5">
+          <p className="text-xs text-muted mb-1">CA Ozon Express (colis livrés depuis le 1er sept.)</p>
+          <p className="text-2xl font-semibold">{carrierRevenue.ozon} DH</p>
         </div>
       </div>
 

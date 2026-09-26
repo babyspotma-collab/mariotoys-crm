@@ -1,4 +1,5 @@
-import { getParcelInfo, getTracking } from "@/lib/ozon";
+import { prisma } from "@/lib/db";
+import { getTracking } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
@@ -6,13 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function OzonParcelDetailPage({ params }: { params: { code: string } }) {
   const code = decodeURIComponent(params.code);
 
-  let parcel: Awaited<ReturnType<typeof getParcelInfo>> = null;
-  let parcelError: string | null = null;
-  try {
-    parcel = await getParcelInfo(code);
-  } catch (err) {
-    parcelError = err instanceof Error ? err.message : String(err);
-  }
+  const parcel = await prisma.parcel.findUnique({
+    where: { carrier_code: { carrier: "OZON", code } },
+  });
 
   let tracking: Awaited<ReturnType<typeof getTracking>> | null = null;
   let trackingError: string | null = null;
@@ -31,9 +28,9 @@ export default async function OzonParcelDetailPage({ params }: { params: { code:
 
       <section className="bg-white border border-line rounded-2xl p-6 mb-6">
         <h2 className="text-sm font-semibold mb-4">Détails du colis</h2>
-        {parcelError || !parcel ? (
+        {!parcel ? (
           <p className="text-sm text-danger">
-            Indisponible pour l&apos;instant : {parcelError ?? "colis introuvable"}
+            Pas encore synchronisé — réessayez après le prochain passage du sync (toutes les 2h).
           </p>
         ) : (
           <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -43,10 +40,10 @@ export default async function OzonParcelDetailPage({ params }: { params: { code:
             <dd>{parcel.phone ? normalizeMoroccanPhone(parcel.phone) : "—"}</dd>
             <dt className="text-muted">Ville</dt>
             <dd>{parcel.cityName || "—"}</dd>
-            <dt className="text-muted">Adresse</dt>
-            <dd>{parcel.address || "—"}</dd>
             <dt className="text-muted">Montant COD</dt>
-            <dd>{parcel.price} DH</dd>
+            <dd>{Number(parcel.price)} DH</dd>
+            <dt className="text-muted">Statut</dt>
+            <dd>{parcel.status || "—"}</dd>
           </dl>
         )}
       </section>

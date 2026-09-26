@@ -63,6 +63,7 @@ model Order {
   updatedAt        DateTime    @updatedAt
 
   items            OrderItem[]
+  parcels          Parcel[]
 
   @@index([status])
   @@index([forcelogCode])
@@ -92,6 +93,33 @@ enum OrderSource {
 enum Carrier {
   FORCELOG
   OZON
+}
+
+// Vue directe et complète de ce qui existe réellement chez chaque
+// transporteur (pas seulement ce qui a été créé via app/orders/[id]/confirm)
+// — synchronisée depuis leurs dashboards web respectifs (voir
+// scripts/sync-forcelog-web.js et scripts/sync-ozon-web.js), qui listent
+// TOUS les colis du compte, y compris ceux créés en dehors du CRM.
+// orderId reste nul tant qu'aucune commande locale ne correspond (par
+// numéro de téléphone) — un Parcel existe indépendamment d'un Order.
+model Parcel {
+  id               String    @id @default(cuid())
+  carrier          Carrier
+  code             String // code colis chez le transporteur
+  orderId          String?
+  order            Order?    @relation(fields: [orderId], references: [id])
+  receiver         String
+  phone            String
+  cityName         String
+  price            Decimal   @db.Decimal(10, 2)
+  status           String // libellé brut (FR) — sert de clé de catégorisation pour Ozon
+  statusCode       String? // STATUS_CODE machine — Forcelog uniquement, null pour Ozon
+  carrierCreatedAt DateTime? // date de création/ramassage côté transporteur, si connue
+  syncedAt         DateTime  @updatedAt
+
+  @@unique([carrier, code])
+  @@index([carrier, status])
+  @@index([orderId])
 }
 
 // Factures CRBT (bordereaux de règlement/virement) — synchronisées depuis

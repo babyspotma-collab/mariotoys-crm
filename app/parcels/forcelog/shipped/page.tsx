@@ -10,10 +10,11 @@ export const dynamic = "force-dynamic";
 const CATEGORY = categoryById("shipped");
 
 export default async function ShippedPage() {
-  const [orders, counts] = await Promise.all([
-    prisma.order.findMany({
-      where: { status: "CONFIRMEE", forcelogStatusCode: { in: CATEGORY.codes } },
-      orderBy: { forcelogStatusChangedAt: "desc" },
+  const [parcels, counts] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "FORCELOG", statusCode: { in: CATEGORY.codes } },
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
     }),
     getParcelCategoryCounts(),
   ]);
@@ -22,7 +23,7 @@ export default async function ShippedPage() {
     <main className="max-w-5xl mx-auto px-6 py-10">
       <AppHeader active="parcels" />
       <ParcelsSubNav active="shipped" counts={counts} />
-      <OrderParcelList orders={orders} emptyMessage="Aucun colis expédié pour l'instant." />
+      <OrderParcelList parcels={parcels} emptyMessage="Aucun colis expédié pour l'instant." />
     </main>
   );
 }

@@ -39,7 +39,7 @@ export const OZON_CATEGORIES: OzonCategory[] = [
     id: "cancelled",
     label: "Colis refusé ou annulé",
     href: "/parcels/ozon/cancelled",
-    statuses: ["Annulé", "Retourné"],
+    statuses: ["Annulé", "Retourné", "Retourné Reçu par client"],
   },
   {
     id: "noAnswer",

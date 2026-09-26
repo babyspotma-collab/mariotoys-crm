@@ -6,17 +6,18 @@ import { getParcelCategoryCounts } from "@/lib/parcel-category-counts";
 
 export const dynamic = "force-dynamic";
 
-// Lit la base (synchronisée toutes les 2h, voir sync-tracking.yml) plutôt
-// que l'API publique Forcelog GetParcels en direct : cette dernière s'est
-// révélée structurellement cassée (pagination ignorée, ne renvoie qu'un
-// petit pool aléatoire d'une vingtaine de colis quels que soient les
-// paramètres) — vérifié en pratique, voir lib/forcelog.ts. Même source de
-// vérité que les onglets par catégorie ci-dessous.
+// Lit Parcel (synchronisé toutes les 2h depuis le dashboard web Forcelog,
+// voir scripts/sync-forcelog-web.js) — la vraie liste complète de tout ce
+// qui existe chez Forcelog depuis le 1er septembre 2026, pas seulement ce
+// qui a été créé via ce CRM. L'API publique GetParcels s'est révélée
+// structurellement cassée (pagination ignorée, ne renvoie qu'un petit
+// pool aléatoire) — vérifié en pratique, voir lib/forcelog.ts.
 export default async function ParcelsPage() {
-  const [orders, counts] = await Promise.all([
-    prisma.order.findMany({
-      where: { status: "CONFIRMEE", carrier: "FORCELOG", forcelogCode: { not: null } },
-      orderBy: { forcelogStatusChangedAt: "desc" },
+  const [parcels, counts] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "FORCELOG" },
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
     }),
     getParcelCategoryCounts(),
   ]);
@@ -25,7 +26,7 @@ export default async function ParcelsPage() {
     <main className="max-w-5xl mx-auto px-6 py-10">
       <AppHeader active="parcels" />
       <ParcelsSubNav active="all" counts={counts} />
-      <OrderParcelList orders={orders} emptyMessage="Aucun colis Forcelog pour l'instant." />
+      <OrderParcelList parcels={parcels} emptyMessage="Aucun colis Forcelog pour l'instant." />
     </main>
   );
 }
