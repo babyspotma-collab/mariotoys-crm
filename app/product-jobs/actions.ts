@@ -11,8 +11,13 @@ export type UploadState = { error: string | null; skipped: string[] };
 // de fichier, juste avant l'extension — ex: "299.jpg" ou
 // "voiture-police_299.jpg" -> 299. Convention partagée avec le worker :
 // lui ne parse rien, le champ "cost" du job vient d'ici.
+//
+// Le groupe de chiffres doit être précédé du début du nom ou d'un
+// séparateur (_ - espace) : sans ça, un export WhatsApp comme
+// "WhatsApp Image 2026-08-04 at 14.34.44.jpeg" ferait lire "44" (fragment
+// de l'heure) comme un prix — faux positif bien pire qu'un fichier ignoré.
 function parsePriceFromFilename(filename: string): number | null {
-  const match = filename.match(/(\d+)(?=\.[^.]+$)/);
+  const match = filename.match(/(?:^|[_\-\s])(\d+)(?=\.[^.]+$)/);
   if (!match) return null;
   const value = parseInt(match[1], 10);
   return Number.isFinite(value) && value > 0 ? value : null;
