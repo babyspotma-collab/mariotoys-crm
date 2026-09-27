@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
@@ -24,7 +25,7 @@ const NO_ANSWER_CODES = categoryById("noAnswer").codes;
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 const BUCKET_PILL: Record<ColisFilter, { tone: PillTone }> = {
   all: { tone: "gray" },
@@ -36,7 +37,7 @@ const BUCKET_PILL: Record<ColisFilter, { tone: PillTone }> = {
 export default async function ParcelsPage({
   searchParams,
 }: {
-  searchParams: { carrier?: string; filter?: string; q?: string; take?: string };
+  searchParams: { carrier?: string; filter?: string; q?: string; page?: string };
 }) {
   const carrier: ColisCarrier = searchParams.carrier === "ozon" ? "ozon" : "forcelog";
   const filter: ColisFilter =
@@ -44,7 +45,7 @@ export default async function ParcelsPage({
       ? searchParams.filter
       : "all";
   const q = searchParams.q?.trim();
-  const take = Math.max(PAGE_SIZE, Number(searchParams.take) || PAGE_SIZE);
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   const [forcelogRaw, ozonRaw] = await Promise.all([getParcelCategoryCounts(), getOzonCategoryCounts()]);
   const buckets = carrier === "forcelog" ? forcelogBucketCounts(forcelogRaw) : ozonBucketCounts(ozonRaw);
@@ -63,14 +64,17 @@ export default async function ParcelsPage({
       : {}),
   };
 
-  const parcels = await prisma.parcel.findMany({
-    where,
-    include: { order: true },
-    orderBy: { carrierCreatedAt: "desc" },
-    take: take + 1,
-  });
-  const hasMore = parcels.length > take;
-  const visible = parcels.slice(0, take);
+  const [visible, listTotal] = await Promise.all([
+    prisma.parcel.findMany({
+      where,
+      include: { order: true },
+      orderBy: { carrierCreatedAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.parcel.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
   const allTabs: { id: ColisFilter; label: string; count: number }[] = [
     { id: "all", label: "Tous", count: buckets.all },
@@ -178,14 +182,9 @@ export default async function ParcelsPage({
         </ul>
       )}
 
-      <div className="flex flex-col items-center gap-3 md:flex-row md:justify-between">
-        <span className="text-xs text-muted">Mis à jour automatiquement depuis {carrierName}</span>
-        {hasMore && (
-          <a href={qsBase({ take: String(take + PAGE_SIZE) })} className="btn-secondary">
-            Afficher plus
-          </a>
-        )}
-      </div>
+      <Pagination page={page} totalPages={totalPages} hrefFor={(p) => qsBase({ page: String(p) })} />
+
+      <p className="text-center text-xs text-muted">Mis à jour automatiquement depuis {carrierName}</p>
     </>
   );
 }

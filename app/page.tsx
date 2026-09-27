@@ -6,6 +6,7 @@ import EmptyState from "@/components/EmptyState";
 import MonthFilter from "@/components/MonthFilter";
 import MoreMenu from "@/components/MoreMenu";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
@@ -15,7 +16,7 @@ import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
-const ORDERS_SAFETY_LIMIT = 500;
+const PAGE_SIZE = 15;
 type Tab = "todo" | "ok" | "all";
 
 const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
@@ -33,33 +34,39 @@ function orderNumberLabel(orderNumber: string) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { month?: string; tab?: string; q?: string };
+  searchParams: { month?: string; tab?: string; q?: string; page?: string };
 }) {
   const { start, end, month } = monthRange(searchParams.month);
   const dateFilter = { createdAt: { gte: start, lt: end } };
   const tab: Tab = searchParams.tab === "ok" || searchParams.tab === "all" ? searchParams.tab : "todo";
   const q = searchParams.q?.trim();
 
-  const [orders, counts] = await Promise.all([
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  const listWhere = {
+    ...dateFilter,
+    ...(tab === "todo" ? { status: "NOUVELLE" as const } : tab === "ok" ? { status: "CONFIRMEE" as const } : {}),
+    ...(q
+      ? {
+          OR: [
+            { customerName: { contains: q, mode: "insensitive" as const } },
+            { orderNumber: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const [orders, listTotal, counts] = await Promise.all([
     prisma.order.findMany({
-      where: {
-        ...dateFilter,
-        ...(tab === "todo" ? { status: "NOUVELLE" } : tab === "ok" ? { status: "CONFIRMEE" } : {}),
-        ...(q
-          ? {
-              OR: [
-                { customerName: { contains: q, mode: "insensitive" } },
-                { orderNumber: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
+      where: listWhere,
       include: { items: true },
       orderBy: { createdAt: "desc" },
-      take: ORDERS_SAFETY_LIMIT,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
+    prisma.order.count({ where: listWhere }),
     prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
   ]);
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
   const countFor = (status: string) => counts.find((c) => c.status === status)?._count ?? 0;
   const totalOrders = counts.reduce((sum, c) => sum + c._count, 0);
@@ -72,8 +79,15 @@ export default async function DashboardPage({
     { id: "all" as const, label: "Toutes", count: totalOrders },
   ];
 
-  const tabHref = (id: Tab) =>
-    `/?tab=${id}${searchParams.month ? `&month=${searchParams.month}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  // Toute URL construite ici repart de la page 1, sauf si "page" est passé
+  // explicitement (liens Précédent / Suivant).
+  const url = (over: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    const merged = { tab, month: searchParams.month, q, ...over };
+    for (const [k, v] of Object.entries(merged)) if (v) params.set(k, v);
+    return `/?${params.toString()}`;
+  };
+  const tabHref = (id: Tab) => url({ tab: id });
   const shortDate = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
   return (
@@ -109,7 +123,7 @@ export default async function DashboardPage({
       {orders.length === 0 ? (
         q ? (
           <EmptyState title={`Aucun résultat pour « ${q} »`}>
-            <a href={tabHref(tab).replace(/&q=[^&]*/, "")} className="font-medium text-ink underline underline-offset-4">
+            <a href={url({ q: undefined })} className="font-medium text-ink underline underline-offset-4">
               Effacer la recherche
             </a>
           </EmptyState>
@@ -188,11 +202,7 @@ export default async function DashboardPage({
         </ul>
       )}
 
-      {orders.length === ORDERS_SAFETY_LIMIT && (
-        <p className="text-center text-xs text-muted">
-          Affichage limité aux {ORDERS_SAFETY_LIMIT} commandes les plus récentes. Affinez avec la recherche.
-        </p>
-      )}
+      <Pagination page={page} totalPages={totalPages} hrefFor={(p) => url({ page: String(p) })} />
 
       {/* Mobile : bouton flottant au-dessus de la barre d'onglets */}
       <a

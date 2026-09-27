@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
-import { CaretLeft, CaretRight, Funnel } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Funnel } from "@phosphor-icons/react/dist/ssr";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
 import Pill from "@/components/Pill";
 import Segmented from "@/components/Segmented";
 import { formatDh, formatInt } from "@/lib/format";
@@ -189,35 +190,7 @@ export default async function BillingPage({
         </EmptyState>
       )}
 
-      {totalPages > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-between gap-4 md:justify-center">
-          {page <= 1 ? (
-            <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
-              <CaretLeft size={16} aria-hidden="true" />
-              Précédent
-            </span>
-          ) : (
-            <a href={qs({ page: page - 1 })} className="btn-secondary">
-              <CaretLeft size={16} aria-hidden="true" />
-              Précédent
-            </a>
-          )}
-          <span className="text-sm tabular-nums text-muted">
-            {page} / {totalPages}
-          </span>
-          {page >= totalPages ? (
-            <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
-              Suivant
-              <CaretRight size={16} aria-hidden="true" />
-            </span>
-          ) : (
-            <a href={qs({ page: page + 1 })} className="btn-secondary">
-              Suivant
-              <CaretRight size={16} aria-hidden="true" />
-            </a>
-          )}
-        </nav>
-      )}
+      <Pagination page={page} totalPages={totalPages} hrefFor={(p) => qs({ page: p })} />
     </>
   );
 }
