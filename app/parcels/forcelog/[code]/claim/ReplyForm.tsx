@@ -19,15 +19,18 @@ export default function ReplyForm({ code }: { code: string }) {
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
-      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
-      <textarea
+      <label htmlFor="reply" className="label mb-0">
+        Votre message
+      </label>
+            <textarea
+        id="reply"
         name="message"
         required
         maxLength={1000}
         rows={3}
-        placeholder="Votre message…"
-        className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+        className="input"
       />
+      {state.error && <p className="alert-error">{state.error}</p>}
       <div>
         <SubmitButton />
       </div>

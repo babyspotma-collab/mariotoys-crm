@@ -11,7 +11,7 @@ const TONE_CLASSES: Record<PillTone, string> = {
 export default function Pill({ tone, children }: { tone: PillTone; children: React.ReactNode }) {
   return (
     <span
-      className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${TONE_CLASSES[tone]}`}
+      className={`inline-block h-6 max-w-full truncate rounded-md px-2 align-middle text-xs font-medium leading-6 ${TONE_CLASSES[tone]}`}
     >
       {children}
     </span>

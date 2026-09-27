@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getTracking } from "@/lib/forcelog";
-import { normalizeMoroccanPhone } from "@/lib/phone";
-import { formatDh } from "@/lib/format";
+import ParcelView from "@/components/ParcelView";
 
 export const dynamic = "force-dynamic";
 
@@ -25,63 +24,28 @@ export default async function ParcelDetailPage({ params }: { params: { code: str
     trackingError = err instanceof Error ? err.message : String(err);
   }
 
+  const base = `/parcels/forcelog/${encodeURIComponent(code)}`;
+
   return (
-    <div className="max-w-2xl">
-      <p className="mb-2 text-xs text-muted">
-        <a href="/parcels?carrier=forcelog" className="no-underline hover:underline">← Retour aux colis</a>
-      </p>
-      <h1 className="mb-1 font-mono text-xl font-semibold">{code}</h1>
-
-      <div className="mb-8 mt-4 flex gap-2">
-        <a href={`/parcels/forcelog/${encodeURIComponent(code)}/return`} className="btn-danger">
-          Demander un retour
-        </a>
-        <a href={`/parcels/forcelog/${encodeURIComponent(code)}/claim`} className="btn-primary">
-          Réclamation
-        </a>
-      </div>
-
-      <section className="card mb-6 p-6">
-        <h2 className="mb-4 text-sm font-semibold">Détails du colis</h2>
-        {!parcel ? (
-          <p className="text-sm text-accent">
-            Pas encore synchronisé — réessayez après le prochain passage du sync (toutes les 2h).
-          </p>
-        ) : (
-          <dl className="grid grid-cols-2 gap-y-2 text-sm">
-            <dt className="text-muted">Destinataire</dt>
-            <dd>{parcel.receiver || "—"}</dd>
-            <dt className="text-muted">Téléphone</dt>
-            <dd>{parcel.phone ? normalizeMoroccanPhone(parcel.phone) : "—"}</dd>
-            <dt className="text-muted">Ville</dt>
-            <dd>{parcel.cityName || "—"}</dd>
-            <dt className="text-muted">Montant COD</dt>
-            <dd>{formatDh(parcel.price)}</dd>
-            <dt className="text-muted">Statut</dt>
-            <dd>{parcel.status || "—"}</dd>
-          </dl>
-        )}
-      </section>
-
-      <section className="card p-6">
-        <h2 className="mb-4 text-sm font-semibold">Historique de suivi</h2>
-        {trackingError ? (
-          <p className="text-sm text-accent">Indisponible pour l&apos;instant : {trackingError}</p>
-        ) : history.length === 0 ? (
-          <p className="text-sm text-muted">Aucun événement pour l&apos;instant.</p>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {history.map((event, i) => (
-              <li key={i} className="border-l-2 border-line pl-3 text-sm">
-                <p className="font-medium">{String((event as any).STATUS ?? (event as any).status ?? "—")}</p>
-                <p className="text-xs text-muted">
-                  {String((event as any).DATE ?? (event as any).date ?? (event as any).CREATION_TIME ?? "")}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </div>
+    <ParcelView
+      carrier="forcelog"
+      code={code}
+      parcel={parcel}
+      trackingError={trackingError}
+      history={history.map((event) => ({
+        status: String((event as any).STATUS ?? (event as any).status ?? "-"),
+        time: String((event as any).DATE ?? (event as any).date ?? (event as any).CREATION_TIME ?? ""),
+      }))}
+      actions={
+        <>
+          <a href={`${base}/claim`} className="btn-secondary">
+            Réclamation
+          </a>
+          <a href={`${base}/return`} className="btn-secondary">
+            Demander un retour
+          </a>
+        </>
+      }
+    />
   );
 }

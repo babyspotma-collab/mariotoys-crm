@@ -1,18 +1,21 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { ImageSquare } from "@phosphor-icons/react/dist/ssr";
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadProductPhotos, type UploadState } from "./actions";
 
 function PendingLabel() {
   const { pending } = useFormStatus();
-  return pending ? <span className="text-[13px] text-muted">Envoi…</span> : null;
+  return pending ? <span className="text-[13px] font-medium text-muted">Envoi en cours…</span> : null;
 }
 
 export default function UploadPhotosForm() {
   const initialState: UploadState = { error: null };
   const [state, formAction] = useFormState(uploadProductPhotos, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   return (
     <div className="flex flex-col gap-3">
@@ -22,44 +25,54 @@ export default function UploadPhotosForm() {
           formAction(formData);
           formRef.current?.reset();
         }}
-        className="card flex flex-col items-stretch gap-4 border-dashed border-line-dashed p-5 md:flex-row md:items-center md:gap-6 md:p-7"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (!inputRef.current || e.dataTransfer.files.length === 0) return;
+          inputRef.current.files = e.dataTransfer.files;
+          formRef.current?.requestSubmit();
+        }}
+        className={`relative flex flex-col items-center gap-4 rounded-[14px] border border-dashed p-6 text-center transition-colors md:flex-row md:gap-5 md:p-7 md:text-left ${
+          dragging ? "border-ink bg-cream-dark" : "border-line-dashed bg-white"
+        }`}
       >
-        <div className="hidden h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl bg-cream-dark text-body md:flex">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 16V4" />
-            <path d="M7 9l5-5 5 5" />
-            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
-          </svg>
+        <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cream-dark text-body md:flex">
+          <ImageSquare size={24} aria-hidden="true" />
         </div>
-        <div className="flex flex-grow flex-col gap-1 text-center md:text-left">
-          <div className="text-base font-semibold md:hidden">Ajouter des photos produit</div>
-          <div className="hidden text-base font-semibold md:block">Glisse tes photos ici</div>
+        <div className="flex flex-grow flex-col gap-1">
+          <div className="text-[15px] font-semibold">
+            <span className="md:hidden">Ajouter des photos produit</span>
+            <span className="hidden md:inline">Glissez vos photos ici</span>
+          </div>
           <div className="text-[13px] text-muted">
-            Photos WhatsApp acceptées telles quelles. Sans prix lisible, le produit est quand même créé, à compléter.
+            Photos WhatsApp acceptées telles quelles. Sans prix lisible, le produit est créé quand même, à compléter.
           </div>
         </div>
-        <div className="flex items-center justify-center">
-          <PendingLabel />
-        </div>
-        <label htmlFor="photos" className="btn-primary h-12 w-full cursor-pointer justify-center text-center md:h-10 md:w-auto">
-          <span className="md:hidden">Ajouter des photos</span>
-          <span className="hidden md:inline">Choisir des photos</span>
+        <PendingLabel />
+        <label htmlFor="photos" className="btn-primary w-full cursor-pointer md:w-auto">
+          Choisir des photos
         </label>
         <input
+          ref={inputRef}
           id="photos"
           name="photos"
           type="file"
           accept="image/*"
           multiple
           required
-          className="absolute -left-[9999px]"
+          className="sr-only"
           onChange={(e) => {
             if (e.currentTarget.files && e.currentTarget.files.length > 0) formRef.current?.requestSubmit();
           }}
         />
       </form>
 
-      {state.error && <p className="rounded-lg bg-pill-red-bg p-3 text-sm text-pill-red-fg">{state.error}</p>}
+      {state.error && <p className="alert-error">{state.error}</p>}
     </div>
   );
 }

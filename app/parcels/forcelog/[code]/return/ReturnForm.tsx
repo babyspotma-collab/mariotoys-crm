@@ -7,7 +7,7 @@ import type { ForcelogCity } from "@/lib/forcelog";
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary" disabled={pending}>
+    <button type="submit" className="btn-primary w-full md:w-fit" disabled={pending}>
       {pending ? "Envoi…" : "Envoyer la demande de retour"}
     </button>
   );
@@ -19,34 +19,32 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
   const [state, formAction] = useFormState(action, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
-
+    <form action={formAction} className="card flex flex-col gap-5 p-4 md:p-6">
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="phone">
+        <label className="label" htmlFor="phone">
           Téléphone
         </label>
-        <input id="phone" name="phone" required className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]" />
+        <input id="phone" name="phone" type="tel" required className="input" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="quarter">
-          Quartier <span className="text-muted font-normal">(5 caractères minimum)</span>
+        <label className="label" htmlFor="quarter">
+          Quartier <span className="font-normal text-muted">(5 caractères minimum)</span>
         </label>
         <input
           id="quarter"
           name="quarter"
           required
           minLength={5}
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+          className="input"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="city">
+        <label className="label" htmlFor="city">
           Ville
         </label>
-        <select id="city" name="city" required className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white">
+        <select id="city" name="city" required className="input">
           <option value="" disabled selected>
             {cities.length === 0 ? "Liste indisponible" : "Sélectionner une ville…"}
           </option>
@@ -59,11 +57,13 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="note">
-          Commentaire <span className="text-muted font-normal">(optionnel)</span>
+        <label className="label" htmlFor="note">
+          Commentaire <span className="font-normal text-muted">(optionnel)</span>
         </label>
-        <textarea id="note" name="note" rows={2} className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]" />
+        <textarea id="note" name="note" rows={2} className="input" />
       </div>
+
+      {state.error && <p className="alert-error">{state.error}</p>}
 
       <SubmitButton />
     </form>

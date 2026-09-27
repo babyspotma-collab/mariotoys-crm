@@ -25,7 +25,7 @@ export default function RelaunchButton({
   }
 
   if (result?.success) {
-    return <p className="text-xs text-pill-green-fg font-medium">Relance envoyée ✓</p>;
+    return <p className="text-xs font-medium text-pill-green-fg">Relance envoyée</p>;
   }
 
   return (
@@ -34,7 +34,7 @@ export default function RelaunchButton({
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="text-xs font-medium px-3 py-1.5 rounded-full bg-ink text-white hover:bg-black transition-colors disabled:opacity-50"
+        className="btn-secondary h-9 px-3 text-[13px] md:h-8"
       >
         {pending ? "Envoi…" : "Relancer"}
       </button>

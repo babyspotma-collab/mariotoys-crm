@@ -20,7 +20,7 @@ function fieldInputType(name: string) {
 function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary" disabled={pending || disabled}>
+    <button type="submit" className="btn-primary w-full md:w-fit" disabled={pending || disabled}>
       {pending ? "Envoi…" : label}
     </button>
   );
@@ -37,11 +37,9 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
   const needsConfirmation = selectedType?.changesParcel ?? false;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
-
+    <form action={formAction} className="card flex flex-col gap-5 p-4 md:p-6">
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="typeId">
+        <label className="label" htmlFor="typeId">
           Type de réclamation
         </label>
         <select
@@ -53,7 +51,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
             setTypeId(Number(e.target.value));
             setConfirmed(false);
           }}
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
+          className="input"
         >
           <option value="" disabled>
             {types.length === 0 ? "Liste indisponible" : "Choisir un type…"}
@@ -68,7 +66,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
 
       {selectedType?.requires.map((field) => (
         <div key={field}>
-          <label className="block text-sm font-medium mb-1" htmlFor={`extra_${field}`}>
+          <label className="label" htmlFor={`extra_${field}`}>
             {fieldLabel(field)}
           </label>
           <input
@@ -76,14 +74,14 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
             name={`extra_${field}`}
             type={fieldInputType(field)}
             required
-            className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+            className="input"
           />
         </div>
       ))}
 
       <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="message">
-          Message <span className="text-muted font-normal">(1000 caractères max)</span>
+        <label className="label" htmlFor="message">
+          Message <span className="font-normal text-muted">(1000 caractères max)</span>
         </label>
         <textarea
           id="message"
@@ -91,22 +89,23 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
           required
           maxLength={1000}
           rows={4}
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+          className="input"
         />
       </div>
 
       {needsConfirmation && (
-        <label className="flex items-start gap-2 text-sm bg-pill-red-bg text-accent rounded-lg p-3">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[10px] bg-pill-amber-bg p-3.5 text-sm text-pill-amber-fg">
           <input
             type="checkbox"
             checked={confirmed}
             onChange={(e) => setConfirmed(e.target.checked)}
-            className="mt-0.5"
+            className="mt-0.5 h-4 w-4 accent-ink"
           />
-          Ce type de réclamation change le statut du colis immédiatement — je confirme vouloir
-          continuer.
+          Ce type de réclamation change immédiatement le statut du colis. Je confirme vouloir continuer.
         </label>
       )}
+
+      {state.error && <p className="alert-error">{state.error}</p>}
 
       <SubmitButton
         label={needsConfirmation && !confirmed ? "Confirmez ci-dessus" : "Envoyer la réclamation"}

@@ -2,11 +2,19 @@
 // transporteur…). Chaque option est un lien : l'état vit dans l'URL.
 export type SegmentedItem = { href: string; label: string; count?: number; active: boolean };
 
-export default function Segmented({ items, label }: { items: SegmentedItem[]; label: string }) {
+export default function Segmented({
+  items,
+  label,
+  className = "w-full md:w-fit",
+}: {
+  items: SegmentedItem[];
+  label: string;
+  className?: string;
+}) {
   return (
     <nav
       aria-label={label}
-      className="flex w-full gap-0.5 overflow-x-auto rounded-[10px] bg-segment p-1 md:w-fit"
+      className={`flex gap-0.5 overflow-x-auto rounded-[10px] bg-segment p-1 ${className}`}
     >
       {items.map((item) => (
         <a

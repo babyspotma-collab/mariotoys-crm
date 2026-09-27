@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
+import { CaretLeft, CaretRight, Funnel } from "@phosphor-icons/react/dist/ssr";
+import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 import Pill from "@/components/Pill";
+import Segmented from "@/components/Segmented";
 import { formatDh, formatInt } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +15,7 @@ const PAGE_SIZE = 20;
 const CRBT_STATUSES = ["Enregistré", "Demande Virement", "Payé"];
 
 function formatDate(date: Date | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -51,173 +55,168 @@ export default async function BillingPage({
     return `/billing?${params.toString()}`;
   };
 
+  const carrierName = carrier === "forcelog" ? "Forcelog" : "Ozon Express";
+  const activeFilters = [searchParams.statut, searchParams.from, searchParams.to].filter(Boolean).length;
+  const kpis = [
+    { label: "Montant total", value: formatDh(sums._sum.amount) },
+    { label: "Frais de livraison", value: formatDh(sums._sum.feesAmount) },
+    { label: "Colis facturés", value: formatInt(sums._sum.parcelsCount) },
+  ];
+
   return (
     <>
-      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Facturation</h1>
-          <p className="text-sm text-muted">
-            {carrier === "forcelog"
-              ? "Bordereaux de règlement Forcelog, synchronisés toutes les 2 h"
-              : "Bordereaux de règlement Ozon Express, synchronisés toutes les 2 h"}
-          </p>
-        </div>
-        <div role="group" aria-label="Transporteur" className="flex gap-0.5 rounded-[10px] bg-segment p-[3px] md:inline-flex">
-          {(["forcelog", "ozon"] as const).map((c) => (
-            <a
-              key={c}
-              href={`/billing?carrier=${c}`}
-              aria-pressed={carrier === c}
-              className={`flex h-11 flex-1 items-center justify-center rounded-lg px-4 text-[13px] no-underline md:h-8 md:flex-none ${
-                carrier === c ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
-              }`}
-            >
-              {c === "forcelog" ? "Forcelog" : "Ozon Express"}
-            </a>
-          ))}
-        </div>
+      <PageHeader
+        title="Facturation"
+        subtitle={`Bordereaux ${carrierName}, synchronisés toutes les 2 h`}
+        actions={
+          <Segmented
+            label="Transporteur"
+            className="w-fit"
+            items={(["forcelog", "ozon"] as const).map((c) => ({
+              href: `/billing?carrier=${c}`,
+              label: c === "forcelog" ? "Forcelog" : "Ozon",
+              active: carrier === c,
+            }))}
+          />
+        }
+      />
+
+      <div className="card grid grid-cols-2 md:grid-cols-3 md:divide-x md:divide-line-soft">
+        {kpis.map((k, i) => (
+          <div
+            key={k.label}
+            className={`flex flex-col gap-1 p-4 md:px-6 md:py-5 ${
+              i === 0 ? "border-r border-line-soft md:border-r-0" : ""
+            } ${i === 2 ? "col-span-2 border-t border-line-soft md:col-span-1 md:border-t-0" : ""}`}
+          >
+            <span className="text-[13px] text-muted">{k.label}</span>
+            <span className="text-2xl font-semibold tracking-tight tabular-nums md:text-[28px]">{k.value}</span>
+          </div>
+        ))}
       </div>
 
-      <form className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center" action="/billing">
-        <input type="hidden" name="carrier" value={carrier} />
-        <select
-          name="statut"
-          defaultValue={searchParams.statut ?? ""}
-          className="h-11 w-full rounded-[10px] border border-line-input bg-white px-3 text-base text-ink md:h-[38px] md:w-auto md:text-[13px]"
-        >
-          <option value="">Tous les statuts</option>
-          {CRBT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <input
-            name="from"
-            type="date"
-            defaultValue={searchParams.from ?? ""}
-            className="h-11 w-1/2 rounded-[10px] border border-line-input bg-white px-3 text-base text-ink md:h-[38px] md:w-auto md:text-[13px]"
-          />
-          <input
-            name="to"
-            type="date"
-            defaultValue={searchParams.to ?? ""}
-            className="h-11 w-1/2 rounded-[10px] border border-line-input bg-white px-3 text-base text-ink md:h-[38px] md:w-auto md:text-[13px]"
-          />
-        </div>
-        <button type="submit" className="btn-secondary h-11 md:h-[38px] px-3.5 text-[13px]">
-          Filtrer
-        </button>
-      </form>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-        <div className="card flex flex-col gap-2 p-4 md:gap-2.5 md:p-[22px_24px]">
-          <div className="text-[13px] text-muted">Montant total</div>
-          <div className="text-2xl font-semibold tracking-tight md:text-[30px]">{formatDh(sums._sum.amount)}</div>
-        </div>
-        <div className="card flex flex-col gap-2 p-4 md:gap-2.5 md:p-[22px_24px]">
-          <div className="text-[13px] text-muted">Frais de livraison</div>
-          <div className="text-2xl font-semibold tracking-tight md:text-[30px]">{formatDh(sums._sum.feesAmount)}</div>
-        </div>
-        <div className="card col-span-2 flex flex-col gap-2 p-4 md:col-span-1 md:gap-2.5 md:p-[22px_24px]">
-          <div className="text-[13px] text-muted">Colis facturés</div>
-          <div className="text-2xl font-semibold tracking-tight md:text-[30px]">{formatInt(sums._sum.parcelsCount)}</div>
-        </div>
-      </div>
+      <details className="group card" open={activeFilters > 0}>
+        <summary className="flex h-12 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium md:px-5 [&::-webkit-details-marker]:hidden">
+          <Funnel size={17} aria-hidden="true" className="text-muted" />
+          Filtres
+          {activeFilters > 0 && (
+            <span className="rounded-md bg-cream-dark px-1.5 text-xs tabular-nums text-body">{activeFilters}</span>
+          )}
+          <CaretRight size={14} aria-hidden="true" className="ml-auto text-muted transition-transform group-open:rotate-90" />
+        </summary>
+        <form action="/billing" className="grid grid-cols-2 gap-3 border-t border-line-soft p-4 md:flex md:items-end md:px-5">
+          <input type="hidden" name="carrier" value={carrier} />
+          <div className="col-span-2 md:w-48">
+            <label htmlFor="statut" className="label">
+              Statut
+            </label>
+            <select id="statut" name="statut" defaultValue={searchParams.statut ?? ""} className="input">
+              <option value="">Tous les statuts</option>
+              {CRBT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="from" className="label">
+              Du
+            </label>
+            <input id="from" name="from" type="date" defaultValue={searchParams.from ?? ""} className="input" />
+          </div>
+          <div>
+            <label htmlFor="to" className="label">
+              Au
+            </label>
+            <input id="to" name="to" type="date" defaultValue={searchParams.to ?? ""} className="input" />
+          </div>
+          <div className="col-span-2 flex gap-2">
+            <button type="submit" className="btn-primary flex-1 md:flex-none">
+              Appliquer
+            </button>
+            {activeFilters > 0 && (
+              <a href={`/billing?carrier=${carrier}`} className="btn-ghost">
+                Réinitialiser
+              </a>
+            )}
+          </div>
+        </form>
+      </details>
 
       {invoices.length > 0 ? (
-        <>
-          {/* Mobile : une carte par bordereau */}
-          <div className="flex flex-col gap-3 md:hidden">
-            {invoices.map((inv) => (
-              <div key={inv.ref} className="card flex flex-col gap-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="font-mono text-[13px] font-medium leading-snug">{inv.ref}</span>
-                  <Pill tone={inv.statut === "Payé" ? "green" : "amber"}>{inv.statut}</Pill>
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-muted">Créé le</div>
-                    <div className="text-body">{formatDate(inv.cDate)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-muted">Payé le</div>
-                    <div className="text-body">{formatDate(inv.payDate)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-muted">Colis</div>
-                    <div className="text-body">{formatInt(inv.parcelsCount)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-muted">Frais</div>
-                    <div className="text-body">{formatDh(inv.feesAmount)}</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between border-t border-line-soft pt-2.5">
-                  <span className="text-[13px] text-muted">Montant</span>
-                  <span className="text-lg font-semibold">{formatDh(inv.amount)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop : tableau */}
-          <div className="card hidden overflow-hidden md:block">
-            <div className="grid grid-cols-[minmax(0,2fr)_120px_120px_90px_140px_150px_100px] items-center gap-3 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
-              <div>Bordereau</div>
-              <div>Créé le</div>
-              <div>Payé le</div>
-              <div className="text-right">Colis</div>
-              <div className="text-right">Frais</div>
-              <div className="text-right">Montant</div>
-              <div className="text-right">Statut</div>
-            </div>
-            {invoices.map((inv) => (
-              <div
+        <ul className="card divide-y divide-line-soft">
+          <li className="hidden h-10 grid-cols-[minmax(0,2fr)_80px_120px_130px_120px] items-center gap-5 px-5 text-xs font-medium text-muted md:grid">
+            <span>Bordereau</span>
+            <span className="text-right">Colis</span>
+            <span className="text-right">Frais</span>
+            <span className="text-right">Montant</span>
+            <span className="text-right">Statut</span>
+          </li>
+          {invoices.map((inv) => {
+            const pill = <Pill tone={inv.statut === "Payé" ? "green" : "amber"}>{inv.statut}</Pill>;
+            return (
+              <li
                 key={inv.ref}
-                className="grid min-h-[60px] grid-cols-[minmax(0,2fr)_120px_120px_90px_140px_150px_100px] items-center gap-3 border-b border-line-soft px-5 py-2 text-sm last:border-b-0"
+                className="flex flex-col gap-2 p-4 md:grid md:grid-cols-[minmax(0,2fr)_80px_120px_130px_120px] md:items-center md:gap-5 md:px-5 md:py-3.5"
               >
-                <div className="truncate font-mono text-[13px]">{inv.ref}</div>
-                <div className="text-body">{formatDate(inv.cDate)}</div>
-                <div className="text-body">{formatDate(inv.payDate)}</div>
-                <div className="text-right">{formatInt(inv.parcelsCount)}</div>
-                <div className="text-right text-body">{formatDh(inv.feesAmount)}</div>
-                <div className="text-right font-semibold">{formatDh(inv.amount)}</div>
-                <div className="text-right">
-                  <Pill tone={inv.statut === "Payé" ? "green" : "amber"}>{inv.statut}</Pill>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="break-all font-mono text-[13px] font-medium md:truncate">{inv.ref}</div>
+                    <div className="mt-0.5 text-xs tabular-nums text-muted">
+                      Créé le {formatDate(inv.cDate)}
+                      {inv.payDate && <>, payé le {formatDate(inv.payDate)}</>}
+                    </div>
+                  </div>
+                  <span className="shrink-0 md:hidden">{pill}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </>
+                <div className="hidden text-right text-sm tabular-nums text-body md:block">{formatInt(inv.parcelsCount)}</div>
+                <div className="hidden text-right text-sm tabular-nums text-body md:block">{formatDh(inv.feesAmount)}</div>
+                <div className="flex items-baseline justify-between gap-3 md:block md:text-right">
+                  <span className="text-[13px] tabular-nums text-muted md:hidden">
+                    {formatInt(inv.parcelsCount)} colis, frais {formatDh(inv.feesAmount)}
+                  </span>
+                  <span className="text-lg font-semibold tabular-nums md:text-sm">{formatDh(inv.amount)}</span>
+                </div>
+                <div className="hidden text-right md:block">{pill}</div>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
-        <div className="card flex flex-col items-center gap-2 border-dashed border-line-dashed p-14 text-center">
-          <div className="text-base font-semibold">Aucun bordereau pour ces filtres</div>
-          <p className="max-w-[460px] text-sm leading-relaxed text-muted">
-            Aucun bordereau {carrier === "forcelog" ? "Forcelog" : "Ozon Express"} ne correspond aux filtres sélectionnés.
-          </p>
-        </div>
+        <EmptyState title="Aucun bordereau pour ces filtres">
+          Aucun bordereau {carrierName} ne correspond aux filtres sélectionnés.
+        </EmptyState>
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4">
-          <a
-            href={qs({ page: Math.max(1, page - 1) })}
-            className={`text-sm no-underline ${page <= 1 ? "pointer-events-none text-muted opacity-40" : "text-ink hover:underline"}`}
-          >
-            ← Précédent
-          </a>
-          <span className="text-xs text-muted">
-            Page {page} / {totalPages}
+        <nav aria-label="Pagination" className="flex items-center justify-between gap-4 md:justify-center">
+          {page <= 1 ? (
+            <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
+              <CaretLeft size={16} aria-hidden="true" />
+              Précédent
+            </span>
+          ) : (
+            <a href={qs({ page: page - 1 })} className="btn-secondary">
+              <CaretLeft size={16} aria-hidden="true" />
+              Précédent
+            </a>
+          )}
+          <span className="text-sm tabular-nums text-muted">
+            {page} / {totalPages}
           </span>
-          <a
-            href={qs({ page: Math.min(totalPages, page + 1) })}
-            className={`text-sm no-underline ${page >= totalPages ? "pointer-events-none text-muted opacity-40" : "text-ink hover:underline"}`}
-          >
-            Suivant →
-          </a>
-        </div>
+          {page >= totalPages ? (
+            <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
+              Suivant
+              <CaretRight size={16} aria-hidden="true" />
+            </span>
+          ) : (
+            <a href={qs({ page: page + 1 })} className="btn-secondary">
+              Suivant
+              <CaretRight size={16} aria-hidden="true" />
+            </a>
+          )}
+        </nav>
       )}
     </>
   );

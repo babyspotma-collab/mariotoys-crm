@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import MonthFilter from "@/components/MonthFilter";
+import PageHeader from "@/components/PageHeader";
+import Segmented from "@/components/Segmented";
 import { monthRange, monthLabel } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
 import { getCarrierStats } from "@/lib/carrier-stats";
@@ -118,135 +120,84 @@ export default async function StatsPage({
   const statusMax = Math.max(1, ...statusEntries.map((s) => s.value));
   const cityMax = Math.max(1, ...topCities.map((c) => c._count));
 
+  const carrierLabel = carrier === "all" ? "Tous transporteurs" : carrier === "forcelog" ? "Forcelog" : "Ozon Express";
+  const statusTotal = statusEntries.reduce((sum, e) => sum + e.value, 0);
+
   return (
     <>
-      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Statistiques</h1>
-          <p className="text-sm text-muted">Ventes et livraisons, par transporteur</p>
-        </div>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <MonthFilter month={month} action="/stats" />
-          <div role="group" aria-label="Transporteur" className="flex gap-0.5 rounded-[10px] bg-segment p-[3px] md:inline-flex">
-            {(["all", "forcelog", "ozon"] as const).map((c) => (
-              <a
-                key={c}
-                href={`/stats?month=${month}&carrier=${c}`}
-                aria-pressed={carrier === c}
-                className={`flex h-9 flex-1 items-center justify-center rounded-lg px-4 text-[13px] no-underline md:h-8 md:flex-none ${
-                  carrier === c ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
-                }`}
-              >
-                {c === "all" ? "Tous" : c === "forcelog" ? "Forcelog" : "Ozon Express"}
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Statistiques"
+        subtitle={monthLabel(month)}
+        actions={<MonthFilter month={month} action="/stats" />}
+      />
 
-      <section className="flex flex-col gap-3.5">
-        <h2 className="text-[15px] font-semibold">Ventes — {monthLabel(month)}</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-          {sales.map((k) => (
-            <div key={k.label} className="card flex flex-col gap-2 p-4 md:p-5">
-              <div className="text-[13px] text-muted">{k.label}</div>
-              <div className="text-2xl font-semibold tracking-tight md:text-[28px]">{k.value}</div>
-              <div className="text-xs text-muted">{k.sub}</div>
-            </div>
-          ))}
-        </div>
+      <Segmented
+        label="Transporteur"
+        items={(["all", "forcelog", "ozon"] as const).map((c) => ({
+          href: `/stats?month=${month}&carrier=${c}`,
+          label: c === "all" ? "Tous" : c === "forcelog" ? "Forcelog" : "Ozon Express",
+          active: carrier === c,
+        }))}
+      />
+
+      <section aria-label="Ventes" className="card grid grid-cols-2 md:grid-cols-4">
+        {sales.map((k, i) => (
+          <div
+            key={k.label}
+            className={`flex flex-col gap-1 p-4 md:px-6 md:py-5 ${i % 2 === 0 ? "border-r border-line-soft" : ""} ${
+              i < 2 ? "border-b border-line-soft md:border-b-0" : ""
+            } ${i === 1 ? "md:border-r" : ""}`}
+          >
+            <span className="text-[13px] text-muted">{k.label}</span>
+            <span className="text-2xl font-semibold tracking-tight tabular-nums md:text-[28px]">{k.value}</span>
+            <span className="text-xs text-muted">{k.sub}</span>
+          </div>
+        ))}
       </section>
 
-      <section className="flex flex-col gap-3.5">
+      <section className="flex flex-col gap-3">
         <h2 className="text-[15px] font-semibold">Livraison par transporteur</h2>
-
-        {/* Mobile : une carte par transporteur */}
-        <div className="flex flex-col gap-3 md:hidden">
-          {visibleCarrierRows.map((r) => (
-            <div key={r.id} className="card flex flex-col gap-3 p-4">
-              <div className="flex items-center gap-2.5 font-semibold">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: r.id === "forcelog" ? "#C8381F" : "#2F5E9E" }} />
-                {r.name}
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Expédiés</div>
-                  <div>{formatInt(r.sent)}</div>
+        <div className={`grid grid-cols-1 gap-4 ${visibleCarrierRows.length > 1 ? "lg:grid-cols-2" : ""}`}>
+          {visibleCarrierRows.map((r) => {
+            const metrics: [string, string][] = [
+              ["Expédiés", formatInt(r.sent)],
+              ["Livrés", formatInt(r.delivered)],
+              ["Retours", `${formatInt(r.returns)}${r.returnRate !== null ? ` (${r.returnRate} %)` : ""}`],
+              ["Délai moyen", r.avgDelayDays !== null ? `${r.avgDelayDays.toFixed(1)} j` : "-"],
+              ["Frais par colis", r.avgFee !== null ? formatDh(r.avgFee) : "-"],
+              ["Encaissé", r.cashIn !== null ? formatDh(r.cashIn) : "-"],
+            ];
+            return (
+              <article key={r.id} className="card flex flex-col gap-5 p-4 md:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="font-semibold">{r.name}</h3>
+                  <div className="text-right">
+                    <div className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+                      {r.deliveryRate !== null ? `${r.deliveryRate} %` : "-"}
+                    </div>
+                    <div className="mt-1 text-xs text-muted">taux de livraison</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Livrés</div>
-                  <div>{formatInt(r.delivered)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Taux livr.</div>
-                  <div className="font-semibold">{r.deliveryRate ?? "—"}{r.deliveryRate !== null ? " %" : ""}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Retours</div>
-                  <div>{formatInt(r.returns)} {r.returnRate !== null ? `(${r.returnRate} %)` : ""}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Délai moy.</div>
-                  <div className="text-body">{r.avgDelayDays !== null ? `${r.avgDelayDays.toFixed(1)} j` : "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-muted">Frais / colis</div>
-                  <div className="text-body">{r.avgFee !== null ? formatDh(r.avgFee) : "—"}</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-line-soft pt-2.5">
-                <span className="text-[13px] text-muted">Encaissé</span>
-                <span className="text-lg font-semibold">{r.cashIn !== null ? formatDh(r.cashIn) : "—"}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop : tableau */}
-        <div className="card hidden overflow-hidden md:block">
-          <div className="grid grid-cols-[minmax(0,1.3fr)_repeat(8,minmax(0,1fr))] items-center gap-2 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
-            <div>Transporteur</div>
-            <div className="text-right">Expédiés</div>
-            <div className="text-right">Livrés</div>
-            <div className="text-right">Taux livr.</div>
-            <div className="text-right">Retours</div>
-            <div className="text-right">Taux retour</div>
-            <div className="text-right">Délai moy.</div>
-            <div className="text-right">Frais / colis</div>
-            <div className="text-right">Encaissé</div>
-          </div>
-          {visibleCarrierRows.map((r) => (
-            <div
-              key={r.id}
-              className="grid min-h-[60px] grid-cols-[minmax(0,1.3fr)_repeat(8,minmax(0,1fr))] items-center gap-2 border-b border-line-soft px-5 py-2 text-sm last:border-b-0"
-            >
-              <div className="flex items-center gap-2.5 font-semibold">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: r.id === "forcelog" ? "#C8381F" : "#2F5E9E" }}
-                />
-                {r.name}
-              </div>
-              <div className="text-right">{formatInt(r.sent)}</div>
-              <div className="text-right">{formatInt(r.delivered)}</div>
-              <div className="text-right font-semibold">{r.deliveryRate ?? "—"}{r.deliveryRate !== null ? " %" : ""}</div>
-              <div className="text-right">{formatInt(r.returns)}</div>
-              <div className="text-right">{r.returnRate ?? "—"}{r.returnRate !== null ? " %" : ""}</div>
-              <div className="text-right text-body">{r.avgDelayDays !== null ? `${r.avgDelayDays.toFixed(1)} j` : "—"}</div>
-              <div className="text-right text-body">{r.avgFee !== null ? formatDh(r.avgFee) : "—"}</div>
-              <div className="text-right font-semibold">{r.cashIn !== null ? formatDh(r.cashIn) : "—"}</div>
-            </div>
-          ))}
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line-soft pt-4 text-sm sm:grid-cols-3">
+                  {metrics.map(([label, value]) => (
+                    <div key={label} className="flex flex-col gap-0.5">
+                      <dt className="text-xs text-muted">{label}</dt>
+                      <dd className="font-medium tabular-nums">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            );
+          })}
         </div>
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section className="card flex flex-col gap-[18px] p-6">
-          <div className="flex items-baseline justify-between">
+        <section className="card flex flex-col gap-4 p-4 md:p-6">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-[15px] font-semibold">Statut des colis</h2>
             <span className="text-xs text-muted">
-              {carrier === "all" ? "Tous transporteurs" : carrier === "forcelog" ? "Forcelog" : "Ozon Express"} ·{" "}
-              {statusEntries.reduce((s, e) => s + e.value, 0)} colis
+              {carrierLabel}, {formatInt(statusTotal)} colis
             </span>
           </div>
           {statusEntries.length === 0 && <p className="text-sm text-muted">Aucun colis ce mois-ci.</p>}
@@ -254,20 +205,18 @@ export default async function StatsPage({
             <div key={s.id} className="flex flex-col gap-1.5">
               <div className="flex justify-between text-[13px]">
                 <span className="text-body">{s.label}</span>
-                <span className="font-semibold">{formatInt(s.value)}</span>
+                <span className="font-semibold tabular-nums">{formatInt(s.value)}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-cream-dark">
-                <div
-                  className="h-2 rounded-full"
-                  style={{ width: `${(s.value / statusMax) * 100}%`, background: STATUS_COLORS[s.id] }}
-                />
-              </div>
+              <div
+                className="h-1.5 rounded-full"
+                style={{ width: `${Math.max(2, (s.value / statusMax) * 100)}%`, background: STATUS_COLORS[s.id] }}
+              />
             </div>
           ))}
         </section>
 
-        <section className="card flex flex-col gap-[18px] p-6">
-          <div className="flex items-baseline justify-between">
+        <section className="card flex flex-col gap-4 p-4 md:p-6">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-[15px] font-semibold">Top villes</h2>
             <span className="text-xs text-muted">Commandes du mois</span>
           </div>
@@ -276,11 +225,9 @@ export default async function StatsPage({
             <div key={c.city} className="flex flex-col gap-1.5">
               <div className="flex justify-between text-[13px]">
                 <span className="text-body">{c.city}</span>
-                <span className="font-semibold">{formatInt(c._count)}</span>
+                <span className="font-semibold tabular-nums">{formatInt(c._count)}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-cream-dark">
-                <div className="h-2 rounded-full bg-ink" style={{ width: `${(c._count / cityMax) * 100}%` }} />
-              </div>
+              <div className="h-1.5 rounded-full bg-ink" style={{ width: `${Math.max(2, (c._count / cityMax) * 100)}%` }} />
             </div>
           ))}
         </section>
