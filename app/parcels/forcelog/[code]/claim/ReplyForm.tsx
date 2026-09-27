@@ -26,7 +26,7 @@ export default function ReplyForm({ code }: { code: string }) {
         maxLength={1000}
         rows={3}
         placeholder="Votre message…"
-        className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+        className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
       />
       <div>
         <SubmitButton />

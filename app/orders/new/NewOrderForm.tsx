@@ -59,7 +59,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
           id="customerName"
           name="customerName"
           required
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -71,7 +71,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
           id="phone"
           name="phone"
           required
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -83,7 +83,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
           id="city"
           name="city"
           required
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
         <p className="text-xs text-muted mt-1">
           La correspondance avec la vraie ville Forcelog se fera sur l&apos;écran de vérification,
@@ -100,7 +100,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
           name="address"
           required
           rows={2}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -112,7 +112,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
               <select
                 value={line.productId}
                 onChange={(e) => selectProduct(i, e.target.value)}
-                className="flex-1 min-w-[180px] border border-line rounded-lg px-3 py-2 text-sm bg-white"
+                className="flex-1 min-w-[180px] border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
               >
                 <option value="" disabled>
                   {products.length === 0 ? "Catalogue indisponible" : "Choisir un produit…"}
@@ -128,7 +128,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
                 min={1}
                 value={line.quantity}
                 onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                className="w-20 border border-line rounded-lg px-3 py-2 text-sm"
+                className="w-20 border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
                 aria-label="Quantité"
               />
               <input
@@ -137,7 +137,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
                 step="0.01"
                 value={line.price}
                 onChange={(e) => updateLine(i, { price: Number(e.target.value) })}
-                className="w-28 border border-line rounded-lg px-3 py-2 text-sm"
+                className="w-28 border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
                 aria-label="Prix unitaire (DH)"
               />
               {lines.length > 1 && (

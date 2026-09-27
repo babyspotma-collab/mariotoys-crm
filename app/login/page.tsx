@@ -27,7 +27,7 @@ export default function LoginPage({
           type="password"
           required
           autoFocus
-          className="mb-4 w-full rounded-[10px] border border-line-input px-3.5 py-2.5 text-sm"
+          className="mb-4 w-full rounded-[10px] border border-line-input px-3.5 py-2.5 text-base md:text-sm min-h-[44px]"
         />
 
         {searchParams.error && <p className="mb-4 text-sm text-accent">Mot de passe incorrect.</p>}

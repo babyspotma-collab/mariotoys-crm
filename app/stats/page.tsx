@@ -120,20 +120,20 @@ export default async function StatsPage({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[28px] font-semibold tracking-tight">Statistiques</h1>
+          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Statistiques</h1>
           <p className="text-sm text-muted">Ventes et livraisons, par transporteur</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <MonthFilter month={month} action="/stats" />
-          <div role="group" aria-label="Transporteur" className="inline-flex gap-0.5 rounded-[10px] bg-segment p-[3px]">
+          <div role="group" aria-label="Transporteur" className="flex gap-0.5 rounded-[10px] bg-segment p-[3px] md:inline-flex">
             {(["all", "forcelog", "ozon"] as const).map((c) => (
               <a
                 key={c}
                 href={`/stats?month=${month}&carrier=${c}`}
                 aria-pressed={carrier === c}
-                className={`flex h-8 items-center rounded-lg px-4 text-[13px] no-underline ${
+                className={`flex h-9 flex-1 items-center justify-center rounded-lg px-4 text-[13px] no-underline md:h-8 md:flex-none ${
                   carrier === c ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
                 }`}
               >
@@ -146,11 +146,11 @@ export default async function StatsPage({
 
       <section className="flex flex-col gap-3.5">
         <h2 className="text-[15px] font-semibold">Ventes — {monthLabel(month)}</h2>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
           {sales.map((k) => (
-            <div key={k.label} className="card flex flex-col gap-2 p-5">
+            <div key={k.label} className="card flex flex-col gap-2 p-4 md:p-5">
               <div className="text-[13px] text-muted">{k.label}</div>
-              <div className="text-[28px] font-semibold tracking-tight">{k.value}</div>
+              <div className="text-2xl font-semibold tracking-tight md:text-[28px]">{k.value}</div>
               <div className="text-xs text-muted">{k.sub}</div>
             </div>
           ))}
@@ -159,7 +159,51 @@ export default async function StatsPage({
 
       <section className="flex flex-col gap-3.5">
         <h2 className="text-[15px] font-semibold">Livraison par transporteur</h2>
-        <div className="card overflow-hidden">
+
+        {/* Mobile : une carte par transporteur */}
+        <div className="flex flex-col gap-3 md:hidden">
+          {visibleCarrierRows.map((r) => (
+            <div key={r.id} className="card flex flex-col gap-3 p-4">
+              <div className="flex items-center gap-2.5 font-semibold">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: r.id === "forcelog" ? "#C8381F" : "#2F5E9E" }} />
+                {r.name}
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Expédiés</div>
+                  <div>{formatInt(r.sent)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Livrés</div>
+                  <div>{formatInt(r.delivered)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Taux livr.</div>
+                  <div className="font-semibold">{r.deliveryRate ?? "—"}{r.deliveryRate !== null ? " %" : ""}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Retours</div>
+                  <div>{formatInt(r.returns)} {r.returnRate !== null ? `(${r.returnRate} %)` : ""}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Délai moy.</div>
+                  <div className="text-body">{r.avgDelayDays !== null ? `${r.avgDelayDays.toFixed(1)} j` : "—"}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted">Frais / colis</div>
+                  <div className="text-body">{r.avgFee !== null ? formatDh(r.avgFee) : "—"}</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-line-soft pt-2.5">
+                <span className="text-[13px] text-muted">Encaissé</span>
+                <span className="text-lg font-semibold">{r.cashIn !== null ? formatDh(r.cashIn) : "—"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop : tableau */}
+        <div className="card hidden overflow-hidden md:block">
           <div className="grid grid-cols-[minmax(0,1.3fr)_repeat(8,minmax(0,1fr))] items-center gap-2 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
             <div>Transporteur</div>
             <div className="text-right">Expédiés</div>
@@ -196,7 +240,7 @@ export default async function StatsPage({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section className="card flex flex-col gap-[18px] p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="text-[15px] font-semibold">Statut des colis</h2>

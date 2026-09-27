@@ -94,7 +94,7 @@ export default function ConfirmForm({
           name="receiver"
           required
           defaultValue={initialValues.receiver}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -107,7 +107,7 @@ export default function ConfirmForm({
           name="phone"
           required
           defaultValue={initialValues.phone}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -121,7 +121,7 @@ export default function ConfirmForm({
             name="forcelogCity"
             required
             defaultValue={matchedForcelogCity?.code ?? ""}
-            className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
           >
             <option value="" disabled>
               {forcelogCities.length === 0 ? "Liste des villes indisponible" : "Sélectionner une ville…"}
@@ -149,7 +149,7 @@ export default function ConfirmForm({
             name="ozonCity"
             required
             defaultValue={matchedOzonCity?.id ?? ""}
-            className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
           >
             <option value="" disabled>
               {ozonCities.length === 0 ? "Liste des villes indisponible" : "Sélectionner une ville…"}
@@ -178,7 +178,7 @@ export default function ConfirmForm({
             id="quartier"
             name="quartier"
             defaultValue={initialValues.quartier}
-            className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
           />
         </div>
       )}
@@ -193,7 +193,7 @@ export default function ConfirmForm({
           required
           rows={2}
           defaultValue={initialValues.address}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -206,7 +206,7 @@ export default function ConfirmForm({
           name="comment"
           rows={2}
           defaultValue={initialValues.comment}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -219,7 +219,7 @@ export default function ConfirmForm({
           name="productNature"
           required
           defaultValue={initialValues.productNature}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -235,7 +235,7 @@ export default function ConfirmForm({
           min="0"
           required
           defaultValue={initialValues.price}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 

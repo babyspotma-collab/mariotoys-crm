@@ -41,7 +41,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
       <p className="mb-2 text-xs text-muted">
         <a href="/" className="no-underline hover:underline">← Retour aux commandes</a>
       </p>
-      <h1 className="mb-1 text-[28px] font-semibold tracking-tight">
+      <h1 className="mb-1 text-[22px] md:text-[28px] font-semibold tracking-tight">
         Vérifier avant envoi — commande {order.orderNumber}
       </h1>
       <p className="text-sm text-muted mb-8">

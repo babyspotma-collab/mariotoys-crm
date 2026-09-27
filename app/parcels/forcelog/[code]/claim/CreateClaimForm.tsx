@@ -53,7 +53,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
             setTypeId(Number(e.target.value));
             setConfirmed(false);
           }}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
         >
           <option value="" disabled>
             {types.length === 0 ? "Liste indisponible" : "Choisir un type…"}
@@ -76,7 +76,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
             name={`extra_${field}`}
             type={fieldInputType(field)}
             required
-            className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
           />
         </div>
       ))}
@@ -91,7 +91,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
           required
           maxLength={1000}
           rows={4}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 

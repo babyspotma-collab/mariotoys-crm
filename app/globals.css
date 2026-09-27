@@ -9,19 +9,31 @@ a:hover {
   color: #c8381f;
 }
 
-.btn {
-  @apply inline-flex h-10 items-center justify-center rounded-[10px] px-[18px] text-sm font-semibold transition-colors;
-}
-.btn-primary {
-  @apply btn bg-ink text-white hover:bg-black;
-}
-.btn-secondary {
-  @apply btn border border-line-input bg-white text-ink hover:bg-cream-dark;
-}
-.btn-danger {
-  @apply btn border border-accent bg-white text-accent hover:bg-accent hover:text-white;
-}
+/* Layer explicite : sans ça, ces classes sont émises APRÈS la couche
+   "utilities" dans le CSS compilé (elles sont physiquement après
+   @tailwind utilities dans ce fichier) et gagnent en cas d'égalité de
+   spécificité — bug vécu en pratique : hidden/md:inline-flex posés sur
+   un <a className="btn-primary hidden md:inline-flex"> ne masquait rien
+   sur mobile, car .btn-primary { display:inline-flex } passait après
+   .hidden { display:none } à spécificité égale. @layer force le bon
+   ordre (components avant utilities) quelle que soit la position dans
+   le fichier source. */
+@layer components {
+  .btn {
+    /* 44px mobile (zone tactile minimale), 40px desktop (fidèle à la maquette) */
+    @apply inline-flex h-11 md:h-10 items-center justify-center rounded-[10px] px-[18px] text-sm font-semibold transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-white hover:bg-black;
+  }
+  .btn-secondary {
+    @apply btn border border-line-input bg-white text-ink hover:bg-cream-dark;
+  }
+  .btn-danger {
+    @apply btn border border-accent bg-white text-accent hover:bg-accent hover:text-white;
+  }
 
-.card {
-  @apply rounded-[14px] border border-line bg-white;
+  .card {
+    @apply rounded-[14px] border border-line bg-white;
+  }
 }

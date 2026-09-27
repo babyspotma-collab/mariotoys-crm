@@ -84,20 +84,20 @@ export default async function ParcelsPage({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[28px] font-semibold tracking-tight">Colis</h1>
+          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Colis</h1>
           <p className="text-sm text-muted">
             {buckets.all} colis · {buckets.delivered} livrés · {buckets.todo} à traiter
           </p>
         </div>
-        <div role="group" aria-label="Transporteur" className="inline-flex gap-0.5 rounded-[10px] bg-segment p-[3px]">
+        <div role="group" aria-label="Transporteur" className="flex gap-0.5 rounded-[10px] bg-segment p-[3px] md:inline-flex">
           {(["forcelog", "ozon"] as const).map((c) => (
             <a
               key={c}
               href={`/parcels?carrier=${c}`}
               aria-pressed={carrier === c}
-              className={`flex h-[34px] items-center rounded-lg px-4 text-[13px] no-underline ${
+              className={`flex h-11 flex-1 items-center justify-center rounded-lg px-4 text-[13px] no-underline md:h-[34px] md:flex-none ${
                 carrier === c ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
               }`}
             >
@@ -107,15 +107,19 @@ export default async function ParcelsPage({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div role="tablist" aria-label="Filtrer les colis" className="flex flex-grow gap-6 border-b border-line">
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
+        <div
+          role="tablist"
+          aria-label="Filtrer les colis"
+          className="flex gap-5 overflow-x-auto border-b border-line md:flex-grow md:gap-6"
+        >
           {tabs.map((t) => (
             <a
               key={t.id}
               href={qsBase({ filter: t.id })}
               role="tab"
               aria-selected={filter === t.id}
-              className={`-mb-px flex h-11 items-center gap-1.5 border-b-2 text-sm no-underline ${
+              className={`-mb-px flex h-11 shrink-0 items-center gap-1.5 border-b-2 text-sm no-underline md:h-11 ${
                 filter === t.id ? "border-ink font-semibold text-ink" : "border-transparent font-medium text-body"
               }`}
             >
@@ -123,7 +127,7 @@ export default async function ParcelsPage({
             </a>
           ))}
         </div>
-        <form action="/parcels" className="flex items-center gap-2">
+        <form action="/parcels" className="flex items-center">
           <input type="hidden" name="carrier" value={carrier} />
           <input type="hidden" name="filter" value={filter} />
           <label htmlFor="qp" className="sr-only">
@@ -135,12 +139,48 @@ export default async function ParcelsPage({
             type="search"
             defaultValue={q}
             placeholder="Nom, ville, n° de suivi…"
-            className="h-10 w-[260px] rounded-[10px] border border-line-input bg-white px-3.5 text-sm text-ink"
+            className="h-11 w-full rounded-[10px] border border-line-input bg-white px-3.5 text-base text-ink md:h-10 md:w-[260px] md:text-sm"
           />
         </form>
       </div>
 
-      <div className="card overflow-hidden">
+      {visible.length === 0 && (
+        <p className="card px-5 py-6 text-sm text-muted">Aucun colis dans cette catégorie.</p>
+      )}
+
+      {/* Mobile : une carte par colis */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {visible.map((parcel) => {
+          const bucket =
+            carrier === "forcelog" ? forcelogBucketForCode(parcel.statusCode) : ozonBucketForStatus(parcel.status);
+          const detailHref = `/parcels/${carrier}/${encodeURIComponent(parcel.code)}`;
+          const canRelaunch = carrier === "forcelog" && !!parcel.statusCode && NO_ANSWER_CODES.includes(parcel.statusCode);
+          return (
+            <a key={parcel.id} href={detailHref} className="card flex flex-col gap-2 p-4 no-underline">
+              <div className="flex items-start justify-between gap-3">
+                <span className="min-w-0 truncate font-semibold text-ink">{parcel.receiver}</span>
+                <Pill tone={BUCKET_PILL[bucket].tone}>{parcel.status || "Statut inconnu"}</Pill>
+              </div>
+              <div className="text-[13px] text-body">{parcel.cityName}</div>
+              <div className="font-mono text-[13px] text-body">{parcel.code}</div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted">
+                  {parcel.order ? `Commande ${parcel.order.orderNumber}` : "Sans commande liée"}
+                </span>
+                <span className="shrink-0 font-semibold">{formatDh(parcel.price)}</span>
+              </div>
+              {canRelaunch && (
+                <div className="pt-1">
+                  <RelaunchButton code={parcel.code} action={relaunch} />
+                </div>
+              )}
+            </a>
+          );
+        })}
+      </div>
+
+      {/* Desktop : tableau */}
+      <div className="card hidden overflow-hidden md:block">
         <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.4fr)_170px_110px_100px] items-center gap-3 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
           <div>Client</div>
           <div>Ville</div>
@@ -149,10 +189,6 @@ export default async function ParcelsPage({
           <div className="text-right">Montant</div>
           <div />
         </div>
-
-        {visible.length === 0 && (
-          <p className="px-5 py-6 text-sm text-muted">Aucun colis dans cette catégorie.</p>
-        )}
 
         {visible.map((parcel) => {
           const bucket =
@@ -197,6 +233,16 @@ export default async function ParcelsPage({
           )}
         </div>
       </div>
+
+      {visible.length > 0 && (
+        <div className="flex items-center justify-center md:hidden">
+          {hasMore && (
+            <a href={qsBase({ take: String(take + PAGE_SIZE) })} className="text-sm font-semibold no-underline">
+              Afficher plus
+            </a>
+          )}
+        </div>
+      )}
     </>
   );
 }

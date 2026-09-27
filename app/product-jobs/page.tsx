@@ -22,7 +22,7 @@ export default async function ProductJobsPage() {
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[28px] font-semibold tracking-tight">Création produits</h1>
+        <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Création produits</h1>
         <p className="text-sm text-muted">
           Dépose tes photos : prix d&apos;achat et référence sont lus sur l&apos;image, les visuels et la fiche sont créés
           automatiquement en brouillon.
@@ -54,21 +54,31 @@ export default async function ProductJobsPage() {
             const thumb = images[0] ?? job.originalPhotoUrl;
 
             return (
-              <div key={job.id} className="flex items-center gap-[18px] border-b border-line-soft px-5 py-3 last:border-b-0">
+              <div key={job.id} className="flex gap-3.5 border-b border-line-soft px-4 py-3 last:border-b-0 md:items-center md:gap-[18px] md:px-5">
                 <img
                   src={thumb}
                   alt={job.originalFilename}
-                  className="h-[60px] w-[60px] shrink-0 rounded-[10px] border border-line object-cover"
+                  className="h-[52px] w-[52px] shrink-0 rounded-[10px] border border-line object-cover md:h-[60px] md:w-[60px]"
                 />
-                <div className="flex min-w-0 flex-grow flex-col gap-1">
+                <div className="flex min-w-0 flex-grow flex-col gap-1.5">
                   <div className="truncate text-sm font-semibold">{job.originalFilename}</div>
-                  <div className={`truncate text-[13px] ${job.status === "ERREUR" ? "text-accent" : "text-muted"}`}>
+                  <div className={`text-[13px] md:truncate ${job.status === "ERREUR" ? "text-accent" : "text-muted"}`}>
                     {meta}
                   </div>
-                  {job.note && <div className="truncate text-xs text-muted">{job.note}</div>}
+                  {job.note && <div className="text-xs text-muted md:truncate">{job.note}</div>}
+                  <div className="flex items-center gap-3 md:hidden">
+                    <Pill tone={pill.tone}>{pill.label}</Pill>
+                    {job.shopifyProductUrl && (
+                      <a href={job.shopifyProductUrl} target="_blank" rel="noreferrer" className="text-[13px] font-semibold no-underline">
+                        {job.status === "CREE_A_COMPLETER" ? "Ajouter le prix →" : "Voir sur Shopify →"}
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <Pill tone={pill.tone}>{pill.label}</Pill>
-                <div className="w-[150px] shrink-0 text-right">
+                <div className="hidden shrink-0 md:block">
+                  <Pill tone={pill.tone}>{pill.label}</Pill>
+                </div>
+                <div className="hidden w-[150px] shrink-0 text-right md:block">
                   {job.shopifyProductUrl && (
                     <a href={job.shopifyProductUrl} target="_blank" rel="noreferrer" className="text-[13px] font-semibold no-underline">
                       {job.status === "CREE_A_COMPLETER" ? "Ajouter le prix →" : "Voir sur Shopify →"}

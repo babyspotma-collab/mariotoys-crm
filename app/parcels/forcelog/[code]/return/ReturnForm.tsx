@@ -26,7 +26,7 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
         <label className="block text-sm font-medium mb-1" htmlFor="phone">
           Téléphone
         </label>
-        <input id="phone" name="phone" required className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+        <input id="phone" name="phone" required className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]" />
       </div>
 
       <div>
@@ -38,7 +38,7 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
           name="quarter"
           required
           minLength={5}
-          className="w-full border border-line rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
         />
       </div>
 
@@ -46,7 +46,7 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
         <label className="block text-sm font-medium mb-1" htmlFor="city">
           Ville
         </label>
-        <select id="city" name="city" required className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white">
+        <select id="city" name="city" required className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white">
           <option value="" disabled selected>
             {cities.length === 0 ? "Liste indisponible" : "Sélectionner une ville…"}
           </option>
@@ -62,7 +62,7 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
         <label className="block text-sm font-medium mb-1" htmlFor="note">
           Commentaire <span className="text-muted font-normal">(optionnel)</span>
         </label>
-        <textarea id="note" name="note" rows={2} className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+        <textarea id="note" name="note" rows={2} className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]" />
       </div>
 
       <SubmitButton />

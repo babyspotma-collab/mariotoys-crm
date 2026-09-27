@@ -15,7 +15,7 @@ export default async function NewOrderPage() {
       <p className="mb-2 text-xs text-muted">
         <a href="/" className="no-underline hover:underline">← Retour aux commandes</a>
       </p>
-      <h1 className="mb-1 text-[28px] font-semibold tracking-tight">Nouvelle commande manuelle</h1>
+      <h1 className="mb-1 text-[22px] md:text-[28px] font-semibold tracking-tight">Nouvelle commande manuelle</h1>
       <p className="mb-8 text-sm text-muted">
         Pour une commande prise par téléphone ou WhatsApp — elle suivra ensuite le même workflow
         que les commandes Shopify.

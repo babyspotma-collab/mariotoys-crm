@@ -67,16 +67,21 @@ export default async function DashboardPage({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[28px] font-semibold tracking-tight">Commandes</h1>
+          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Commandes</h1>
           <p className="text-sm text-muted">
             {monthLabel(month)} · {totalOrders} commandes · {confirmationRate} % confirmées
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <MonthFilter month={month} action="/" />
-          <form action="/" className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex items-center gap-3">
+            <MonthFilter month={month} action="/" />
+            <a href="/orders/new" className="btn-primary flex-1 text-center md:hidden">
+              Nouvelle commande
+            </a>
+          </div>
+          <form action="/" className="flex items-center">
             <input type="hidden" name="month" value={month} />
             <input type="hidden" name="tab" value={tab} />
             <label htmlFor="q" className="sr-only">
@@ -88,23 +93,27 @@ export default async function DashboardPage({
               type="search"
               defaultValue={q}
               placeholder="Rechercher un client, un n°…"
-              className="h-10 w-[260px] rounded-[10px] border border-line-input bg-white px-3.5 text-sm text-ink"
+              className="h-11 w-full rounded-[10px] border border-line-input bg-white px-3.5 text-base text-ink md:h-10 md:w-[260px] md:text-sm"
             />
           </form>
-          <a href="/orders/new" className="btn-primary">
+          <a href="/orders/new" className="btn-primary hidden md:inline-flex">
             Nouvelle commande
           </a>
         </div>
       </div>
 
-      <div role="tablist" aria-label="Filtrer les commandes" className="inline-flex w-fit gap-0.5 rounded-[10px] bg-segment p-[3px]">
+      <div
+        role="tablist"
+        aria-label="Filtrer les commandes"
+        className="flex w-full gap-0.5 overflow-x-auto rounded-[10px] bg-segment p-[3px] md:inline-flex md:w-fit"
+      >
         {tabs.map((t) => (
           <a
             key={t.id}
             href={`/?tab=${t.id}${searchParams.month ? `&month=${searchParams.month}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             role="tab"
             aria-selected={tab === t.id}
-            className={`flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-[13px] no-underline ${
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[13px] no-underline md:h-8 ${
               tab === t.id ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
             }`}
           >
@@ -113,7 +122,61 @@ export default async function DashboardPage({
         ))}
       </div>
 
-      <div className="card overflow-hidden">
+      {orders.length === 0 && (
+        <p className="card px-5 py-6 text-sm text-muted">Aucune commande pour ce mois.</p>
+      )}
+
+      {/* Mobile : une carte par commande */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {orders.map((order) => {
+          const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
+          const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
+          return (
+            <div key={order.id} className="card flex flex-col gap-2.5 p-4">
+              <div className="flex items-center justify-between text-[13px] text-muted">
+                <span className="font-mono">{orderNumberLabel(order.orderNumber)}</span>
+                <span>{order.createdAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold">
+                    {order.customerName}
+                    {order.source === "MANUEL" && <span className="ml-1.5 text-[11px] font-normal text-muted">(manuel)</span>}
+                  </div>
+                  <div className="text-[13px] text-body">{order.city}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[13px] text-body">{itemsLabel}</div>
+                </div>
+                <div className="shrink-0 font-semibold">{formatDh(order.totalPrice)}</div>
+              </div>
+              {order.forcelogError && <p className="text-xs text-accent">Erreur Forcelog : {order.forcelogError}</p>}
+              {order.status === "NOUVELLE" ? (
+                <div className="flex items-center gap-2">
+                  <a href={`/orders/${order.id}/confirm`} className="btn-primary h-11 flex-1 justify-center text-center">
+                    Confirmer
+                  </a>
+                  <MoreMenu>
+                    <form action={cancelOrder.bind(null, order.id)}>
+                      <button
+                        type="submit"
+                        className="w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-accent hover:bg-cream-dark"
+                      >
+                        Annuler la commande
+                      </button>
+                    </form>
+                  </MoreMenu>
+                </div>
+              ) : (
+                <div>
+                  <Pill tone={pill.tone}>{pill.label}</Pill>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop : tableau */}
+      <div className="card hidden overflow-hidden md:block">
         <div className="grid grid-cols-[96px_minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,2fr)_110px_90px_92px] items-center gap-3 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
           <div>N°</div>
           <div>Client</div>
@@ -123,10 +186,6 @@ export default async function DashboardPage({
           <div className="text-right">Date</div>
           <div />
         </div>
-
-        {orders.length === 0 && (
-          <p className="px-5 py-6 text-sm text-muted">Aucune commande pour ce mois.</p>
-        )}
 
         {orders.map((order) => {
           const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
