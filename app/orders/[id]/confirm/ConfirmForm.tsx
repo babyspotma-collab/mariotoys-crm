@@ -56,7 +56,7 @@ export default function ConfirmForm({
   return (
     <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
       {state.error && (
-        <p className="text-sm text-danger bg-danger/10 rounded-lg p-3">{state.error}</p>
+        <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>
       )}
 
       <div>
@@ -133,7 +133,7 @@ export default function ConfirmForm({
             ))}
           </select>
           {!matchedForcelogCity && initialValues.city && (
-            <p className="text-xs text-danger mt-1">
+            <p className="text-xs text-accent mt-1">
               Ville Shopify d&apos;origine « {initialValues.city} » non reconnue automatiquement —
               choisissez la bonne ville dans la liste.
             </p>
@@ -161,7 +161,7 @@ export default function ConfirmForm({
             ))}
           </select>
           {!matchedOzonCity && initialValues.city && (
-            <p className="text-xs text-danger mt-1">
+            <p className="text-xs text-accent mt-1">
               Ville Shopify d&apos;origine « {initialValues.city} » non reconnue automatiquement —
               choisissez la bonne ville dans la liste.
             </p>

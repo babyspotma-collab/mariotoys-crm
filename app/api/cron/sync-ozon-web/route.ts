@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { ozonCategoryById } from "@/lib/ozon-categories";
+
+const DELIVERED_STATUSES = ozonCategoryById("delivered").statuses;
 
 // Reçoit les données extraites du dashboard web Ozon Express
 // (client.ozoneexpress.ma) par scripts/sync-ozon-web.js (GitHub Actions
@@ -44,6 +47,18 @@ export async function POST(req: NextRequest) {
   for (const p of parcels) {
     const carrierCreatedAt = parseOzonDate(p.carrierCreatedAt);
 
+    const existing = await prisma.parcel.findUnique({
+      where: { carrier_code: { carrier: "OZON", code: p.code } },
+      select: { orderId: true, deliveredAt: true },
+    });
+
+    // Posé une seule fois, au run où le statut entre dans la catégorie
+    // "delivered" — jamais réécrit ensuite (sert au délai moyen de
+    // livraison, Statistiques — voir sync-forcelog-web pour le même
+    // raisonnement côté Forcelog).
+    const justDelivered = DELIVERED_STATUSES.includes(p.status);
+    const deliveredAt = existing?.deliveredAt ?? (justDelivered ? new Date() : null);
+
     if (!p.phone) {
       await prisma.parcel.upsert({
         where: { carrier_code: { carrier: "OZON", code: p.code } },
@@ -56,22 +71,19 @@ export async function POST(req: NextRequest) {
           price: p.price,
           status: p.status,
           carrierCreatedAt,
+          deliveredAt,
         },
         update: {
           receiver: p.receiver,
           cityName: p.cityName,
           price: p.price,
           status: p.status,
+          deliveredAt,
         },
       });
       parcelsUpserted++;
       continue;
     }
-
-    const existing = await prisma.parcel.findUnique({
-      where: { carrier_code: { carrier: "OZON", code: p.code } },
-      select: { orderId: true },
-    });
 
     let orderId = existing?.orderId ?? null;
     if (!orderId) {
@@ -97,9 +109,11 @@ export async function POST(req: NextRequest) {
         price: p.price,
         status: p.status,
         carrierCreatedAt,
+        deliveredAt,
       },
       update: {
         orderId,
+        deliveredAt,
         receiver: p.receiver,
         cityName: p.cityName,
         price: p.price,

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getTracking } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { formatDh } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,16 @@ export default async function OzonParcelDetailPage({ params }: { params: { code:
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-10">
-      <p className="text-xs text-muted mb-2">
-        <a href="/parcels/ozon">← Retour aux colis</a>
+    <div className="max-w-2xl">
+      <p className="mb-2 text-xs text-muted">
+        <a href="/parcels?carrier=ozon" className="no-underline hover:underline">← Retour aux colis</a>
       </p>
-      <h1 className="text-xl font-semibold mb-8 font-mono">{code}</h1>
+      <h1 className="mb-8 font-mono text-xl font-semibold">{code}</h1>
 
-      <section className="bg-white border border-line rounded-2xl p-6 mb-6">
-        <h2 className="text-sm font-semibold mb-4">Détails du colis</h2>
+      <section className="card mb-6 p-6">
+        <h2 className="mb-4 text-sm font-semibold">Détails du colis</h2>
         {!parcel ? (
-          <p className="text-sm text-danger">
+          <p className="text-sm text-accent">
             Pas encore synchronisé — réessayez après le prochain passage du sync (toutes les 2h).
           </p>
         ) : (
@@ -41,31 +42,31 @@ export default async function OzonParcelDetailPage({ params }: { params: { code:
             <dt className="text-muted">Ville</dt>
             <dd>{parcel.cityName || "—"}</dd>
             <dt className="text-muted">Montant COD</dt>
-            <dd>{Number(parcel.price)} DH</dd>
+            <dd>{formatDh(parcel.price)}</dd>
             <dt className="text-muted">Statut</dt>
             <dd>{parcel.status || "—"}</dd>
           </dl>
         )}
       </section>
 
-      <section className="bg-white border border-line rounded-2xl p-6">
-        <h2 className="text-sm font-semibold mb-4">Historique de suivi</h2>
+      <section className="card p-6">
+        <h2 className="mb-4 text-sm font-semibold">Historique de suivi</h2>
         {trackingError ? (
-          <p className="text-sm text-danger">Indisponible pour l&apos;instant : {trackingError}</p>
+          <p className="text-sm text-accent">Indisponible pour l&apos;instant : {trackingError}</p>
         ) : !tracking || tracking.history.length === 0 ? (
           <p className="text-sm text-muted">Aucun événement pour l&apos;instant.</p>
         ) : (
           <ol className="flex flex-col gap-3">
             {tracking.history.map((event, i) => (
-              <li key={i} className="text-sm border-l-2 border-line pl-3">
+              <li key={i} className="border-l-2 border-line pl-3 text-sm">
                 <p className="font-medium">{event.status}</p>
                 <p className="text-xs text-muted">{event.timeStr}</p>
-                {event.comment && <p className="text-xs text-muted mt-1">{event.comment}</p>}
+                {event.comment && <p className="mt-1 text-xs text-muted">{event.comment}</p>}
               </li>
             ))}
           </ol>
         )}
       </section>
-    </main>
+    </div>
   );
 }

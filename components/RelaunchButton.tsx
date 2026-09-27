@@ -25,7 +25,7 @@ export default function RelaunchButton({
   }
 
   if (result?.success) {
-    return <p className="text-xs text-sage-dark font-medium">Relance envoyée ✓</p>;
+    return <p className="text-xs text-pill-green-fg font-medium">Relance envoyée ✓</p>;
   }
 
   return (
@@ -38,7 +38,7 @@ export default function RelaunchButton({
       >
         {pending ? "Envoi…" : "Relancer"}
       </button>
-      {result?.error && <p className="text-xs text-danger">{result.error}</p>}
+      {result?.error && <p className="text-xs text-accent">{result.error}</p>}
     </div>
   );
 }

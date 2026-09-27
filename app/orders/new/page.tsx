@@ -11,23 +11,23 @@ export default async function NewOrderPage() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-10">
-      <p className="text-xs text-muted mb-2">
-        <a href="/">← Retour au dashboard</a>
+    <div className="max-w-2xl">
+      <p className="mb-2 text-xs text-muted">
+        <a href="/" className="no-underline hover:underline">← Retour aux commandes</a>
       </p>
-      <h1 className="text-xl font-semibold mb-1">Nouvelle commande manuelle</h1>
-      <p className="text-sm text-muted mb-8">
+      <h1 className="mb-1 text-[28px] font-semibold tracking-tight">Nouvelle commande manuelle</h1>
+      <p className="mb-8 text-sm text-muted">
         Pour une commande prise par téléphone ou WhatsApp — elle suivra ensuite le même workflow
         que les commandes Shopify.
       </p>
 
       {productsError && (
-        <p className="text-sm text-danger bg-danger/10 rounded-lg p-3 mb-6">
+        <p className="mb-6 rounded-lg bg-pill-red-bg p-3 text-sm text-pill-red-fg">
           Impossible de charger le catalogue Shopify : {productsError}
         </p>
       )}
 
       <NewOrderForm products={products} />
-    </main>
+    </div>
   );
 }

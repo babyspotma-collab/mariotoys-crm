@@ -28,14 +28,14 @@ export default async function ClaimPage({ params }: { params: { code: string } }
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-10">
-      <p className="text-xs text-muted mb-2">
-        <a href={`/parcels/forcelog/${encodeURIComponent(code)}`}>← Retour au colis</a>
+    <div className="max-w-2xl">
+      <p className="mb-2 text-xs text-muted">
+        <a href={`/parcels/forcelog/${encodeURIComponent(code)}`} className="no-underline hover:underline">← Retour au colis</a>
       </p>
-      <h1 className="text-xl font-semibold mb-1 font-mono">Réclamation — {code}</h1>
+      <h1 className="mb-1 font-mono text-xl font-semibold">Réclamation — {code}</h1>
 
       {claimError && (
-        <p className="text-sm text-danger bg-danger/10 rounded-lg p-3 mb-6">
+        <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3 mb-6">
           Impossible de vérifier la réclamation existante : {claimError}
         </p>
       )}
@@ -52,7 +52,7 @@ export default async function ClaimPage({ params }: { params: { code: string } }
               <div
                 key={i}
                 className={`max-w-[85%] rounded-2xl p-3 text-sm ${
-                  m.from === "CUSTOMER" ? "bg-ink text-white self-end ml-auto" : "bg-stone"
+                  m.from === "CUSTOMER" ? "bg-ink text-white self-end ml-auto" : "bg-cream"
                 }`}
               >
                 <p className="text-[11px] opacity-70 mb-1">
@@ -71,6 +71,6 @@ export default async function ClaimPage({ params }: { params: { code: string } }
       )}
 
       {!claimError && !exists && <CreateClaimForm code={code} types={types} />}
-    </main>
+    </div>
   );
 }

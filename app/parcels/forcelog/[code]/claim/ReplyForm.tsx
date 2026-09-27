@@ -19,7 +19,7 @@ export default function ReplyForm({ code }: { code: string }) {
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
-      {state.error && <p className="text-sm text-danger bg-danger/10 rounded-lg p-3">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
       <textarea
         name="message"
         required

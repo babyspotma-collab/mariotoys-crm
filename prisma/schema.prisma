@@ -115,6 +115,7 @@ model Parcel {
   status           String // libellé brut (FR) — sert de clé de catégorisation pour Ozon
   statusCode       String? // STATUS_CODE machine — Forcelog uniquement, null pour Ozon
   carrierCreatedAt DateTime? // date de création/ramassage côté transporteur, si connue
+  deliveredAt      DateTime? // posée une seule fois, au run de sync où le statut entre dans la catégorie "delivered" — jamais réécrite ensuite (voir app/api/cron/sync-*-web) ; sert au délai moyen de livraison (Statistiques)
   syncedAt         DateTime  @updatedAt
 
   @@unique([carrier, code])
@@ -174,12 +175,17 @@ enum ProductJobStatus {
   ERREUR
 }
 
-// Factures CRBT (bordereaux de règlement/virement) — synchronisées depuis
-// le dashboard web Forcelog (customer.forcelog.ma/index/CRBT/Json),
-// aucun endpoint équivalent n'existant sur l'API publique. Voir
-// scripts/sync-forcelog-web.js.
+// Factures de règlement/virement — synchronisées depuis le dashboard web
+// de chaque transporteur (Forcelog : customer.forcelog.ma/index/CRBT/Json,
+// voir scripts/sync-forcelog-web.js ; Ozon Express : voir
+// scripts/sync-ozon-web.js), aucun endpoint équivalent n'existant sur les
+// API publiques. "ref" reste la clé (@id, non composite, pour éviter une
+// migration de clé primaire) : les formats de référence Forcelog
+// (CRBT-xxxxx) et Ozon sont assez distincts pour qu'une collision soit
+// improbable ; carrier sert au filtrage par transporteur sur /billing.
 model CrbtInvoice {
-  ref          String    @id // ex: CRBT-161533-100926-8836-66
+  ref          String    @id
+  carrier      Carrier   @default(FORCELOG) // toutes les factures existantes avant l'ajout d'Ozon sont Forcelog
   cDate        DateTime
   payDate      DateTime?
   statut       String // libellé nettoyé : "Payé" / "Enregistré" / "Demande Virement"
@@ -189,4 +195,6 @@ model CrbtInvoice {
   balance      Decimal   @db.Decimal(10, 2)
   amount       Decimal   @db.Decimal(10, 2)
   syncedAt     DateTime  @updatedAt
+
+  @@index([carrier])
 }

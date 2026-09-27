@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { categoryById } from "@/lib/parcel-categories";
+
+const DELIVERED_CODES = categoryById("delivered").codes;
 
 // Reçoit les données extraites du dashboard web Forcelog par
 // scripts/sync-forcelog-web.js (exécuté dans GitHub Actions, jamais sur
@@ -63,6 +66,17 @@ export async function POST(req: NextRequest) {
   let parcelsLinked = 0;
 
   for (const p of parcels) {
+    const existing = await prisma.parcel.findUnique({
+      where: { carrier_code: { carrier: "FORCELOG", code: p.code } },
+      select: { orderId: true, deliveredAt: true },
+    });
+
+    // Posé une seule fois, au run où le statut entre dans la catégorie
+    // "delivered" — jamais réécrit ensuite, même si le statut change à
+    // nouveau plus tard (sert au délai moyen de livraison, Statistiques).
+    const justDelivered = p.statusCode ? DELIVERED_CODES.includes(p.statusCode) : false;
+    const deliveredAt = existing?.deliveredAt ?? (justDelivered ? new Date() : null);
+
     if (!p.phone) {
       await prisma.parcel.upsert({
         where: { carrier_code: { carrier: "FORCELOG", code: p.code } },
@@ -76,6 +90,7 @@ export async function POST(req: NextRequest) {
           status: p.status,
           statusCode: p.statusCode,
           carrierCreatedAt: parseForcelogDate(p.carrierCreatedAt),
+          deliveredAt,
         },
         update: {
           receiver: p.receiver,
@@ -83,16 +98,12 @@ export async function POST(req: NextRequest) {
           price: p.price,
           status: p.status,
           statusCode: p.statusCode,
+          deliveredAt,
         },
       });
       parcelsUpserted++;
       continue;
     }
-
-    const existing = await prisma.parcel.findUnique({
-      where: { carrier_code: { carrier: "FORCELOG", code: p.code } },
-      select: { orderId: true },
-    });
 
     // Ne cherche une commande à rattacher que si ce colis n'en a pas déjà
     // une — un rattachement une fois établi n'est jamais remis en cause
@@ -122,6 +133,7 @@ export async function POST(req: NextRequest) {
         status: p.status,
         statusCode: p.statusCode,
         carrierCreatedAt: parseForcelogDate(p.carrierCreatedAt),
+        deliveredAt,
       },
       update: {
         orderId,
@@ -129,6 +141,7 @@ export async function POST(req: NextRequest) {
         cityName: p.cityName,
         price: p.price,
         status: p.status,
+        deliveredAt,
         statusCode: p.statusCode,
       },
     });
@@ -143,6 +156,7 @@ export async function POST(req: NextRequest) {
     await prisma.crbtInvoice.upsert({
       where: { ref: inv.ref },
       create: {
+        carrier: "FORCELOG",
         ref: inv.ref,
         cDate,
         payDate: parseForcelogDate(inv.payDate),

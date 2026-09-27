@@ -20,7 +20,7 @@ export default function ReturnForm({ code, cities }: { code: string; cities: For
 
   return (
     <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-danger bg-danger/10 rounded-lg p-3">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
 
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="phone">

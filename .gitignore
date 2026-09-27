@@ -13,3 +13,6 @@ npm-debug.log*
 
 .vercel
 .env*
+
+# Fichiers de maquette design (référence locale, pas du code)
+maquette/

@@ -2,15 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+a {
+  color: inherit;
+}
+a:hover {
+  color: #c8381f;
+}
+
 .btn {
-  @apply inline-flex items-center justify-center text-[13px] font-medium px-4 py-2 rounded-full tracking-wide transition-colors;
+  @apply inline-flex h-10 items-center justify-center rounded-[10px] px-[18px] text-sm font-semibold transition-colors;
 }
 .btn-primary {
   @apply btn bg-ink text-white hover:bg-black;
 }
-.btn-danger {
-  @apply btn bg-white text-danger border border-danger hover:bg-danger hover:text-white;
+.btn-secondary {
+  @apply btn border border-line-input bg-white text-ink hover:bg-cream-dark;
 }
-.badge {
-  @apply inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full;
+.btn-danger {
+  @apply btn border border-accent bg-white text-accent hover:bg-accent hover:text-white;
+}
+
+.card {
+  @apply rounded-[14px] border border-line bg-white;
 }

@@ -1,193 +1,181 @@
 import { prisma } from "@/lib/db";
 import { cancelOrder } from "./orders/actions";
-import AppHeader from "@/components/AppHeader";
 import MonthFilter from "@/components/MonthFilter";
-import { monthRange } from "@/lib/date-range";
-import { normalizeMoroccanPhone } from "@/lib/phone";
-import { getCarrierRevenue } from "@/lib/carrier-revenue";
+import MoreMenu from "@/components/MoreMenu";
+import Pill, { type PillTone } from "@/components/Pill";
+import { monthLabel, monthRange } from "@/lib/date-range";
+import { formatDh } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 const ORDERS_SAFETY_LIMIT = 500;
+type Tab = "todo" | "ok" | "all";
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    NOUVELLE: "bg-slate/20 text-slate",
-    CONFIRMEE: "bg-sage/20 text-sage-dark",
-    ANNULEE: "bg-danger/10 text-danger",
-  };
-  const labels: Record<string, string> = {
-    NOUVELLE: "Nouvelle",
-    CONFIRMEE: "Confirmée",
-    ANNULEE: "Annulée",
-  };
-  return <span className={`badge ${styles[status] ?? ""}`}>{labels[status] ?? status}</span>;
+const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
+  NOUVELLE: { tone: "gray", label: "Nouvelle" },
+  CONFIRMEE: { tone: "green", label: "Confirmée" },
+  ANNULEE: { tone: "red", label: "Annulée" },
+};
+
+function orderNumberLabel(orderNumber: string) {
+  // Les commandes Shopify stockent déjà orderNumber au format "#7325" —
+  // ne jamais re-préfixer un second "#" (bug corrigé : "##7325").
+  return orderNumber;
 }
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { month?: string };
+  searchParams: { month?: string; tab?: string; q?: string };
 }) {
   const { start, end, month } = monthRange(searchParams.month);
   const dateFilter = { createdAt: { gte: start, lt: end } };
+  const tab: Tab = searchParams.tab === "ok" || searchParams.tab === "all" ? searchParams.tab : "todo";
+  const q = searchParams.q?.trim();
 
-  const [orders, counts, shopifyRevenue, forcelogStats, carrierRevenue] = await Promise.all([
+  const [orders, counts] = await Promise.all([
     prisma.order.findMany({
-      where: dateFilter,
+      where: {
+        ...dateFilter,
+        ...(tab === "todo" ? { status: "NOUVELLE" } : tab === "ok" ? { status: "CONFIRMEE" } : {}),
+        ...(q
+          ? {
+              OR: [
+                { customerName: { contains: q, mode: "insensitive" } },
+                { orderNumber: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
       include: { items: true },
       orderBy: { createdAt: "desc" },
       take: ORDERS_SAFETY_LIMIT,
     }),
     prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
-    prisma.order.aggregate({
-      where: { ...dateFilter, source: "SHOPIFY" },
-      _sum: { totalPrice: true },
-    }),
-    prisma.order.groupBy({
-      by: ["forcelogStatusCode"],
-      where: { ...dateFilter, forcelogCode: { not: null } },
-      _count: true,
-      _sum: { totalPrice: true },
-    }),
-    getCarrierRevenue(),
   ]);
 
   const countFor = (status: string) => counts.find((c) => c.status === status)?._count ?? 0;
   const totalOrders = counts.reduce((sum, c) => sum + c._count, 0);
-  const confirmationRate = totalOrders > 0 ? Math.round((countFor("CONFIRMEE") / totalOrders) * 100) : 0;
+  const confirmedCount = countFor("CONFIRMEE");
+  const confirmationRate = totalOrders > 0 ? Math.round((confirmedCount / totalOrders) * 100) : 0;
 
-  const totalShipped = forcelogStats.reduce((sum, s) => sum + s._count, 0);
-  const delivered = forcelogStats.find((s) => s.forcelogStatusCode === "DELIVERED");
-  const deliveryRate = totalShipped > 0 ? Math.round(((delivered?._count ?? 0) / totalShipped) * 100) : 0;
+  const tabs = [
+    { id: "todo" as const, label: "À confirmer", count: countFor("NOUVELLE") },
+    { id: "ok" as const, label: "Confirmées", count: confirmedCount },
+    { id: "all" as const, label: "Toutes", count: totalOrders },
+  ];
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10">
-      <AppHeader active="orders" />
-
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-        <MonthFilter month={month} action="/" />
-        <a href="/orders/new" className="btn-primary">
-          + Nouvelle commande
-        </a>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-10">
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">Nouvelles</p>
-          <p className="text-2xl font-semibold">{countFor("NOUVELLE")}</p>
+    <>
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-[28px] font-semibold tracking-tight">Commandes</h1>
+          <p className="text-sm text-muted">
+            {monthLabel(month)} · {totalOrders} commandes · {confirmationRate} % confirmées
+          </p>
         </div>
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">Confirmées</p>
-          <p className="text-2xl font-semibold">{countFor("CONFIRMEE")}</p>
-        </div>
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">Annulées</p>
-          <p className="text-2xl font-semibold">{countFor("ANNULEE")}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-10">
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">CA Shopify</p>
-          <p className="text-2xl font-semibold">{Number(shopifyRevenue._sum.totalPrice ?? 0)} DH</p>
-        </div>
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">Taux de confirmation</p>
-          <p className="text-2xl font-semibold">{confirmationRate}%</p>
-        </div>
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">Taux de livraison Forcelog</p>
-          <p className="text-2xl font-semibold">{deliveryRate}%</p>
+        <div className="flex items-center gap-3">
+          <MonthFilter month={month} action="/" />
+          <form action="/" className="flex items-center gap-3">
+            <input type="hidden" name="month" value={month} />
+            <input type="hidden" name="tab" value={tab} />
+            <label htmlFor="q" className="sr-only">
+              Rechercher une commande
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Rechercher un client, un n°…"
+              className="h-10 w-[260px] rounded-[10px] border border-line-input bg-white px-3.5 text-sm text-ink"
+            />
+          </form>
+          <a href="/orders/new" className="btn-primary">
+            Nouvelle commande
+          </a>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-10">
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">CA Forcelog (colis livrés depuis le 1er sept.)</p>
-          <p className="text-2xl font-semibold">{carrierRevenue.forcelog} DH</p>
-        </div>
-        <div className="bg-white border border-line rounded-2xl p-5">
-          <p className="text-xs text-muted mb-1">CA Ozon Express (colis livrés depuis le 1er sept.)</p>
-          <p className="text-2xl font-semibold">{carrierRevenue.ozon} DH</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        {orders.length === 0 && (
-          <p className="text-sm text-muted">Aucune commande pour ce mois.</p>
-        )}
-
-        {orders.map((order) => (
-          <div key={order.id} className="bg-white border border-line rounded-2xl p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-              <div>
-                <p className="font-medium">
-                  #{order.orderNumber} — {order.customerName}
-                  {order.source === "MANUEL" && (
-                    <span className="badge bg-slate/20 text-slate ml-2 align-middle">Manuel</span>
-                  )}
-                </p>
-                <p className="text-sm text-muted">
-                  {order.address}, {order.city} · {normalizeMoroccanPhone(order.phone)}
-                </p>
-                <p className="text-xs text-muted mt-1">
-                  {order.createdAt.toLocaleString("fr-FR", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={order.status} />
-                <span className="text-sm font-semibold">{Number(order.totalPrice)} DH</span>
-              </div>
-            </div>
-
-            <ul className="text-sm text-muted mb-3">
-              {order.items.map((item) => (
-                <li key={item.id}>
-                  {item.title} × {item.quantity} — {Number(item.price)} DH
-                </li>
-              ))}
-            </ul>
-
-            {order.forcelogCode && (
-              <p className="text-xs text-muted mb-3">
-                Colis Forcelog : <span className="font-mono">{order.forcelogCode}</span>
-                {order.forcelogStatus ? ` — ${order.forcelogStatus}` : ""}
-              </p>
-            )}
-
-            {order.forcelogError && (
-              <p className="text-xs text-danger mb-3">Erreur Forcelog : {order.forcelogError}</p>
-            )}
-
-            {order.status === "NOUVELLE" && (
-              <div className="flex gap-2">
-                <a href={`/orders/${order.id}/confirm`} className="btn-primary">
-                  Confirmer
-                </a>
-                <form action={cancelOrder.bind(null, order.id)}>
-                  <button type="submit" className="btn-danger">
-                    Annuler
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {order.status === "NOUVELLE" && order.forcelogError && (
-              <p className="text-xs text-muted mt-2">
-                Le colis n&apos;a pas pu être créé — cliquez sur Confirmer pour corriger et
-                réessayer.
-              </p>
-            )}
-          </div>
+      <div role="tablist" aria-label="Filtrer les commandes" className="inline-flex w-fit gap-0.5 rounded-[10px] bg-segment p-[3px]">
+        {tabs.map((t) => (
+          <a
+            key={t.id}
+            href={`/?tab=${t.id}${searchParams.month ? `&month=${searchParams.month}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-[13px] no-underline ${
+              tab === t.id ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
+            }`}
+          >
+            {t.label} <span className="font-medium text-muted">{t.count}</span>
+          </a>
         ))}
       </div>
-    </main>
+
+      <div className="card overflow-hidden">
+        <div className="grid grid-cols-[96px_minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,2fr)_110px_90px_92px] items-center gap-3 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
+          <div>N°</div>
+          <div>Client</div>
+          <div>Ville</div>
+          <div>Articles</div>
+          <div className="text-right">Montant</div>
+          <div className="text-right">Date</div>
+          <div />
+        </div>
+
+        {orders.length === 0 && (
+          <p className="px-5 py-6 text-sm text-muted">Aucune commande pour ce mois.</p>
+        )}
+
+        {orders.map((order) => {
+          const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
+          const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
+          return (
+            <div key={order.id} className="flex flex-col border-b border-line-soft last:border-b-0">
+              <div className="grid min-h-16 grid-cols-[96px_minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,2fr)_110px_90px_92px] items-center gap-3 px-5 py-3 text-sm">
+                <div className="font-mono text-[13px] text-muted">{orderNumberLabel(order.orderNumber)}</div>
+                <div className="min-w-0">
+                  <span className="font-medium">{order.customerName}</span>
+                  {order.source === "MANUEL" && (
+                    <span className="ml-1.5 align-middle text-[11px] text-muted">(manuel)</span>
+                  )}
+                </div>
+                <div className="truncate text-body">{order.city}</div>
+                <div className="truncate pr-4 text-body">{itemsLabel}</div>
+                <div className="text-right font-semibold">{formatDh(order.totalPrice)}</div>
+                <div className="text-right text-[13px] text-muted">
+                  {order.createdAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                </div>
+                <div className="flex items-center justify-end gap-1">
+                  {order.status === "NOUVELLE" ? (
+                    <a href={`/orders/${order.id}/confirm`} className="btn-secondary h-[34px] px-3.5 text-[13px]">
+                      Confirmer
+                    </a>
+                  ) : (
+                    <Pill tone={pill.tone}>{pill.label}</Pill>
+                  )}
+                  {order.status === "NOUVELLE" && (
+                    <MoreMenu>
+                      <form action={cancelOrder.bind(null, order.id)}>
+                        <button
+                          type="submit"
+                          className="w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-accent hover:bg-cream-dark"
+                        >
+                          Annuler la commande
+                        </button>
+                      </form>
+                    </MoreMenu>
+                  )}
+                </div>
+              </div>
+              {order.forcelogError && (
+                <p className="px-5 pb-3 text-xs text-accent">Erreur Forcelog : {order.forcelogError}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

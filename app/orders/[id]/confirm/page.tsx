@@ -37,12 +37,12 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     order.items.map((i) => `${i.title} x${i.quantity}`).join(", ") || "Jouet";
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-10">
-      <p className="text-xs text-muted mb-2">
-        <a href="/">← Retour au dashboard</a>
+    <div className="max-w-2xl">
+      <p className="mb-2 text-xs text-muted">
+        <a href="/" className="no-underline hover:underline">← Retour aux commandes</a>
       </p>
-      <h1 className="text-xl font-semibold mb-1">
-        Vérifier avant envoi — commande #{order.orderNumber}
+      <h1 className="mb-1 text-[28px] font-semibold tracking-tight">
+        Vérifier avant envoi — commande {order.orderNumber}
       </h1>
       <p className="text-sm text-muted mb-8">
         Corrigez les champs si besoin (téléphone, ville, adresse), choisissez le transporteur,
@@ -50,13 +50,13 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
       </p>
 
       {forcelogCitiesError && (
-        <p className="text-sm text-danger bg-danger/10 rounded-lg p-3 mb-6">
+        <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3 mb-6">
           Impossible de charger la liste des villes Forcelog : {forcelogCitiesError}. Rechargez la
           page pour réessayer.
         </p>
       )}
       {ozonCitiesError && (
-        <p className="text-sm text-danger bg-danger/10 rounded-lg p-3 mb-6">
+        <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3 mb-6">
           Impossible de charger la liste des villes Ozon Express : {ozonCitiesError}. Rechargez la
           page pour réessayer.
         </p>
@@ -78,6 +78,6 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
           fragile: order.fragile,
         }}
       />
-    </main>
+    </div>
   );
 }

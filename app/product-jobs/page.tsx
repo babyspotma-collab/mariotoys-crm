@@ -1,26 +1,17 @@
 import { prisma } from "@/lib/db";
-import AppHeader from "@/components/AppHeader";
+import Pill, { type PillTone } from "@/components/Pill";
 import UploadPhotosForm from "./UploadPhotosForm";
+import { formatDh } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    EN_ATTENTE: "bg-slate/20 text-slate",
-    EN_COURS: "bg-sage/20 text-sage-dark",
-    CREE: "bg-sage/20 text-sage-dark",
-    CREE_A_COMPLETER: "bg-amber-100 text-amber-800",
-    ERREUR: "bg-danger/10 text-danger",
-  };
-  const labels: Record<string, string> = {
-    EN_ATTENTE: "En attente",
-    EN_COURS: "En cours",
-    CREE: "Créé",
-    CREE_A_COMPLETER: "Créé – à compléter",
-    ERREUR: "Erreur",
-  };
-  return <span className={`badge ${styles[status] ?? ""}`}>{labels[status] ?? status}</span>;
-}
+const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
+  EN_ATTENTE: { tone: "gray", label: "En attente" },
+  EN_COURS: { tone: "blue", label: "Génération en cours" },
+  CREE: { tone: "green", label: "Créé en brouillon" },
+  CREE_A_COMPLETER: { tone: "amber", label: "À compléter" },
+  ERREUR: { tone: "red", label: "Erreur" },
+};
 
 export default async function ProductJobsPage() {
   const jobs = await prisma.productJob.findMany({
@@ -29,91 +20,66 @@ export default async function ProductJobsPage() {
   });
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10">
-      <AppHeader active="productJobs" />
-      <h1 className="text-xl font-semibold mb-1">Création produits</h1>
-      <p className="text-sm text-muted mb-8">
-        Dépose des photos produit ci-dessous — le worker sur PC lit le prix
-        et la référence sur chaque photo, génère les visuels via Gemini, puis
-        crée directement le produit Shopify en brouillon. Tout s&apos;enchaîne
-        automatiquement, sans étape manuelle intermédiaire.
-      </p>
+    <>
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-[28px] font-semibold tracking-tight">Création produits</h1>
+        <p className="text-sm text-muted">
+          Dépose tes photos : prix d&apos;achat et référence sont lus sur l&apos;image, les visuels et la fiche sont créés
+          automatiquement en brouillon.
+        </p>
+      </div>
 
       <UploadPhotosForm />
 
-      <div className="flex flex-col gap-3">
-        {jobs.length === 0 && <p className="text-sm text-muted">Aucun job pour l&apos;instant.</p>}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[15px] font-semibold">Traitements récents</h2>
+          <span className="text-xs text-muted">Le PC doit être allumé pour que le traitement avance</span>
+        </div>
 
-        {jobs.map((job) => (
-          <div key={job.id} className="bg-white border border-line rounded-2xl p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-              <div>
-                <p className="font-medium">{job.originalFilename}</p>
-                <p className="text-sm text-muted">
-                  Coût : {job.cost ? `${Number(job.cost)} DH` : "—"}
-                  {job.sellPrice ? ` · Prix de vente : ${Number(job.sellPrice)} DH` : ""}
-                  {job.compareAtPrice ? ` (barré ${Number(job.compareAtPrice)} DH)` : ""}
-                  {job.sku ? ` · Réf. ${job.sku}` : ""} ·{" "}
-                  {job.createdAt.toLocaleString("fr-FR", {
-                    day: "2-digit",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-              <StatusBadge status={job.status} />
-            </div>
+        <div className="card overflow-hidden">
+          {jobs.length === 0 && <p className="px-5 py-6 text-sm text-muted">Aucun job pour l&apos;instant.</p>}
 
-            <div className="flex gap-3 flex-wrap">
-              <a href={job.originalPhotoUrl} target="_blank" rel="noreferrer">
+          {jobs.map((job) => {
+            const pill = STATUS_PILL[job.status] ?? { tone: "gray" as const, label: job.status };
+            const meta =
+              job.status === "ERREUR"
+                ? job.errorMessage ?? "Erreur inconnue"
+                : job.cost
+                  ? `Coût ${formatDh(job.cost)} → vente ${formatDh(job.sellPrice)}${job.sku ? ` · SKU ${job.sku}` : ""}`
+                  : job.status === "CREE_A_COMPLETER"
+                    ? `Prix et SKU introuvables sur la photo${job.missingFields.length ? ` (${job.missingFields.join(", ")})` : ""}`
+                    : "En attente de traitement par le worker";
+            const images = Array.isArray(job.generatedImageUrls) ? (job.generatedImageUrls as string[]) : [];
+            const thumb = images[0] ?? job.originalPhotoUrl;
+
+            return (
+              <div key={job.id} className="flex items-center gap-[18px] border-b border-line-soft px-5 py-3 last:border-b-0">
                 <img
-                  src={job.originalPhotoUrl}
+                  src={thumb}
                   alt={job.originalFilename}
-                  className="w-20 h-20 object-cover rounded-lg border border-line"
+                  className="h-[60px] w-[60px] shrink-0 rounded-[10px] border border-line object-cover"
                 />
-              </a>
-              {Array.isArray(job.generatedImageUrls) &&
-                (job.generatedImageUrls as string[]).map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer">
-                    <img
-                      src={url}
-                      alt={`Visuel généré ${i + 1}`}
-                      className="w-20 h-20 object-cover rounded-lg border border-sage-dark"
-                    />
-                  </a>
-                ))}
-            </div>
-
-            {(job.status === "CREE" || job.status === "CREE_A_COMPLETER") && job.shopifyProductUrl && (
-              <a
-                href={job.shopifyProductUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-sage-dark underline mt-3 inline-block"
-              >
-                Voir le produit Shopify →
-              </a>
-            )}
-
-            {job.status === "CREE_A_COMPLETER" && job.missingFields.length > 0 && (
-              <p className="text-xs text-amber-800 bg-amber-100 rounded-lg p-3 mt-3">
-                À compléter : {job.missingFields.join(", ")}
-              </p>
-            )}
-
-            {job.note && (
-              <p className="text-xs text-muted bg-slate/10 rounded-lg p-3 mt-3">{job.note}</p>
-            )}
-
-            {job.status === "ERREUR" && job.errorMessage && (
-              <p className="text-xs text-danger bg-danger/10 rounded-lg p-3 mt-3">
-                {job.errorMessage}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    </main>
+                <div className="flex min-w-0 flex-grow flex-col gap-1">
+                  <div className="truncate text-sm font-semibold">{job.originalFilename}</div>
+                  <div className={`truncate text-[13px] ${job.status === "ERREUR" ? "text-accent" : "text-muted"}`}>
+                    {meta}
+                  </div>
+                  {job.note && <div className="truncate text-xs text-muted">{job.note}</div>}
+                </div>
+                <Pill tone={pill.tone}>{pill.label}</Pill>
+                <div className="w-[150px] shrink-0 text-right">
+                  {job.shopifyProductUrl && (
+                    <a href={job.shopifyProductUrl} target="_blank" rel="noreferrer" className="text-[13px] font-semibold no-underline">
+                      {job.status === "CREE_A_COMPLETER" ? "Ajouter le prix →" : "Voir sur Shopify →"}
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }

@@ -38,7 +38,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
 
   return (
     <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-danger bg-danger/10 rounded-lg p-3">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
 
       <div>
         <label className="block text-sm font-medium mb-1" htmlFor="typeId">
@@ -96,7 +96,7 @@ export default function CreateClaimForm({ code, types }: { code: string; types: 
       </div>
 
       {needsConfirmation && (
-        <label className="flex items-start gap-2 text-sm bg-danger/10 text-danger rounded-lg p-3">
+        <label className="flex items-start gap-2 text-sm bg-pill-red-bg text-accent rounded-lg p-3">
           <input
             type="checkbox"
             checked={confirmed}

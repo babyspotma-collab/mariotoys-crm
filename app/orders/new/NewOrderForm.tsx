@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
 import type { ShopifyProductSummary } from "@/lib/shopify-admin";
+import { formatDh } from "@/lib/format";
 
 type Line = { productId: string; title: string; price: number; quantity: number };
 
@@ -46,7 +47,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
 
   return (
     <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-danger bg-danger/10 rounded-lg p-3">{state.error}</p>}
+      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
 
       <input type="hidden" name="items" value={JSON.stringify(lines)} />
 
@@ -143,7 +144,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
                 <button
                   type="button"
                   onClick={() => removeLine(i)}
-                  className="text-sm text-danger px-2"
+                  className="text-sm text-accent px-2"
                   aria-label="Retirer cet article"
                 >
                   ×
@@ -152,12 +153,12 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
             </div>
           ))}
         </div>
-        <button type="button" onClick={addLine} className="text-sm text-sage-dark mt-3">
+        <button type="button" onClick={addLine} className="text-sm text-pill-green-fg mt-3">
           + Ajouter un article
         </button>
       </div>
 
-      <p className="text-sm font-semibold">Total : {total} DH</p>
+      <p className="text-sm font-semibold">Total : {formatDh(total)}</p>
 
       <SubmitButton />
     </form>
