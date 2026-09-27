@@ -52,11 +52,13 @@ function parseMoneyDh(text) {
   return Number.isFinite(n) ? Math.abs(n) : 0;
 }
 
+// Même règle que normalizeMoroccanPhone (lib/phone.ts), y compris
+// "+212 0612…" (13 chiffres "2120…") — garder les deux synchronisées.
 function normPhone(raw) {
   let d = String(raw ?? "").replace(/\D/g, "");
-  if (d.startsWith("212")) d = "0" + d.slice(3);
-  else if (d.startsWith("00212")) d = "0" + d.slice(5);
-  else if (d.length === 9 && !d.startsWith("0")) d = "0" + d;
+  if (d.startsWith("00212")) d = d.slice(5);
+  else if (d.startsWith("212") && d.length >= 12) d = d.slice(3);
+  if (d.length === 9 && !d.startsWith("0")) d = "0" + d;
   return d;
 }
 

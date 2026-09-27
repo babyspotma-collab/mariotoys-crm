@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { applyAutoConfirmations } from "@/lib/auto-confirm";
 import { ozonCategoryById } from "@/lib/ozon-categories";
 
 const DELIVERED_STATUSES = ozonCategoryById("delivered").statuses;
@@ -161,10 +162,21 @@ export async function POST(req: NextRequest) {
     invoicesUpserted++;
   }
 
+  // Colis à jour -> confirme les commandes déjà expédiées (voir
+  // lib/auto-confirm.ts). Une erreur ici n'annule pas la synchro des colis,
+  // elle est remontée dans la réponse (visible dans les logs GitHub Actions).
+  let autoConfirm: { autoConfirmed: number; toReview: number } | { error: string };
+  try {
+    autoConfirm = await applyAutoConfirmations();
+  } catch (err) {
+    autoConfirm = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   return NextResponse.json({
     parcelsReceived: parcels.length,
     parcelsUpserted,
     parcelsLinked,
     invoicesUpserted,
+    autoConfirm,
   });
 }

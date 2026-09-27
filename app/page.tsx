@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { cancelOrder } from "./orders/actions";
 import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
+import AutoConfirmPanel from "@/components/AutoConfirmPanel";
 import ConfirmButton from "@/components/ConfirmButton";
 import EmptyState from "@/components/EmptyState";
 import MoreMenu from "@/components/MoreMenu";
@@ -13,6 +14,7 @@ import Segmented from "@/components/Segmented";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { findAutoConfirmations } from "@/lib/auto-confirm";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +59,7 @@ export default async function DashboardPage({
       : {}),
   };
 
-  const [orders, listTotal, counts] = await Promise.all([
+  const [orders, listTotal, counts, auto] = await Promise.all([
     prisma.order.findMany({
       where: listWhere,
       include: { items: true },
@@ -67,6 +69,7 @@ export default async function DashboardPage({
     }),
     prisma.order.count({ where: listWhere }),
     prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
+    findAutoConfirmations(),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
@@ -105,6 +108,8 @@ export default async function DashboardPage({
           </>
         }
       />
+
+      <AutoConfirmPanel toConfirm={auto.toConfirm} toReview={auto.toReview} />
 
       <PeriodFilter action="/" keep={{ tab, q }} range={range} />
 
@@ -157,6 +162,9 @@ export default async function DashboardPage({
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
                       <span className="hidden md:inline"> · {phone}</span>
                     </div>
+                    {order.autoConfirmedAt && (
+                      <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
+                    )}
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>
                 </div>

@@ -23,6 +23,10 @@ model Order {
   phone            String
   totalPrice       Decimal     @db.Decimal(10, 2)
   status           OrderStatus @default(NOUVELLE)
+  // Posé quand la commande est passée en CONFIRMEE par lib/auto-confirm.ts
+  // (un colis Forcelog/Ozon correspondant a été trouvé), null sinon —
+  // affiche la mention "Confirmée automatiquement (colis envoyé)".
+  autoConfirmedAt  DateTime?
 
   // Transporteur choisi à la confirmation (voir app/orders/[id]/confirm) —
   // Forcelog et Ozon Express sont deux intégrations totalement
