@@ -2,10 +2,12 @@ import { prisma } from "@/lib/db";
 import { CaretRight, Funnel } from "@phosphor-icons/react/dist/ssr";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import PeriodFilter from "@/components/PeriodFilter";
 import Pagination from "@/components/Pagination";
 import Pill from "@/components/Pill";
 import Segmented from "@/components/Segmented";
 import { formatDh, formatInt } from "@/lib/format";
+import { periodParams, periodRange } from "@/lib/date-range";
 
 export const dynamic = "force-dynamic";
 
@@ -23,19 +25,19 @@ function formatDate(date: Date | null): string {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: { carrier?: string; statut?: string; from?: string; to?: string; page?: string };
+  searchParams: { carrier?: string; statut?: string; period?: string; from?: string; to?: string; page?: string };
 }) {
   const carrier: "forcelog" | "ozon" = searchParams.carrier === "ozon" ? "ozon" : "forcelog";
   const page = Math.max(1, Number(searchParams.page) || 1);
 
-  const where: Record<string, unknown> = { carrier: carrier.toUpperCase() };
+  const range = periodRange(searchParams);
+  const periodKeep = periodParams(range);
+
+  const where: Record<string, unknown> = {
+    carrier: carrier.toUpperCase(),
+    cDate: { gte: range.start, lt: range.end },
+  };
   if (searchParams.statut) where.statut = searchParams.statut;
-  if (searchParams.from || searchParams.to) {
-    where.cDate = {
-      ...(searchParams.from ? { gte: new Date(searchParams.from) } : {}),
-      ...(searchParams.to ? { lte: new Date(`${searchParams.to}T23:59:59`) } : {}),
-    };
-  }
 
   const [invoices, total, sums] = await Promise.all([
     prisma.crbtInvoice.findMany({
@@ -51,13 +53,13 @@ export default async function BillingPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const qs = (overrides: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
-    const merged = { carrier, statut: searchParams.statut, from: searchParams.from, to: searchParams.to, ...overrides };
+    const merged = { carrier, statut: searchParams.statut, ...periodKeep, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v) params.set(k, String(v));
     return `/billing?${params.toString()}`;
   };
 
   const carrierName = carrier === "forcelog" ? "Forcelog" : "Ozon Express";
-  const activeFilters = [searchParams.statut, searchParams.from, searchParams.to].filter(Boolean).length;
+  const activeFilters = searchParams.statut ? 1 : 0;
   const kpis = [
     { label: "Montant total", value: formatDh(sums._sum.amount) },
     { label: "Frais de livraison", value: formatDh(sums._sum.feesAmount) },
@@ -68,19 +70,21 @@ export default async function BillingPage({
     <>
       <PageHeader
         title="Facturation"
-        subtitle={`Bordereaux ${carrierName}, synchronisés toutes les 2 h`}
+        subtitle={`${range.label} · bordereaux ${carrierName}, synchronisés toutes les 2 h`}
         actions={
           <Segmented
             label="Transporteur"
             className="w-fit"
             items={(["forcelog", "ozon"] as const).map((c) => ({
-              href: `/billing?carrier=${c}`,
+              href: `/billing?${new URLSearchParams({ carrier: c, ...periodKeep })}`,
               label: c === "forcelog" ? "Forcelog" : "Ozon",
               active: carrier === c,
             }))}
           />
         }
       />
+
+      <PeriodFilter action="/billing" keep={{ carrier, statut: searchParams.statut }} range={range} />
 
       <div className="card grid grid-cols-2 md:grid-cols-3 md:divide-x md:divide-line-soft">
         {kpis.map((k, i) => (
@@ -107,6 +111,9 @@ export default async function BillingPage({
         </summary>
         <form action="/billing" className="grid grid-cols-2 gap-3 border-t border-line-soft p-4 md:flex md:items-end md:px-5">
           <input type="hidden" name="carrier" value={carrier} />
+          {Object.entries(periodKeep).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
           <div className="col-span-2 md:w-48">
             <label htmlFor="statut" className="label">
               Statut
@@ -120,24 +127,12 @@ export default async function BillingPage({
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="from" className="label">
-              Du
-            </label>
-            <input id="from" name="from" type="date" defaultValue={searchParams.from ?? ""} className="input" />
-          </div>
-          <div>
-            <label htmlFor="to" className="label">
-              Au
-            </label>
-            <input id="to" name="to" type="date" defaultValue={searchParams.to ?? ""} className="input" />
-          </div>
           <div className="col-span-2 flex gap-2">
             <button type="submit" className="btn-primary flex-1 md:flex-none">
               Appliquer
             </button>
             {activeFilters > 0 && (
-              <a href={`/billing?carrier=${carrier}`} className="btn-ghost">
+              <a href={qs({ statut: undefined })} className="btn-ghost">
                 Réinitialiser
               </a>
             )}

@@ -4,10 +4,10 @@ import { OZON_CATEGORIES, ALL_OZON_CATEGORIZED_STATUSES, type OzonCategoryId } f
 export type OzonCategoryCounts = Record<OzonCategoryId | "all" | "uncategorized", number>;
 
 /** Un seul groupBy sur Parcel.status (carrier OZON), réparti ensuite entre les catégories — utilisé pour les compteurs affichés sur chaque onglet. */
-export async function getOzonCategoryCounts(): Promise<OzonCategoryCounts> {
+export async function getOzonCategoryCounts(range?: { start: Date; end: Date }): Promise<OzonCategoryCounts> {
   const rows = await prisma.parcel.groupBy({
     by: ["status"],
-    where: { carrier: "OZON" },
+    where: { carrier: "OZON", ...(range ? { carrierCreatedAt: { gte: range.start, lt: range.end } } : {}) },
     _count: true,
   });
 

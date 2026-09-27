@@ -3,14 +3,14 @@ import { cancelOrder } from "./orders/actions";
 import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
 import ConfirmButton from "@/components/ConfirmButton";
 import EmptyState from "@/components/EmptyState";
-import MonthFilter from "@/components/MonthFilter";
 import MoreMenu from "@/components/MoreMenu";
 import PageHeader from "@/components/PageHeader";
+import PeriodFilter from "@/components/PeriodFilter";
 import Pagination from "@/components/Pagination";
 import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
-import { monthLabel, monthRange } from "@/lib/date-range";
+import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
@@ -34,9 +34,11 @@ function orderNumberLabel(orderNumber: string) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { month?: string; tab?: string; q?: string; page?: string };
+  searchParams: { period?: string; from?: string; to?: string; tab?: string; q?: string; page?: string };
 }) {
-  const { start, end, month } = monthRange(searchParams.month);
+  const range = periodRange(searchParams);
+  const { start, end } = range;
+  const periodKeep = periodParams(range);
   const dateFilter = { createdAt: { gte: start, lt: end } };
   const tab: Tab = searchParams.tab === "ok" || searchParams.tab === "all" ? searchParams.tab : "todo";
   const q = searchParams.q?.trim();
@@ -83,7 +85,7 @@ export default async function DashboardPage({
   // explicitement (liens Précédent / Suivant).
   const url = (over: Record<string, string | undefined>) => {
     const params = new URLSearchParams();
-    const merged = { tab, month: searchParams.month, q, ...over };
+    const merged = { tab, ...periodKeep, q, ...over };
     for (const [k, v] of Object.entries(merged)) if (v) params.set(k, v);
     return `/?${params.toString()}`;
   };
@@ -93,10 +95,9 @@ export default async function DashboardPage({
     <>
       <PageHeader
         title="Commandes"
-        subtitle={`${totalOrders} commandes · ${confirmationRate} % confirmées`}
+        subtitle={`${range.label} · ${totalOrders} commandes, ${confirmationRate} % confirmées`}
         actions={
           <>
-            <MonthFilter month={month} action="/" />
             <a href="/orders/new" className="btn-primary hidden md:inline-flex">
               <Plus size={16} weight="bold" aria-hidden="true" />
               Nouvelle commande
@@ -105,6 +106,8 @@ export default async function DashboardPage({
         }
       />
 
+      <PeriodFilter action="/" keep={{ tab, q }} range={range} />
+
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <Segmented
           label="Filtrer les commandes"
@@ -112,7 +115,7 @@ export default async function DashboardPage({
         />
         <SearchForm
           action="/"
-          hidden={{ month, tab }}
+          hidden={{ ...periodKeep, tab }}
           defaultValue={q}
           label="Rechercher une commande"
           placeholder="Client ou n° de commande"
@@ -127,9 +130,9 @@ export default async function DashboardPage({
             </a>
           </EmptyState>
         ) : tab === "todo" ? (
-          <EmptyState title="Aucune commande à confirmer">Tout est à jour pour {monthLabel(month).toLowerCase()}.</EmptyState>
+          <EmptyState title="Aucune commande à confirmer">Tout est à jour sur cette période.</EmptyState>
         ) : (
-          <EmptyState title="Aucune commande">Rien pour {monthLabel(month).toLowerCase()} dans cet onglet.</EmptyState>
+          <EmptyState title="Aucune commande">Rien sur cette période dans cet onglet.</EmptyState>
         )
       ) : (
         <ul className="card divide-y divide-line-soft">

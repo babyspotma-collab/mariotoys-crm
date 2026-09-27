@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import PeriodFilter from "@/components/PeriodFilter";
 import Pagination from "@/components/Pagination";
 import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
@@ -19,6 +20,7 @@ import {
   type ColisFilter,
 } from "@/lib/parcel-filters";
 import { formatDh } from "@/lib/format";
+import { periodParams, periodRange } from "@/lib/date-range";
 import { relaunch } from "./actions";
 
 const NO_ANSWER_CODES = categoryById("noAnswer").codes;
@@ -37,7 +39,7 @@ const BUCKET_PILL: Record<ColisFilter, { tone: PillTone }> = {
 export default async function ParcelsPage({
   searchParams,
 }: {
-  searchParams: { carrier?: string; filter?: string; q?: string; page?: string };
+  searchParams: { carrier?: string; filter?: string; q?: string; page?: string; period?: string; from?: string; to?: string };
 }) {
   const carrier: ColisCarrier = searchParams.carrier === "ozon" ? "ozon" : "forcelog";
   const filter: ColisFilter =
@@ -47,11 +49,15 @@ export default async function ParcelsPage({
   const q = searchParams.q?.trim();
   const page = Math.max(1, Number(searchParams.page) || 1);
 
-  const [forcelogRaw, ozonRaw] = await Promise.all([getParcelCategoryCounts(), getOzonCategoryCounts()]);
+  const range = periodRange(searchParams);
+  const periodKeep = periodParams(range);
+
+  const [forcelogRaw, ozonRaw] = await Promise.all([getParcelCategoryCounts(range), getOzonCategoryCounts(range)]);
   const buckets = carrier === "forcelog" ? forcelogBucketCounts(forcelogRaw) : ozonBucketCounts(ozonRaw);
 
   const where: Record<string, unknown> = {
     carrier: carrier.toUpperCase(),
+    carrierCreatedAt: { gte: range.start, lt: range.end },
     ...parcelWhereFor(carrier, filter),
     ...(q
       ? {
@@ -85,7 +91,7 @@ export default async function ParcelsPage({
   const tabs = allTabs.filter((t) => t.id === "all" || t.count > 0);
 
   const qsBase = (over: Record<string, string>) => {
-    const params = new URLSearchParams({ carrier, filter, ...(q ? { q } : {}) });
+    const params = new URLSearchParams({ carrier, filter, ...periodKeep, ...(q ? { q } : {}) });
     for (const [k, v] of Object.entries(over)) params.set(k, v);
     return `/parcels?${params.toString()}`;
   };
@@ -96,19 +102,21 @@ export default async function ParcelsPage({
     <>
       <PageHeader
         title="Colis"
-        subtitle={`${buckets.all} colis · ${buckets.delivered} livrés, ${buckets.todo} à traiter`}
+        subtitle={`${range.label} · ${buckets.all} colis, ${buckets.delivered} livrés, ${buckets.todo} à traiter`}
         actions={
           <Segmented
             label="Transporteur"
             className="w-fit"
             items={(["forcelog", "ozon"] as const).map((c) => ({
-              href: `/parcels?carrier=${c}`,
+              href: `/parcels?${new URLSearchParams({ carrier: c, ...periodKeep })}`,
               label: c === "forcelog" ? "Forcelog" : "Ozon",
               active: carrier === c,
             }))}
           />
         }
       />
+
+      <PeriodFilter action="/parcels" keep={{ carrier, filter, q }} range={range} />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <Segmented
@@ -117,7 +125,7 @@ export default async function ParcelsPage({
         />
         <SearchForm
           action="/parcels"
-          hidden={{ carrier, filter }}
+          hidden={{ carrier, filter, ...periodKeep }}
           defaultValue={q}
           label="Rechercher un colis"
           placeholder="Nom, ville, n° de suivi"
@@ -127,12 +135,12 @@ export default async function ParcelsPage({
       {visible.length === 0 ? (
         q ? (
           <EmptyState title={`Aucun résultat pour « ${q} »`}>
-            <a href={`/parcels?carrier=${carrier}&filter=${filter}`} className="font-medium text-ink underline underline-offset-4">
+            <a href={`/parcels?${new URLSearchParams({ carrier, filter, ...periodKeep })}`} className="font-medium text-ink underline underline-offset-4">
               Effacer la recherche
             </a>
           </EmptyState>
         ) : (
-          <EmptyState title="Aucun colis dans cette catégorie" />
+          <EmptyState title="Aucun colis sur cette période dans cette catégorie" />
         )
       ) : (
         <ul className="card divide-y divide-line-soft">
