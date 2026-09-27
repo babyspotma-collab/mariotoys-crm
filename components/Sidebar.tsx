@@ -3,61 +3,29 @@
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
+import { ChartBar, Package, Receipt, ShoppingBag, SignOut, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
 const NAV = [
-  {
-    href: "/",
-    label: "Commandes",
-    short: "Commandes",
-    icon: <path d="M5 8h14l-1 12H6L5 8z M9 8V6a3 3 0 0 1 6 0v2" />,
-  },
-  {
-    href: "/parcels",
-    label: "Colis",
-    short: "Colis",
-    icon: <path d="M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7 M12 11v10" />,
-  },
-  {
-    href: "/product-jobs",
-    label: "Création produits",
-    short: "Produits",
-    icon: <path d="M4 4h16v16H4z M12 8v8M8 12h8" />,
-  },
-  {
-    href: "/billing",
-    label: "Facturation",
-    short: "Factures",
-    icon: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6M9 12h6" />,
-  },
-  {
-    href: "/stats",
-    label: "Statistiques",
-    short: "Stats",
-    icon: <path d="M5 20V10M12 20V4M19 20v-7" />,
-  },
+  { href: "/", label: "Commandes", short: "Commandes", Icon: ShoppingBag },
+  { href: "/parcels", label: "Colis", short: "Colis", Icon: Package },
+  { href: "/product-jobs", label: "Création produits", short: "Produits", Icon: Sparkle },
+  { href: "/billing", label: "Facturation", short: "Factures", Icon: Receipt },
+  { href: "/stats", label: "Statistiques", short: "Stats", Icon: ChartBar },
 ];
 
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
+  if (href === "/") return pathname === "/" || pathname.startsWith("/orders");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavIcon({ children }: { children: React.ReactNode }) {
+function Logo({ size }: { size: number }) {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="shrink-0"
+    <div
+      className="flex items-center justify-center rounded-lg bg-accent font-bold text-white"
+      style={{ width: size, height: size, fontSize: size / 2 }}
     >
-      {children}
-    </svg>
+      M
+    </div>
   );
 }
 
@@ -67,82 +35,80 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Desktop: sidebar fixe à gauche */}
+      {/* Desktop : barre latérale fixe */}
       <nav
         aria-label="Navigation principale"
-        className="hidden md:flex md:w-[232px] md:shrink-0 md:flex-col md:gap-8 md:border-r md:border-line md:bg-cream-dark md:px-4 md:py-7"
+        className="sticky top-0 hidden h-[100dvh] md:flex md:w-[228px] md:shrink-0 md:flex-col md:gap-8 md:border-r md:border-line md:bg-white md:px-3 md:py-6"
       >
-        <div className="flex items-center gap-2.5 px-2">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-accent text-[15px] font-bold text-white">
-            M
-          </div>
-          <div className="text-[15px] font-semibold">Mario Toys</div>
+        <div className="flex items-center gap-2.5 px-3">
+          <Logo size={28} />
+          <div className="text-[15px] font-semibold tracking-tight">Mario Toys</div>
         </div>
 
         <div className="flex flex-col gap-0.5">
-          {NAV.map((item) => {
-            const active = isActive(pathname, item.href);
+          {NAV.map(({ href, label, Icon }) => {
+            const active = isActive(pathname, href);
             return (
               <a
-                key={item.href}
-                href={item.href}
+                key={href}
+                href={href}
                 aria-current={active ? "page" : undefined}
                 className={`flex h-10 items-center gap-3 rounded-lg px-3 text-sm no-underline transition-colors ${
-                  active
-                    ? "bg-white font-semibold text-ink shadow-sm"
-                    : "text-body hover:text-ink"
+                  active ? "bg-cream-dark font-semibold text-ink" : "text-body hover:bg-cream hover:text-ink"
                 }`}
               >
-                <NavIcon>{item.icon}</NavIcon>
-                {item.label}
+                <Icon size={19} weight={active ? "fill" : "regular"} aria-hidden="true" />
+                {label}
               </a>
             );
           })}
         </div>
 
         <form action={logout} className="mt-auto">
-          <button type="submit" className="px-3 text-[13px] text-muted hover:text-ink">
+          <button
+            type="submit"
+            className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-muted transition-colors hover:bg-cream hover:text-ink"
+          >
+            <SignOut size={19} aria-hidden="true" />
             Se déconnecter
           </button>
         </form>
       </nav>
 
-      {/* Mobile: barre supérieure (logo + menu compte) */}
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-cream px-4 pt-[env(safe-area-inset-top,0px)] md:hidden">
+      {/* Mobile : barre supérieure (logo + menu compte) */}
+      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur md:hidden">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-[13px] font-bold text-white">
-            M
-          </div>
-          <div className="text-sm font-semibold">Mario Toys</div>
+          <Logo size={26} />
+          <div className="text-sm font-semibold tracking-tight">Mario Toys</div>
         </div>
         <MoreMenu>
           <form action={logout}>
-            <button type="submit" className="w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-cream-dark">
+            <button type="submit" className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink hover:bg-cream">
+              <SignOut size={16} aria-hidden="true" />
               Se déconnecter
             </button>
           </form>
         </MoreMenu>
       </header>
 
-      {/* Mobile: barre fixe en bas, 5 onglets + libellé court */}
+      {/* Mobile : barre d'onglets fixe en bas */}
       <nav
         aria-label="Navigation principale"
-        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-cream-dark/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
       >
-        {NAV.map((item) => {
-          const active = isActive(pathname, item.href);
+        {NAV.map(({ href, short, Icon }) => {
+          const active = isActive(pathname, href);
           return (
             <a
-              key={item.href}
-              href={item.href}
+              key={href}
+              href={href}
               aria-current={active ? "page" : undefined}
-              className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 border-t-2 py-1.5 text-[10px] no-underline"
-              style={{ borderTopColor: active ? "#C8381F" : "transparent" }}
+              className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[10.5px] no-underline ${
+                active ? "font-semibold text-ink" : "text-muted"
+              }`}
             >
-              <span className={active ? "text-accent" : "text-muted"}>
-                <NavIcon>{item.icon}</NavIcon>
-              </span>
-              <span className={`leading-none ${active ? "font-semibold text-ink" : "text-muted"}`}>{item.short}</span>
+              <Icon size={22} weight={active ? "fill" : "regular"} aria-hidden="true" />
+              <span className="leading-none">{short}</span>
             </a>
           );
         })}

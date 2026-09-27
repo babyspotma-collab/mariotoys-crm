@@ -8,7 +8,8 @@ export default function MonthFilter({ month, action }: { month: string; action: 
         name="month"
         defaultValue={month}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="h-[38px] rounded-[10px] border border-line-input bg-white px-3.5 text-[13px] font-medium text-ink"
+        aria-label="Mois"
+        className="input w-auto font-medium"
       />
       <noscript>
         <button type="submit" className="text-[13px] text-muted hover:text-ink">

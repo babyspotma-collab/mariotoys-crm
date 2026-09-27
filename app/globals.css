@@ -5,8 +5,10 @@
 a {
   color: inherit;
 }
-a:hover {
-  color: #c8381f;
+
+:focus-visible {
+  outline: 2px solid #18181b;
+  outline-offset: 2px;
 }
 
 /* Layer explicite : sans ça, ces classes sont émises APRÈS la couche
@@ -17,23 +19,44 @@ a:hover {
    sur mobile, car .btn-primary { display:inline-flex } passait après
    .hidden { display:none } à spécificité égale. @layer force le bon
    ordre (components avant utilities) quelle que soit la position dans
-   le fichier source. */
+   le fichier source.
+
+   Règle de forme : contrôles (boutons, champs) = 44px mobile / 40px
+   desktop, arrondi 10px ; conteneurs (.card) = arrondi 14px. */
 @layer components {
   .btn {
-    /* 44px mobile (zone tactile minimale), 40px desktop (fidèle à la maquette) */
-    @apply inline-flex h-11 md:h-10 items-center justify-center rounded-[10px] px-[18px] text-sm font-semibold transition-colors;
+    @apply inline-flex h-11 select-none items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 text-sm font-semibold no-underline transition duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 md:h-10;
   }
   .btn-primary {
-    @apply btn bg-ink text-white hover:bg-black;
+    @apply btn bg-ink text-white hover:bg-zinc-700;
   }
   .btn-secondary {
-    @apply btn border border-line-input bg-white text-ink hover:bg-cream-dark;
+    @apply btn border border-line-input bg-white text-ink hover:bg-cream;
+  }
+  .btn-ghost {
+    @apply btn text-body hover:bg-cream-dark hover:text-ink;
   }
   .btn-danger {
-    @apply btn border border-accent bg-white text-accent hover:bg-accent hover:text-white;
+    @apply btn border border-accent/30 bg-white text-accent hover:bg-pill-red-bg;
+  }
+  .btn-icon {
+    @apply btn w-11 px-0 md:w-10;
   }
 
   .card {
     @apply rounded-[14px] border border-line bg-white;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+  .input {
+    @apply block min-h-11 w-full rounded-[10px] border border-line-input bg-white px-3.5 py-2 text-base text-ink transition-colors placeholder:text-zinc-400 hover:border-zinc-400 focus:border-ink focus:outline-none md:min-h-10 md:text-sm;
+  }
+  .hint {
+    @apply mt-1.5 text-xs text-muted;
+  }
+  .alert-error {
+    @apply rounded-[10px] bg-pill-red-bg px-3.5 py-3 text-sm text-pill-red-fg;
   }
 }

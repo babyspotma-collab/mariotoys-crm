@@ -5,13 +5,14 @@ import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
 import type { ShopifyProductSummary } from "@/lib/shopify-admin";
 import { formatDh } from "@/lib/format";
+import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 
 type Line = { productId: string; title: string; price: number; quantity: number };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary" disabled={pending}>
+    <button type="submit" className="btn-primary flex-1 md:flex-none" disabled={pending}>
       {pending ? "Création…" : "Créer la commande"}
     </button>
   );
@@ -46,73 +47,63 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
   const total = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5 bg-white border border-line rounded-2xl p-6">
-      {state.error && <p className="text-sm text-accent bg-pill-red-bg rounded-lg p-3">{state.error}</p>}
-
+    <form action={formAction} className="card flex flex-col">
       <input type="hidden" name="items" value={JSON.stringify(lines)} />
 
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="customerName">
-          Nom du client
-        </label>
-        <input
-          id="customerName"
-          name="customerName"
-          required
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
-        />
-      </div>
+      <fieldset className="flex flex-col gap-4 p-4 md:p-6">
+        <legend className="sr-only">Client</legend>
+        <h2 className="text-sm font-semibold">Client</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="customerName">
+              Nom du client
+            </label>
+            <input id="customerName" name="customerName" required autoComplete="off" className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="phone">
+              Téléphone
+            </label>
+            <input id="phone" name="phone" type="tel" required autoComplete="off" className="input tabular-nums" />
+          </div>
+        </div>
+        <div>
+          <label className="label" htmlFor="city">
+            Ville
+          </label>
+          <input id="city" name="city" required className="input" />
+          <p className="hint">La ville exacte du transporteur se choisit à l&apos;étape Confirmer.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="address">
+            Adresse
+          </label>
+          <textarea id="address" name="address" required rows={2} className="input" />
+        </div>
+      </fieldset>
 
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="phone">
-          Téléphone
-        </label>
-        <input
-          id="phone"
-          name="phone"
-          required
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
-        />
-      </div>
+      <fieldset className="flex flex-col gap-3 border-t border-line-soft p-4 md:p-6">
+        <legend className="sr-only">Articles</legend>
+        <h2 className="text-sm font-semibold">Articles</h2>
 
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="city">
-          Ville
-        </label>
-        <input
-          id="city"
-          name="city"
-          required
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
-        />
-        <p className="text-xs text-muted mt-1">
-          La correspondance avec la vraie ville Forcelog se fera sur l&apos;écran de vérification,
-          à l&apos;étape Confirmer.
-        </p>
-      </div>
+        <div className="hidden grid-cols-[minmax(0,1fr)_80px_120px_40px] gap-2 text-xs font-medium text-muted md:grid">
+          <span>Produit</span>
+          <span>Quantité</span>
+          <span>Prix unitaire</span>
+          <span />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="address">
-          Adresse
-        </label>
-        <textarea
-          id="address"
-          name="address"
-          required
-          rows={2}
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
-        />
-      </div>
-
-      <div>
-        <p className="block text-sm font-medium mb-2">Articles</p>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4 md:gap-2">
           {lines.map((line, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2">
+            <div
+              key={i}
+              className="grid grid-cols-[80px_minmax(0,1fr)_44px] gap-2 md:grid-cols-[minmax(0,1fr)_80px_120px_40px]"
+            >
               <select
                 value={line.productId}
                 onChange={(e) => selectProduct(i, e.target.value)}
-                className="flex-1 min-w-[180px] border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px] bg-white"
+                aria-label="Produit"
+                className="input col-span-3 md:col-span-1"
               >
                 <option value="" disabled>
                   {products.length === 0 ? "Catalogue indisponible" : "Choisir un produit…"}
@@ -128,7 +119,7 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
                 min={1}
                 value={line.quantity}
                 onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                className="w-20 border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+                className="input tabular-nums"
                 aria-label="Quantité"
               />
               <input
@@ -137,30 +128,41 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
                 step="0.01"
                 value={line.price}
                 onChange={(e) => updateLine(i, { price: Number(e.target.value) })}
-                className="w-28 border border-line rounded-lg px-3 py-2.5 text-base md:text-sm min-h-[44px]"
+                className="input tabular-nums"
                 aria-label="Prix unitaire (DH)"
               />
-              {lines.length > 1 && (
+              {lines.length > 1 ? (
                 <button
                   type="button"
                   onClick={() => removeLine(i)}
-                  className="text-sm text-accent px-2"
+                  className="btn-icon text-muted hover:bg-pill-red-bg hover:text-accent"
                   aria-label="Retirer cet article"
                 >
-                  ×
+                  <Trash size={18} aria-hidden="true" />
                 </button>
+              ) : (
+                <span />
               )}
             </div>
           ))}
         </div>
-        <button type="button" onClick={addLine} className="text-sm text-pill-green-fg mt-3">
-          + Ajouter un article
+
+        <button type="button" onClick={addLine} className="btn-ghost w-fit px-3">
+          <Plus size={16} weight="bold" aria-hidden="true" />
+          Ajouter un article
         </button>
+      </fieldset>
+
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+56px)] flex flex-col gap-3 rounded-b-[14px] border-t border-line bg-white/95 p-4 backdrop-blur md:static md:bottom-auto md:px-6">
+        {state.error && <p className="alert-error">{state.error}</p>}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col">
+            <span className="text-xs text-muted">Total</span>
+            <span className="text-lg font-semibold tabular-nums">{formatDh(total)}</span>
+          </div>
+          <SubmitButton />
+        </div>
       </div>
-
-      <p className="text-sm font-semibold">Total : {formatDh(total)}</p>
-
-      <SubmitButton />
     </form>
   );
 }

@@ -13,6 +13,7 @@
     "sync-forcelog-web": "node scripts/sync-forcelog-web.js"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "^5.18.0",
     "@vercel/blob": "^2.8.0",
     "geist": "^1.7.2",

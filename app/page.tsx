@@ -1,10 +1,17 @@
 import { prisma } from "@/lib/db";
 import { cancelOrder } from "./orders/actions";
+import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
+import ConfirmButton from "@/components/ConfirmButton";
+import EmptyState from "@/components/EmptyState";
 import MonthFilter from "@/components/MonthFilter";
 import MoreMenu from "@/components/MoreMenu";
+import PageHeader from "@/components/PageHeader";
 import Pill, { type PillTone } from "@/components/Pill";
+import SearchForm from "@/components/SearchForm";
+import Segmented from "@/components/Segmented";
 import { monthLabel, monthRange } from "@/lib/date-range";
 import { formatDh } from "@/lib/format";
+import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -65,176 +72,136 @@ export default async function DashboardPage({
     { id: "all" as const, label: "Toutes", count: totalOrders },
   ];
 
+  const tabHref = (id: Tab) =>
+    `/?tab=${id}${searchParams.month ? `&month=${searchParams.month}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const shortDate = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
   return (
     <>
-      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[22px] md:text-[28px] font-semibold tracking-tight">Commandes</h1>
-          <p className="text-sm text-muted">
-            {monthLabel(month)} · {totalOrders} commandes · {confirmationRate} % confirmées
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex items-center gap-3">
+      <PageHeader
+        title="Commandes"
+        subtitle={`${totalOrders} commandes · ${confirmationRate} % confirmées`}
+        actions={
+          <>
             <MonthFilter month={month} action="/" />
-            <a href="/orders/new" className="btn-primary flex-1 text-center md:hidden">
+            <a href="/orders/new" className="btn-primary hidden md:inline-flex">
+              <Plus size={16} weight="bold" aria-hidden="true" />
               Nouvelle commande
             </a>
-          </div>
-          <form action="/" className="flex items-center">
-            <input type="hidden" name="month" value={month} />
-            <input type="hidden" name="tab" value={tab} />
-            <label htmlFor="q" className="sr-only">
-              Rechercher une commande
-            </label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Rechercher un client, un n°…"
-              className="h-11 w-full rounded-[10px] border border-line-input bg-white px-3.5 text-base text-ink md:h-10 md:w-[260px] md:text-sm"
-            />
-          </form>
-          <a href="/orders/new" className="btn-primary hidden md:inline-flex">
-            Nouvelle commande
-          </a>
-        </div>
+          </>
+        }
+      />
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <Segmented
+          label="Filtrer les commandes"
+          items={tabs.map((t) => ({ href: tabHref(t.id), label: t.label, count: t.count, active: tab === t.id }))}
+        />
+        <SearchForm
+          action="/"
+          hidden={{ month, tab }}
+          defaultValue={q}
+          label="Rechercher une commande"
+          placeholder="Client ou n° de commande"
+        />
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Filtrer les commandes"
-        className="flex w-full gap-0.5 overflow-x-auto rounded-[10px] bg-segment p-[3px] md:inline-flex md:w-fit"
-      >
-        {tabs.map((t) => (
-          <a
-            key={t.id}
-            href={`/?tab=${t.id}${searchParams.month ? `&month=${searchParams.month}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[13px] no-underline md:h-8 ${
-              tab === t.id ? "bg-white font-semibold text-ink shadow-sm" : "font-medium text-body"
-            }`}
-          >
-            {t.label} <span className="font-medium text-muted">{t.count}</span>
-          </a>
-        ))}
-      </div>
-
-      {orders.length === 0 && (
-        <p className="card px-5 py-6 text-sm text-muted">Aucune commande pour ce mois.</p>
-      )}
-
-      {/* Mobile : une carte par commande */}
-      <div className="flex flex-col gap-3 md:hidden">
-        {orders.map((order) => {
-          const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
-          const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
-          return (
-            <div key={order.id} className="card flex flex-col gap-2.5 p-4">
-              <div className="flex items-center justify-between text-[13px] text-muted">
-                <span className="font-mono">{orderNumberLabel(order.orderNumber)}</span>
-                <span>{order.createdAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold">
-                    {order.customerName}
-                    {order.source === "MANUEL" && <span className="ml-1.5 text-[11px] font-normal text-muted">(manuel)</span>}
+      {orders.length === 0 ? (
+        q ? (
+          <EmptyState title={`Aucun résultat pour « ${q} »`}>
+            <a href={tabHref(tab).replace(/&q=[^&]*/, "")} className="font-medium text-ink underline underline-offset-4">
+              Effacer la recherche
+            </a>
+          </EmptyState>
+        ) : tab === "todo" ? (
+          <EmptyState title="Aucune commande à confirmer">Tout est à jour pour {monthLabel(month).toLowerCase()}.</EmptyState>
+        ) : (
+          <EmptyState title="Aucune commande">Rien pour {monthLabel(month).toLowerCase()} dans cet onglet.</EmptyState>
+        )
+      ) : (
+        <ul className="card divide-y divide-line-soft">
+          {orders.map((order) => {
+            const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
+            const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
+            const isNew = order.status === "NOUVELLE";
+            const phone = normalizeMoroccanPhone(order.phone);
+            return (
+              <li
+                key={order.id}
+                className="flex flex-col gap-3 p-4 md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_172px] md:items-center md:gap-5 md:px-5 md:py-3.5"
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold md:font-medium">
+                      {order.customerName}
+                      {order.source === "MANUEL" && <span className="ml-2 text-xs font-normal text-muted">Manuel</span>}
+                    </div>
+                    <div className="mt-0.5 truncate text-[13px] tabular-nums text-muted">
+                      <span className="md:hidden">{order.city} · </span>
+                      {orderNumberLabel(order.orderNumber)}, {shortDate(order.createdAt)}
+                      <span className="hidden md:inline"> · {phone}</span>
+                    </div>
                   </div>
-                  <div className="text-[13px] text-body">{order.city}</div>
-                  <div className="mt-0.5 line-clamp-2 text-[13px] text-body">{itemsLabel}</div>
+                  <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>
                 </div>
-                <div className="shrink-0 font-semibold">{formatDh(order.totalPrice)}</div>
-              </div>
-              {order.forcelogError && <p className="text-xs text-accent">Erreur Forcelog : {order.forcelogError}</p>}
-              {order.status === "NOUVELLE" ? (
-                <div className="flex items-center gap-2">
-                  <a href={`/orders/${order.id}/confirm`} className="btn-primary h-11 flex-1 justify-center text-center">
-                    Confirmer
-                  </a>
-                  <MoreMenu>
-                    <form action={cancelOrder.bind(null, order.id)}>
-                      <button
-                        type="submit"
-                        className="w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-accent hover:bg-cream-dark"
+                <div className="hidden truncate text-sm text-body md:block">{order.city}</div>
+                <div className="line-clamp-2 text-[13px] text-body md:line-clamp-1 md:text-sm">{itemsLabel}</div>
+                <div className="hidden text-right text-sm font-semibold tabular-nums md:block">{formatDh(order.totalPrice)}</div>
+
+                <div className="flex items-center gap-2 md:justify-end md:gap-1">
+                  {isNew ? (
+                    <>
+                      <a
+                        href={`tel:${phone}`}
+                        aria-label={`Appeler ${order.customerName} au ${phone}`}
+                        title={phone}
+                        className="btn-secondary w-11 px-0 md:hidden"
                       >
-                        Annuler la commande
-                      </button>
-                    </form>
-                  </MoreMenu>
-                </div>
-              ) : (
-                <div>
-                  <Pill tone={pill.tone}>{pill.label}</Pill>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Desktop : tableau */}
-      <div className="card hidden overflow-hidden md:block">
-        <div className="grid grid-cols-[96px_minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,2fr)_110px_90px_92px] items-center gap-3 border-b border-line-soft px-5 text-[12px] font-medium uppercase tracking-wide text-muted h-11">
-          <div>N°</div>
-          <div>Client</div>
-          <div>Ville</div>
-          <div>Articles</div>
-          <div className="text-right">Montant</div>
-          <div className="text-right">Date</div>
-          <div />
-        </div>
-
-        {orders.map((order) => {
-          const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
-          const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
-          return (
-            <div key={order.id} className="flex flex-col border-b border-line-soft last:border-b-0">
-              <div className="grid min-h-16 grid-cols-[96px_minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,2fr)_110px_90px_92px] items-center gap-3 px-5 py-3 text-sm">
-                <div className="font-mono text-[13px] text-muted">{orderNumberLabel(order.orderNumber)}</div>
-                <div className="min-w-0">
-                  <span className="font-medium">{order.customerName}</span>
-                  {order.source === "MANUEL" && (
-                    <span className="ml-1.5 align-middle text-[11px] text-muted">(manuel)</span>
-                  )}
-                </div>
-                <div className="truncate text-body">{order.city}</div>
-                <div className="truncate pr-4 text-body">{itemsLabel}</div>
-                <div className="text-right font-semibold">{formatDh(order.totalPrice)}</div>
-                <div className="text-right text-[13px] text-muted">
-                  {order.createdAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                </div>
-                <div className="flex items-center justify-end gap-1">
-                  {order.status === "NOUVELLE" ? (
-                    <a href={`/orders/${order.id}/confirm`} className="btn-secondary h-[34px] px-3.5 text-[13px]">
-                      Confirmer
-                    </a>
+                        <Phone size={18} aria-hidden="true" />
+                      </a>
+                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
+                        Confirmer
+                      </a>
+                      <MoreMenu>
+                        <form action={cancelOrder.bind(null, order.id)}>
+                          <ConfirmButton
+                            message={`Annuler la commande ${orderNumberLabel(order.orderNumber)} de ${order.customerName} ?`}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-accent hover:bg-pill-red-bg"
+                          >
+                            <XCircle size={16} aria-hidden="true" />
+                            Annuler la commande
+                          </ConfirmButton>
+                        </form>
+                      </MoreMenu>
+                    </>
                   ) : (
                     <Pill tone={pill.tone}>{pill.label}</Pill>
                   )}
-                  {order.status === "NOUVELLE" && (
-                    <MoreMenu>
-                      <form action={cancelOrder.bind(null, order.id)}>
-                        <button
-                          type="submit"
-                          className="w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-accent hover:bg-cream-dark"
-                        >
-                          Annuler la commande
-                        </button>
-                      </form>
-                    </MoreMenu>
-                  )}
                 </div>
-              </div>
-              {order.forcelogError && (
-                <p className="px-5 pb-3 text-xs text-accent">Erreur Forcelog : {order.forcelogError}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {order.forcelogError && (
+                  <p className="alert-error text-xs md:col-span-full">Erreur Forcelog : {order.forcelogError}</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {orders.length === ORDERS_SAFETY_LIMIT && (
+        <p className="text-center text-xs text-muted">
+          Affichage limité aux {ORDERS_SAFETY_LIMIT} commandes les plus récentes. Affinez avec la recherche.
+        </p>
+      )}
+
+      {/* Mobile : bouton flottant au-dessus de la barre d'onglets */}
+      <a
+        href="/orders/new"
+        aria-label="Nouvelle commande"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-lg shadow-zinc-900/20 transition active:scale-95 md:hidden"
+      >
+        <Plus size={24} weight="bold" aria-hidden="true" />
+      </a>
     </>
   );
 }

@@ -13,10 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="overflow-x-hidden bg-cream text-ink font-sans antialiased">
-        <div className="flex min-h-screen flex-col md:flex-row">
+        <div className="flex min-h-[100dvh] flex-col md:flex-row">
           <Sidebar />
-          <main className="min-w-0 flex-grow px-4 py-5 pb-24 md:px-12 md:py-10 md:pb-10">
-            <div className="mx-auto flex max-w-6xl flex-col gap-5 md:gap-7">{children}</div>
+          <main className="min-w-0 flex-grow px-4 pb-28 pt-5 md:px-10 md:py-9">
+            <div className="mx-auto flex max-w-6xl flex-col gap-5 md:gap-6">{children}</div>
           </main>
         </div>
       </body>
