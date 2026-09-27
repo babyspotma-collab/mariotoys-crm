@@ -4,7 +4,7 @@ import { getCities as getForcelogCities } from "@/lib/forcelog";
 import { getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import PageHeader from "@/components/PageHeader";
-import { formatDh } from "@/lib/format";
+import { formatDateTimeMa, formatDh } from "@/lib/format";
 import ConfirmForm from "./ConfirmForm";
 
 export default async function ConfirmOrderPage({ params }: { params: { id: string } }) {
@@ -43,7 +43,12 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
       <PageHeader
         back={{ href: "/", label: "Commandes" }}
         title={`Commande ${order.orderNumber}`}
-        subtitle="Vérifiez les informations, choisissez le transporteur, puis créez le colis."
+        subtitle={
+          <>
+            <span className="tabular-nums">Passée le {formatDateTimeMa(order.createdAt)}</span>
+            <span className="mt-1 block">Vérifiez les informations, choisissez le transporteur, puis créez le colis.</span>
+          </>
+        }
       />
 
       {forcelogCitiesError && (

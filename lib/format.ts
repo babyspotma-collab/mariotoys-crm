@@ -23,3 +23,18 @@ function toNumber(value: Moneyish): number | null {
   const num = typeof value === "number" ? value : Number(value.toString());
   return Number.isFinite(num) ? num : null;
 }
+
+/** "28/09/2026 · 14:32", toujours à l'heure du Maroc (le serveur Vercel tourne en UTC). */
+export function formatDateTimeMa(date: Date): string {
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Africa/Casablanca",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("day")}/${get("month")}/${get("year")} · ${get("hour")}:${get("minute")}`;
+}

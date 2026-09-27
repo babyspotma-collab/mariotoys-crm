@@ -11,7 +11,7 @@ import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
 import { monthLabel, monthRange } from "@/lib/date-range";
-import { formatDh } from "@/lib/format";
+import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +88,6 @@ export default async function DashboardPage({
     return `/?${params.toString()}`;
   };
   const tabHref = (id: Tab) => url({ tab: id });
-  const shortDate = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
   return (
     <>
@@ -152,7 +151,7 @@ export default async function DashboardPage({
                     </div>
                     <div className="mt-0.5 truncate text-[13px] tabular-nums text-muted">
                       <span className="md:hidden">{order.city} · </span>
-                      {orderNumberLabel(order.orderNumber)}, {shortDate(order.createdAt)}
+                      {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
                       <span className="hidden md:inline"> · {phone}</span>
                     </div>
                   </div>
