@@ -19,6 +19,14 @@ type ScrapedParcel = {
   status: string;
   carrierCreatedAt: string | null; // "YYYY-MM-DD HH:mm"
 };
+type ScrapedInvoice = {
+  ref: string; // ex: VRT-N-2733902-240926-53-56768
+  cDate: string; // "YYYY-MM-DD HH:mm"
+  payDate: string | null;
+  statut: string;
+  parcelsCount: number;
+  amount: number;
+};
 
 function parseOzonDate(raw: string | null): Date | null {
   if (!raw) return null;
@@ -33,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  let body: { parcels?: ScrapedParcel[] };
+  let body: { parcels?: ScrapedParcel[]; invoices?: ScrapedInvoice[] };
   try {
     body = await req.json();
   } catch {
@@ -41,6 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   const parcels = body.parcels ?? [];
+  const invoices = body.invoices ?? [];
   let parcelsUpserted = 0;
   let parcelsLinked = 0;
 
@@ -123,5 +132,39 @@ export async function POST(req: NextRequest) {
     parcelsUpserted++;
   }
 
-  return NextResponse.json({ parcelsReceived: parcels.length, parcelsUpserted, parcelsLinked });
+  let invoicesUpserted = 0;
+  for (const inv of invoices) {
+    const cDate = parseOzonDate(inv.cDate);
+    if (!cDate) continue; // date de création obligatoire, ligne ignorée sinon
+
+    // Pas de détail de frais disponible sur la page "Liste Virements"
+    // Ozon (contrairement au CRBT Forcelog) — fees/feesAmount/balance
+    // restent null plutôt qu'un 0 trompeur (voir prisma/schema.prisma).
+    await prisma.crbtInvoice.upsert({
+      where: { ref: inv.ref },
+      create: {
+        ref: inv.ref,
+        carrier: "OZON",
+        cDate,
+        payDate: parseOzonDate(inv.payDate),
+        statut: inv.statut,
+        parcelsCount: inv.parcelsCount,
+        amount: inv.amount,
+      },
+      update: {
+        payDate: parseOzonDate(inv.payDate),
+        statut: inv.statut,
+        parcelsCount: inv.parcelsCount,
+        amount: inv.amount,
+      },
+    });
+    invoicesUpserted++;
+  }
+
+  return NextResponse.json({
+    parcelsReceived: parcels.length,
+    parcelsUpserted,
+    parcelsLinked,
+    invoicesUpserted,
+  });
 }

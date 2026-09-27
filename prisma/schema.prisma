@@ -188,11 +188,14 @@ model CrbtInvoice {
   carrier      Carrier   @default(FORCELOG) // toutes les factures existantes avant l'ajout d'Ozon sont Forcelog
   cDate        DateTime
   payDate      DateTime?
-  statut       String // libellé nettoyé : "Payé" / "Enregistré" / "Demande Virement"
+  statut       String // libellé nettoyé : "Payé" / "Enregistré" / "Demande Virement" (Forcelog) ou "Payé" / "Programmé" (Ozon)
   parcelsCount Int
-  fees         Int
-  feesAmount   Decimal   @db.Decimal(10, 2)
-  balance      Decimal   @db.Decimal(10, 2)
+  // Ozon Express n'expose aucun détail de frais sur sa page "Liste
+  // Virements" (contrairement au CRBT Forcelog) — champs optionnels,
+  // null pour les factures Ozon plutôt qu'un 0 trompeur.
+  fees         Int?
+  feesAmount   Decimal?  @db.Decimal(10, 2)
+  balance      Decimal?  @db.Decimal(10, 2)
   amount       Decimal   @db.Decimal(10, 2)
   syncedAt     DateTime  @updatedAt
 

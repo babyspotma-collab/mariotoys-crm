@@ -177,6 +177,81 @@ function collectParcels(rows) {
   return parcels;
 }
 
+// Page "Liste Virements" (client.ozoneexpress.ma/V2/Invoices) : même
+// technologie DataTables que /parcels_json, mais endpoint et noms de
+// colonnes différents — trouvé en observant le réseau au chargement de
+// la page (POST vers /V2/Invoices?action=json, pas une URL séparée comme
+// pour les colis). Colonnes réelles : REF/DATE/STATUT/P_DATE/COLIS/TOTAL
+// (+ ACTIONS, ignorée) — PAS de détail de frais (contrairement au CRBT
+// Forcelog), voir prisma/schema.prisma. f_time_s très ancien pour
+// récupérer tout l'historique (pas de raison de le borner comme pour les
+// colis, peu de virements au total).
+const INVOICE_COLUMNS = ["REF", "DATE", "STATUT", "P_DATE", "COLIS", "TOTAL", "ACTIONS"];
+const INVOICES_SINCE = "2024-01-01 00:00";
+
+async function fetchAllInvoiceRows(cookieHeader) {
+  const rows = [];
+  let start = 0;
+  for (let i = 0; i < 50; i++) {
+    const params = new URLSearchParams({
+      draw: "1",
+      ...dataTablesColumns(INVOICE_COLUMNS),
+      start: String(start),
+      length: String(PAGE_LENGTH),
+      "search[value]": "",
+      "search[regex]": "false",
+      filter_status: "",
+      f_time_s: INVOICES_SINCE,
+      f_time_e: new Date().toISOString().slice(0, 16).replace("T", " "),
+    });
+
+    const res = await fetch("https://client.ozoneexpress.ma/V2/Invoices?action=json", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: cookieHeader,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: params.toString(),
+    });
+    if (!res.ok) throw new Error(`/V2/Invoices?action=json — HTTP ${res.status}`);
+    const data = await res.json();
+    const page = data.aaData ?? [];
+    rows.push(...page);
+
+    start += PAGE_LENGTH;
+    if (start >= (data.iTotalDisplayRecords ?? 0) || page.length === 0) break;
+  }
+  return rows;
+}
+
+function collectInvoices(rows) {
+  const invoices = [];
+  for (const row of rows) {
+    const ref = (stripHtml(row.REF).match(/^\S+/) || [])[0] ?? "";
+    if (!ref) continue;
+
+    const cDateMatch = String(row.DATE ?? "").match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+    if (!cDateMatch) continue;
+
+    const statutText = stripHtml(row.STATUT).split(/(?=Paiement prévu)/)[0].trim();
+    // "P_DATE" n'est une vraie date de paiement effectif que si le
+    // statut est "Payé" — sinon c'est une date prévisionnelle (badge
+    // "Programmé" + "Paiement prévu le...").
+    const payDateMatch = statutText === "Payé" ? String(row.P_DATE ?? "").match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/) : null;
+
+    invoices.push({
+      ref,
+      cDate: cDateMatch[0],
+      payDate: payDateMatch ? payDateMatch[0] : null,
+      statut: statutText,
+      parcelsCount: parseInt(stripHtml(String(row.COLIS ?? "")), 10) || 0,
+      amount: parseMoneyDh(row.TOTAL),
+    });
+  }
+  return invoices;
+}
+
 async function main() {
   for (const key of ["OZON_WEB_EMAIL", "OZON_WEB_PASSWORD", "CRM_BASE_URL", "CRON_SECRET"]) {
     if (!process.env[key]) throw new Error(`Variable manquante: ${key}`);
@@ -197,6 +272,11 @@ async function main() {
   const parcels = collectParcels(rows);
   console.log(`Total colis: ${parcels.length}`);
 
+  console.log("Récupération des factures (Liste Virements)...");
+  const invoiceRows = await fetchAllInvoiceRows(cookieHeader);
+  const invoices = collectInvoices(invoiceRows);
+  console.log(`Total factures: ${invoices.length}`);
+
   console.log(`Envoi vers ${CRM_BASE_URL}/api/cron/sync-ozon-web...`);
   const res = await fetch(`${CRM_BASE_URL}/api/cron/sync-ozon-web`, {
     method: "POST",
@@ -204,7 +284,7 @@ async function main() {
       "Content-Type": "application/json",
       Authorization: `Bearer ${CRON_SECRET}`,
     },
-    body: JSON.stringify({ parcels }),
+    body: JSON.stringify({ parcels, invoices }),
   });
   const result = await res.json();
   if (!res.ok) {
