@@ -39,8 +39,17 @@ function stripHtml(html) {
 }
 
 function parseMoneyDh(text) {
-  const n = parseFloat(String(text ?? "").replace(/[^\d.,-]/g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
+  // BUG corrigé (2026-09-27) : appliqué tel quel sur du HTML brut (ex:
+  // `<span class="text-success">6157 DH</span>`), le tiret de la classe
+  // CSS "text-success"/"text-danger" passait le filtre [^\d.,-] et se
+  // retrouvait collé aux chiffres une fois les autres caractères
+  // supprimés — "6157" devenait "-6157". D'où les montants Ozon tous
+  // négatifs en base alors que ce sont des virements REÇUS. On retire
+  // donc les balises AVANT d'extraire le nombre, et on force en positif
+  // (Math.abs) : ce sont toujours des sommes qu'Ozon nous verse, jamais
+  // un solde qu'on lui devrait, quel que soit le formatage source.
+  const n = parseFloat(stripHtml(text).replace(/[^\d.,-]/g, "").replace(",", "."));
+  return Number.isFinite(n) ? Math.abs(n) : 0;
 }
 
 function normPhone(raw) {
