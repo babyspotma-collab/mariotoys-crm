@@ -27,6 +27,9 @@ type ScrapedInvoice = {
   statut: string;
   parcelsCount: number;
   amount: number;
+  // CRBT total - montant net, calculé depuis l'export Excel du virement par
+  // scripts/sync-ozon-web.js ; null/absent si l'export était illisible.
+  feesAmount?: number | null;
 };
 
 function parseOzonDate(raw: string | null): Date | null {
@@ -138,9 +141,9 @@ export async function POST(req: NextRequest) {
     const cDate = parseOzonDate(inv.cDate);
     if (!cDate) continue; // date de création obligatoire, ligne ignorée sinon
 
-    // Pas de détail de frais disponible sur la page "Liste Virements"
-    // Ozon (contrairement au CRBT Forcelog) — fees/feesAmount/balance
-    // restent null plutôt qu'un 0 trompeur (voir prisma/schema.prisma).
+    // Frais : seulement si le script a pu les calculer — sinon on ne touche
+    // pas à la valeur déjà en base (null plutôt qu'un 0 trompeur).
+    const fees = typeof inv.feesAmount === "number" && inv.feesAmount >= 0 ? { feesAmount: inv.feesAmount } : {};
     await prisma.crbtInvoice.upsert({
       where: { ref: inv.ref },
       create: {
@@ -151,12 +154,14 @@ export async function POST(req: NextRequest) {
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         amount: inv.amount,
+        ...fees,
       },
       update: {
         payDate: parseOzonDate(inv.payDate),
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         amount: inv.amount,
+        ...fees,
       },
     });
     invoicesUpserted++;

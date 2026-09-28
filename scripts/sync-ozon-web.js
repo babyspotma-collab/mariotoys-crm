@@ -24,6 +24,7 @@
  */
 
 require("dotenv").config();
+const zlib = require("zlib");
 const { chromium } = require("playwright");
 
 const { OZON_WEB_EMAIL, OZON_WEB_PASSWORD, CRM_BASE_URL, CRON_SECRET } = process.env;
@@ -263,6 +264,68 @@ function collectInvoices(rows) {
   return invoices;
 }
 
+// ─── Frais par virement ────────────────────────────────────────────────────
+// La liste des virements n'a pas de colonne frais. Vérifié sur 11 virements
+// réels (juin-sept 2026) : les frais du PDF de chaque virement ("Total Frais
+// Colis" + "Total Frais Supplementaire", ex. colis fragile) sont TOUJOURS
+// égaux à (somme des CRBT des colis) - (montant net viré). La colonne
+// "Frais" de l'export Excel, elle, est incomplète (toujours plus basse que
+// le PDF) : on ne l'utilise pas. On lit donc la colonne "Crbt" de l'export
+// Excel (/V2/Invoices/Export/Ref/<ref>) et on en déduit les frais.
+
+// Lecture minimale d'une entrée d'un fichier .xlsx (zip) sans dépendance :
+// annuaire central -> en-tête local -> données (stockées ou deflate).
+function readZipEntry(buf, name) {
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd < 0) return null;
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  for (let i = 0; i < count; i++) {
+    const method = buf.readUInt16LE(p + 10);
+    const size = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    if (buf.toString("utf8", p + 46, p + 46 + nameLen) === name) {
+      const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+      const data = buf.subarray(start, start + size);
+      return method === 8 ? zlib.inflateRawSync(data) : data;
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return null;
+}
+
+/** Somme de la colonne "Crbt" de l'export Excel d'un virement, ou null si illisible. */
+function sumCrbtFromXlsx(buf) {
+  const xml = readZipEntry(buf, "xl/worksheets/sheet1.xml");
+  if (!xml) return null;
+  const cells = [...xml.toString("utf8").matchAll(/<c r="([A-Z]+)(\d+)"[^>]*>([\s\S]*?)<\/c>/g)].map(([, col, row, inner]) => ({
+    col,
+    row: Number(row),
+    value: (inner.match(/<t[^>]*>([\s\S]*?)<\/t>|<v>([\s\S]*?)<\/v>/) || [])
+      .slice(1)
+      .find((v) => v !== undefined) ?? "",
+  }));
+  const header = cells.find((c) => c.row === 1 && c.value.trim() === "Crbt");
+  if (!header) return null;
+  const values = cells.filter((c) => c.col === header.col && c.row > 1).map((c) => parseFloat(c.value));
+  if (values.length === 0 || values.some((v) => !Number.isFinite(v))) return null;
+  return values.reduce((a, b) => a + b, 0);
+}
+
+async function fetchInvoiceFees(cookieHeader, invoice) {
+  const res = await fetch(`https://client.ozoneexpress.ma/V2/Invoices/Export/Ref/${encodeURIComponent(invoice.ref)}`, {
+    headers: { Cookie: cookieHeader },
+  });
+  if (!res.ok) return null;
+  const crbt = sumCrbtFromXlsx(Buffer.from(await res.arrayBuffer()));
+  if (crbt === null) return null;
+  const fees = Math.round((crbt - invoice.amount) * 100) / 100;
+  return fees >= 0 ? fees : null; // incohérent -> on n'écrit rien plutôt qu'une valeur fausse
+}
+
 async function main() {
   for (const key of ["OZON_WEB_EMAIL", "OZON_WEB_PASSWORD", "CRM_BASE_URL", "CRON_SECRET"]) {
     if (!process.env[key]) throw new Error(`Variable manquante: ${key}`);
@@ -288,6 +351,18 @@ async function main() {
   const invoices = collectInvoices(invoiceRows);
   console.log(`Total factures: ${invoices.length}`);
 
+  console.log("Calcul des frais par virement (exports Excel)...");
+  let feesFound = 0;
+  for (const inv of invoices) {
+    try {
+      inv.feesAmount = await fetchInvoiceFees(cookieHeader, inv);
+    } catch {
+      inv.feesAmount = null; // un export illisible ne bloque pas la synchro
+    }
+    if (inv.feesAmount !== null) feesFound++;
+  }
+  console.log(`Frais trouvés: ${feesFound}/${invoices.length}`);
+
   console.log(`Envoi vers ${CRM_BASE_URL}/api/cron/sync-ozon-web...`);
   const res = await fetch(`${CRM_BASE_URL}/api/cron/sync-ozon-web`, {
     method: "POST",
@@ -305,7 +380,9 @@ async function main() {
   console.log("OK:", JSON.stringify(result));
 }
 
-main().catch((err) => {
+module.exports = { sumCrbtFromXlsx };
+
+if (require.main === module) main().catch((err) => {
   console.error("Erreur:", err.message);
   process.exit(1);
 });

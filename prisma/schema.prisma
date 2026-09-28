@@ -194,9 +194,9 @@ model CrbtInvoice {
   payDate      DateTime?
   statut       String // libellé nettoyé : "Payé" / "Enregistré" / "Demande Virement" (Forcelog) ou "Payé" / "Programmé" (Ozon)
   parcelsCount Int
-  // Ozon Express n'expose aucun détail de frais sur sa page "Liste
-  // Virements" (contrairement au CRBT Forcelog) — champs optionnels,
-  // null pour les factures Ozon plutôt qu'un 0 trompeur.
+  // Ozon Express : seul feesAmount est rempli (CRBT total - montant net,
+  // calculé depuis l'export Excel de chaque virement, voir
+  // scripts/sync-ozon-web.js) ; fees et balance restent null.
   fees         Int?
   feesAmount   Decimal?  @db.Decimal(10, 2)
   balance      Decimal?  @db.Decimal(10, 2)
