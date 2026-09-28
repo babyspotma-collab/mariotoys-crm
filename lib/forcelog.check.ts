@@ -1,7 +1,7 @@
 // Vérification rapide : npx tsx lib/forcelog.check.ts
 // Rejoue la vraie réponse AddParcel (commande #7409) avec un faux fetch.
 import assert from "node:assert";
-import { addParcel } from "./forcelog";
+import { addParcel, forcelogMessageFr } from "./forcelog";
 
 const reply = (body: unknown) => (globalThis.fetch = (async () => new Response(JSON.stringify(body))) as typeof fetch);
 process.env.FORCELOG_API_KEY ||= "test";
@@ -19,5 +19,9 @@ const input = { orderNum: "#7409", receiver: "x", phone: "0600000000", city: "CS
 
   reply({ "ADD-PARCEL": { RESULT: "ERROR", MESSAGE: "Ville invalide" } });
   await assert.rejects(addParcel(input), /Ville invalide/);
+  reply({ "ADD-PARCEL": { RESULT: "ERROR", MESSAGE: "Parcel product nature exceeded max chars: 100" } });
+  await assert.rejects(addParcel(input), { message: "Nature du produit trop longue (100 caractères max)." });
+  assert.equal(forcelogMessageFr("Parcel address exceeded max chars: 150"), "Adresse trop longue (150 caractères max).");
+  assert.equal(forcelogMessageFr("Parcel code Not Found"), "Colis introuvable chez Forcelog.");
   console.log("forcelog checks OK");
 })();

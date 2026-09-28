@@ -7,6 +7,7 @@ import { addParcel as addForcelogParcel, getCities as getForcelogCities } from "
 import { addParcel as addOzonParcel, getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { existingParcelCode } from "@/lib/existing-parcel";
+import { tooLongError } from "@/lib/parcel-limits";
 
 export type ConfirmState = { error: string | null };
 
@@ -36,6 +37,9 @@ export async function createParcel(
   if (!Number.isFinite(price) || price <= 0) {
     return { error: "Le prix doit être un nombre positif." };
   }
+  // Limites de caractères du transporteur vérifiées ici, avant tout envoi.
+  const tooLong = tooLongError(carrier, { receiver, address, comment, productNature });
+  if (tooLong) return { error: tooLong };
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 

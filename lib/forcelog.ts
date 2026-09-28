@@ -9,6 +9,8 @@
 // échoue avec une erreur de validation, l'erreur brute est conservée
 // dans Order.forcelogError pour ajustement des noms exacts.
 
+import { TOO_LONG } from "@/lib/parcel-limits";
+
 const BASE_URL = "https://api.forcelog.ma";
 
 function headers() {
@@ -55,9 +57,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const failure = findResultFailure(json);
   if (failure) {
-    throw new Error(`Forcelog ${path} — ${failure}`);
+    throw new Error(forcelogMessageFr(failure));
   }
   return json as T;
+}
+
+// Messages d'erreur métier Forcelog (anglais, bruts) -> français lisible,
+// affichés tels quels à l'utilisateur (écran de confirmation, fiche colis).
+const TOO_LONG_FIELDS: Record<string, string> = {
+  "product nature": TOO_LONG.productNature,
+  address: TOO_LONG.address,
+  comment: TOO_LONG.comment,
+  receiver: TOO_LONG.receiver,
+  phone: "Téléphone trop long",
+  quartier: "Quartier trop long",
+  quarter: "Quartier trop long",
+  "order num": "N° de commande trop long",
+};
+
+export function forcelogMessageFr(raw: string): string {
+  const tooLong = raw.match(/^(?:parcel\s+)?(.+?)\s+exceeded max chars:\s*(\d+)/i);
+  if (tooLong) {
+    const field = tooLong[1].toLowerCase().replace(/_/g, " ").trim();
+    const label = TOO_LONG_FIELDS[field] ?? `Champ « ${tooLong[1]} » trop long`;
+    return `${label} (${tooLong[2]} caractères max).`;
+  }
+  if (/parcel code not found/i.test(raw)) return "Colis introuvable chez Forcelog.";
+  return `Forcelog a refusé la demande : ${raw}`;
 }
 
 export function healthCheck() {

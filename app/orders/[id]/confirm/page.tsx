@@ -4,6 +4,7 @@ import { getCities as getForcelogCities } from "@/lib/forcelog";
 import { getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { existingParcelCode } from "@/lib/existing-parcel";
+import { buildProductNature } from "@/lib/parcel-limits";
 import PageHeader from "@/components/PageHeader";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import ConfirmForm from "./ConfirmForm";
@@ -61,8 +62,8 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     ozonCitiesError = err instanceof Error ? err.message : String(err);
   }
 
-  const defaultProductNature =
-    order.items.map((i) => `${i.title} x${i.quantity}`).join(", ") || "Jouet";
+  // Courte et ≤ 100 caractères (limite Forcelog / Ozon), voir lib/parcel-limits.ts.
+  const defaultProductNature = buildProductNature(order.items);
 
   return (
     <>

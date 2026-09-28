@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { createParcel, type ConfirmState } from "./actions";
 import type { ForcelogCity } from "@/lib/forcelog";
 import type { OzonCity } from "@/lib/ozon";
+import { limitFor, type LimitedField } from "@/lib/parcel-limits";
 
 type InitialValues = {
   receiver: string;
@@ -42,6 +43,33 @@ export default function ConfirmForm({
   const initialState: ConfirmState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
   const [carrier, setCarrier] = useState<"FORCELOG" | "OZON">("FORCELOG");
+  // Champs limités en longueur selon le transporteur (voir lib/parcel-limits.ts) :
+  // contrôlés pour afficher le compteur et bloquer la saisie au-delà.
+  const [values, setValues] = useState<Record<LimitedField, string>>({
+    receiver: initialValues.receiver,
+    address: initialValues.address,
+    comment: initialValues.comment,
+    productNature: initialValues.productNature,
+  });
+  const limited = (field: LimitedField) => ({
+    id: field,
+    name: field,
+    value: values[field],
+    maxLength: limitFor(carrier, field),
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setValues((v) => ({ ...v, [field]: e.target.value })),
+    "aria-describedby": limitFor(carrier, field) ? `${field}-count` : undefined,
+  });
+  const counter = (field: LimitedField) => {
+    const max = limitFor(carrier, field);
+    if (max === undefined) return null;
+    const length = values[field].length;
+    return (
+      <p id={`${field}-count`} className={`hint text-right tabular-nums ${length > max ? "font-medium text-pill-red-fg" : ""}`}>
+        {length}/{max}
+      </p>
+    );
+  };
 
   // Présélectionne la ville si son nom correspond à la ville Shopify
   // d'origine ; sinon on laisse le choix explicite à l'utilisateur plutôt
@@ -97,7 +125,8 @@ export default function ConfirmForm({
             <label className="label" htmlFor="receiver">
               Nom
             </label>
-            <input id="receiver" name="receiver" required defaultValue={initialValues.receiver} className="input" />
+            <input {...limited("receiver")} required className="input" />
+            {counter("receiver")}
           </div>
           <div>
             <label className="label" htmlFor="phone">
@@ -181,14 +210,16 @@ export default function ConfirmForm({
           <label className="label" htmlFor="address">
             Adresse
           </label>
-          <textarea id="address" name="address" required rows={2} defaultValue={initialValues.address} className="input" />
+          <textarea {...limited("address")} required rows={2} className="input" />
+          {counter("address")}
         </div>
 
         <div>
           <label className="label" htmlFor="comment">
             Commentaire <span className="font-normal text-muted">(optionnel)</span>
           </label>
-          <textarea id="comment" name="comment" rows={2} defaultValue={initialValues.comment} className="input" />
+          <textarea {...limited("comment")} rows={2} className="input" />
+          {counter("comment")}
         </div>
       </fieldset>
 
@@ -200,13 +231,8 @@ export default function ConfirmForm({
             <label className="label" htmlFor="productNature">
               Nature du produit
             </label>
-            <input
-              id="productNature"
-              name="productNature"
-              required
-              defaultValue={initialValues.productNature}
-              className="input"
-            />
+            <textarea {...limited("productNature")} required rows={2} className="input" />
+            {counter("productNature")}
           </div>
           <div>
             <label className="label" htmlFor="price">
