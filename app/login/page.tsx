@@ -6,15 +6,16 @@ export default function LoginPage({
   searchParams: { error?: string };
 }) {
   return (
-    <div className="flex min-h-[80dvh] items-center justify-center">
+    <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-6">
+      <img
+        src="/logo-wordmark.webp"
+        alt="Mario Toys CRM Connect"
+        width={800}
+        height={496}
+        className="h-auto w-full max-w-[18rem] rounded-2xl shadow-lg shadow-zinc-900/10 md:max-w-sm"
+      />
       <form action={login} className="card flex w-full max-w-sm flex-col gap-5 p-6 md:p-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-base font-bold text-white">M</div>
-          <div>
-            <h1 className="text-base font-semibold leading-tight">Mario Toys</h1>
-            <p className="text-xs text-muted">Accès réservé</p>
-          </div>
-        </div>
+        <h1 className="text-center text-sm text-muted">Accès réservé</h1>
 
         <div>
           <label className="label" htmlFor="password">

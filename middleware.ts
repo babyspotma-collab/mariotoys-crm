@@ -24,5 +24,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Images et icônes publiques (logo de la page de connexion, favicon,
+  // icônes d'écran d'accueil, manifeste) servies sans session.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|webp|ico)$|manifest.webmanifest).*)"],
 };

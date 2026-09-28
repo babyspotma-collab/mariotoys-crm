@@ -18,14 +18,13 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function Logo({ size }: { size: number }) {
+// Logo recadré depuis public/logo.png (fond sombre conservé : le texte
+// argenté "CRM CONNECT" disparaîtrait sur fond blanc).
+function Logo({ className }: { className: string }) {
   return (
-    <div
-      className="flex items-center justify-center rounded-lg bg-accent font-bold text-white"
-      style={{ width: size, height: size, fontSize: size / 2 }}
-    >
-      M
-    </div>
+    <a href="/" aria-label="Mario Toys CRM Connect, accueil" className="block shrink-0">
+      <img src="/logo-wordmark.webp" alt="Mario Toys CRM Connect" width={800} height={496} className={className} />
+    </a>
   );
 }
 
@@ -40,9 +39,8 @@ export default function Sidebar() {
         aria-label="Navigation principale"
         className="sticky top-0 hidden h-[100dvh] md:flex md:w-[228px] md:shrink-0 md:flex-col md:gap-8 md:border-r md:border-line md:bg-white md:px-3 md:py-6"
       >
-        <div className="flex items-center gap-2.5 px-3">
-          <Logo size={28} />
-          <div className="text-[15px] font-semibold tracking-tight">Mario Toys</div>
+        <div className="px-2">
+          <Logo className="h-auto w-full rounded-xl" />
         </div>
 
         <div className="flex flex-col gap-0.5">
@@ -77,10 +75,7 @@ export default function Sidebar() {
 
       {/* Mobile : barre supérieure (logo + menu compte) */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur md:hidden">
-        <div className="flex items-center gap-2">
-          <Logo size={26} />
-          <div className="text-sm font-semibold tracking-tight">Mario Toys</div>
-        </div>
+        <Logo className="h-10 w-auto rounded-md" />
         <MoreMenu>
           <form action={logout}>
             <button type="submit" className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink hover:bg-cream">
