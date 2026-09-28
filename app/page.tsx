@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { cancelOrder } from "./orders/actions";
+import { cancelOrder, confirmOrder } from "./orders/actions";
 import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
 import AutoConfirmPanel from "@/components/AutoConfirmPanel";
 import ConfirmButton from "@/components/ConfirmButton";
@@ -19,7 +19,13 @@ import { findAutoConfirmations } from "@/lib/auto-confirm";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 15;
-type Tab = "todo" | "ok" | "all";
+type Tab = "todo" | "noparcel" | "ok" | "all";
+const TABS: Tab[] = ["todo", "noparcel", "ok", "all"];
+
+// Cycle : À confirmer (NOUVELLE) -> Confirmée (CONFIRMEE, comptée dans les
+// statistiques) -> Colis créé (CONFIRMEE + colis chez le transporteur).
+// "Colis créé" n'est pas un statut en base : on le déduit du colis.
+const NO_PARCEL = { forcelogCode: null, ozonCode: null, parcels: { none: {} } };
 
 const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
   NOUVELLE: { tone: "gray", label: "Nouvelle" },
@@ -42,13 +48,19 @@ export default async function DashboardPage({
   const { start, end } = range;
   const periodKeep = periodParams(range);
   const dateFilter = { createdAt: { gte: start, lt: end } };
-  const tab: Tab = searchParams.tab === "ok" || searchParams.tab === "all" ? searchParams.tab : "todo";
+  const tab: Tab = TABS.find((t) => t === searchParams.tab) ?? "todo";
   const q = searchParams.q?.trim();
 
   const page = Math.max(1, Number(searchParams.page) || 1);
   const listWhere = {
     ...dateFilter,
-    ...(tab === "todo" ? { status: "NOUVELLE" as const } : tab === "ok" ? { status: "CONFIRMEE" as const } : {}),
+    ...(tab === "todo"
+      ? { status: "NOUVELLE" as const }
+      : tab === "noparcel"
+        ? { status: "CONFIRMEE" as const, ...NO_PARCEL }
+        : tab === "ok"
+          ? { status: "CONFIRMEE" as const }
+          : {}),
     ...(q
       ? {
           OR: [
@@ -59,16 +71,17 @@ export default async function DashboardPage({
       : {}),
   };
 
-  const [orders, listTotal, counts, auto] = await Promise.all([
+  const [orders, listTotal, counts, noParcelCount, auto] = await Promise.all([
     prisma.order.findMany({
       where: listWhere,
-      include: { items: true },
+      include: { items: true, parcels: { select: { id: true }, take: 1 } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
     prisma.order.count({ where: listWhere }),
     prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
+    prisma.order.count({ where: { ...dateFilter, status: "CONFIRMEE", ...NO_PARCEL } }),
     findAutoConfirmations(),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
@@ -80,6 +93,7 @@ export default async function DashboardPage({
 
   const tabs = [
     { id: "todo" as const, label: "À confirmer", count: countFor("NOUVELLE") },
+    { id: "noparcel" as const, label: "Confirmées sans colis", count: noParcelCount },
     { id: "ok" as const, label: "Confirmées", count: confirmedCount },
     { id: "all" as const, label: "Toutes", count: totalOrders },
   ];
@@ -136,6 +150,8 @@ export default async function DashboardPage({
           </EmptyState>
         ) : tab === "todo" ? (
           <EmptyState title="Aucune commande à confirmer">Tout est à jour sur cette période.</EmptyState>
+        ) : tab === "noparcel" ? (
+          <EmptyState title="Aucune commande en attente de colis">Toutes les commandes confirmées ont leur colis.</EmptyState>
         ) : (
           <EmptyState title="Aucune commande">Rien sur cette période dans cet onglet.</EmptyState>
         )
@@ -145,6 +161,7 @@ export default async function DashboardPage({
             const pill = STATUS_PILL[order.status] ?? { tone: "gray" as const, label: order.status };
             const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
             const isNew = order.status === "NOUVELLE";
+            const hasParcel = !!(order.forcelogCode || order.ozonCode || order.parcels.length);
             const phone = normalizeMoroccanPhone(order.phone);
             return (
               <li
@@ -183,9 +200,12 @@ export default async function DashboardPage({
                       >
                         <Phone size={18} aria-hidden="true" />
                       </a>
-                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
-                        Confirmer
-                      </a>
+                      {/* Confirmer = statut seulement, aucun envoi au transporteur */}
+                      <form action={confirmOrder.bind(null, order.id)} className="flex flex-1 md:flex-none">
+                        <button type="submit" className="btn-primary w-full md:h-9 md:px-3.5 md:text-[13px]">
+                          Confirmer
+                        </button>
+                      </form>
                       <MoreMenu>
                         <form action={cancelOrder.bind(null, order.id)}>
                           <ConfirmButton
@@ -198,6 +218,12 @@ export default async function DashboardPage({
                         </form>
                       </MoreMenu>
                     </>
+                  ) : order.status === "CONFIRMEE" && !hasParcel ? (
+                    <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
+                      Créer le colis
+                    </a>
+                  ) : order.status === "CONFIRMEE" ? (
+                    <Pill tone="green">Colis créé</Pill>
                   ) : (
                     <Pill tone={pill.tone}>{pill.label}</Pill>
                   )}

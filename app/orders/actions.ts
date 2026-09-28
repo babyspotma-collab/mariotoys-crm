@@ -10,3 +10,15 @@ export async function cancelOrder(orderId: string) {
   });
   revalidatePath("/");
 }
+
+// Confirmer = uniquement passer la commande en CONFIRMEE (comptée dans les
+// statistiques). Aucun appel transporteur : le colis se crée ensuite, à
+// part, depuis "Créer le colis" (app/orders/[id]/confirm).
+export async function confirmOrder(orderId: string) {
+  await prisma.order.updateMany({
+    where: { id: orderId, status: "NOUVELLE" },
+    data: { status: "CONFIRMEE" },
+  });
+  revalidatePath("/");
+  revalidatePath(`/orders/${orderId}/confirm`);
+}

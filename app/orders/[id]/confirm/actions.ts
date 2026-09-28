@@ -43,6 +43,11 @@ export async function createParcel(
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 
+  // Le colis ne se crée qu'après la confirmation (étape séparée).
+  if (order.status !== "CONFIRMEE") {
+    return { error: "Confirmez d'abord la commande avant de créer son colis." };
+  }
+
   // Protection anti-doublon : jamais un 2e colis chez le transporteur pour
   // une commande qui en a déjà un (ex. nouvel essai après une erreur
   // d'affichage alors que le colis avait bien été créé).
