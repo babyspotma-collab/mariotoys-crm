@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { addParcel as addForcelogParcel, getCities as getForcelogCities } from "@/lib/forcelog";
 import { addParcel as addOzonParcel, getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { existingParcelCode } from "@/lib/existing-parcel";
 
 export type ConfirmState = { error: string | null };
 
@@ -38,6 +39,14 @@ export async function createParcel(
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 
+  // Protection anti-doublon : jamais un 2e colis chez le transporteur pour
+  // une commande qui en a déjà un (ex. nouvel essai après une erreur
+  // d'affichage alors que le colis avait bien été créé).
+  const existing = await existingParcelCode(order);
+  if (existing) {
+    return { error: `Cette commande a déjà un colis (${existing}). Aucun nouveau colis n'a été créé.` };
+  }
+
   try {
     if (carrier === "FORCELOG") {
       const city = String(formData.get("forcelogCity") ?? "").trim();
@@ -63,7 +72,11 @@ export async function createParcel(
           status: "CONFIRMEE",
           carrier: "FORCELOG",
           forcelogCode: parcel.code,
-          forcelogError: null,
+          // IS_DOUBLE = 1 : le colis est créé, mais Forcelog pense qu'un
+          // colis identique existe déjà — signalé sur la ligne de commande.
+          forcelogError: parcel.isDouble
+            ? `Doublon possible signalé par Forcelog (IS_DOUBLE) pour le colis ${parcel.code} : vérifiez qu'un autre colis n'existe pas déjà pour ce client.`
+            : null,
           forcelogProductNature: productNature,
           customerName: receiver,
           phone,

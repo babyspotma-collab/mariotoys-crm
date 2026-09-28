@@ -79,6 +79,7 @@ export type AddParcelInput = {
 
 export type AddParcelResult = {
   code: string; // code colis Forcelog
+  isDouble: boolean; // ADD-PARCEL.IS_DOUBLE : Forcelog signale un doublon probable
   raw: unknown;
 };
 
@@ -100,8 +101,15 @@ export type AddParcelResult = {
 // silencieusement perdre le code — ça garde la commande en NOUVELLE au
 // lieu d'un faux CONFIRMEE, et la réponse brute conservée dans
 // forcelogError permettra de corriger la forme exacte dès le prochain essai.
+//
+// Forme réelle confirmée le 28/09/2026 (colis F-CSA3A9DWNB38, commande
+// #7409) : { "AUTH": {...}, "ADD-PARCEL": { RESULT: "SUCCESS", MESSAGE,
+// IS_DOUBLE: 0, "NEW-PARCEL": { TRACKING_NUMBER, ORDER_NUM, ... } } } —
+// le code est donc DEUX niveaux sous la racine, lu en priorité ci-dessous.
 function extractParcelCode(json: unknown): string | null {
   if (!json || typeof json !== "object") return null;
+  const confirmed = (json as any)["ADD-PARCEL"]?.["NEW-PARCEL"]?.TRACKING_NUMBER;
+  if (typeof confirmed === "string" && confirmed) return confirmed;
   const candidates: Record<string, unknown>[] = [json as Record<string, unknown>];
   for (const value of Object.values(json as Record<string, unknown>)) {
     if (value && typeof value === "object") candidates.push(value as Record<string, unknown>);
@@ -138,7 +146,8 @@ export async function addParcel(input: AddParcelInput): Promise<AddParcelResult>
       `Forcelog AddParcel — code colis introuvable dans la réponse (forme non confirmée). Réponse brute: ${JSON.stringify(json).slice(0, 500)}`
     );
   }
-  return { code, raw: json };
+  const isDouble = Number((json as any)["ADD-PARCEL"]?.IS_DOUBLE ?? 0) === 1;
+  return { code, isDouble, raw: json };
 }
 
 // Forme réelle confirmée : { "GET-PARCEL": { RESULT, ... } } — mêmes

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCities as getForcelogCities } from "@/lib/forcelog";
 import { getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { existingParcelCode } from "@/lib/existing-parcel";
 import PageHeader from "@/components/PageHeader";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import ConfirmForm from "./ConfirmForm";
@@ -15,6 +16,31 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
 
   if (!order) notFound();
   if (order.status !== "NOUVELLE") redirect("/");
+
+  // Un colis existe déjà (ex. créé chez le transporteur malgré une erreur
+  // d'affichage) : on montre son numéro au lieu du formulaire, pour ne
+  // jamais en créer un second.
+  const existing = await existingParcelCode(order);
+  if (existing) {
+    const carrierPath = order.ozonCode === existing ? "ozon" : "forcelog";
+    return (
+      <>
+        <PageHeader back={{ href: "/", label: "Commandes" }} title={`Commande ${order.orderNumber}`} />
+        <div className="card flex flex-col gap-3 p-4 md:p-6">
+          <p className="text-sm">
+            Cette commande a déjà un colis :{" "}
+            <a
+              href={`/parcels/${carrierPath}/${encodeURIComponent(existing)}`}
+              className="font-mono font-semibold underline underline-offset-4"
+            >
+              {existing}
+            </a>
+          </p>
+          <p className="text-sm text-muted">Aucun nouveau colis ne peut être créé pour cette commande.</p>
+        </div>
+      </>
+    );
+  }
 
   // Les deux listes de villes sont chargées d'avance (transporteur choisi
   // côté client, voir ConfirmForm) — un seul échec (ex: Ozon down)

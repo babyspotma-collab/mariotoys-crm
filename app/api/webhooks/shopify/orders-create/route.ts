@@ -27,8 +27,14 @@ export async function POST(req: NextRequest) {
     shippingAddress.phone ?? order.phone ?? order.customer?.phone ?? ""
   );
 
+  // La variante choisie (couleur…) n'est PAS dans li.title : ex. commande
+  // #7409, titre produit "… - Rose" mais variante "Bleu". On l'ajoute au
+  // titre, sinon la nature du colis envoyée au transporteur est fausse.
   const items = (order.line_items ?? []).map((li: any) => ({
-    title: li.title as string,
+    title:
+      li.variant_title && li.variant_title !== "Default Title"
+        ? `${li.title} (variante : ${li.variant_title})`
+        : (li.title as string),
     quantity: li.quantity as number,
     price: li.price as string,
   }));
