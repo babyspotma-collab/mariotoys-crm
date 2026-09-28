@@ -7,6 +7,9 @@ import Pill, { type PillTone } from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
 import RelaunchButton from "@/components/RelaunchButton";
+import SelectionBar from "@/components/SelectionBar";
+import { DeliveryNotesView, PickupsView } from "@/components/CarrierLogistics";
+import { eligibleOzonCodes } from "@/lib/delivery-notes";
 import { getParcelCategoryCounts } from "@/lib/parcel-category-counts";
 import { getOzonCategoryCounts } from "@/lib/ozon-category-counts";
 import { categoryById } from "@/lib/parcel-categories";
@@ -21,7 +24,7 @@ import {
 } from "@/lib/parcel-filters";
 import { formatDh } from "@/lib/format";
 import { periodParams, periodRange } from "@/lib/date-range";
-import { relaunch } from "./actions";
+import { createOzonDeliveryNote, relaunch } from "./actions";
 
 const NO_ANSWER_CODES = categoryById("noAnswer").codes;
 
@@ -39,9 +42,69 @@ const BUCKET_PILL: Record<ColisFilter, { tone: PillTone }> = {
 export default async function ParcelsPage({
   searchParams,
 }: {
-  searchParams: { carrier?: string; filter?: string; q?: string; page?: string; period?: string; from?: string; to?: string };
+  searchParams: {
+    carrier?: string;
+    filter?: string;
+    q?: string;
+    page?: string;
+    period?: string;
+    from?: string;
+    to?: string;
+    view?: string;
+    error?: string;
+    created?: string;
+  };
 }) {
   const carrier: ColisCarrier = searchParams.carrier === "ozon" ? "ozon" : "forcelog";
+  const view = searchParams.view === "notes" || searchParams.view === "pickups" ? searchParams.view : "parcels";
+  const carrierName = carrier === "forcelog" ? "Forcelog" : "Ozon Express";
+
+  // En-tête commun : transporteur + onglets Colis / Bons de livraison / Ramassages.
+  const header = (subtitle: string) => (
+    <>
+      <PageHeader
+        title="Colis"
+        subtitle={subtitle}
+        actions={
+          <Segmented
+            label="Transporteur"
+            className="w-fit"
+            items={(["forcelog", "ozon"] as const).map((c) => ({
+              href: `/parcels?${new URLSearchParams({ carrier: c, ...(view !== "parcels" ? { view } : {}) })}`,
+              label: c === "forcelog" ? "Forcelog" : "Ozon",
+              active: carrier === c,
+            }))}
+          />
+        }
+      />
+      <Segmented
+        label="Rubrique"
+        items={[
+          { href: `/parcels?carrier=${carrier}`, label: "Colis", active: view === "parcels" },
+          { href: `/parcels?carrier=${carrier}&view=notes`, label: "Bons de livraison", active: view === "notes" },
+          { href: `/parcels?carrier=${carrier}&view=pickups`, label: "Ramassages", active: view === "pickups" },
+        ]}
+      />
+      {searchParams.error && <p className="alert-error">{searchParams.error}</p>}
+    </>
+  );
+
+  if (view === "notes") {
+    return (
+      <>
+        {header(`Bons de livraison ${carrierName}`)}
+        <DeliveryNotesView carrier={carrier} created={searchParams.created} />
+      </>
+    );
+  }
+  if (view === "pickups") {
+    return (
+      <>
+        {header(`Demandes de ramassage ${carrierName}`)}
+        <PickupsView carrier={carrier} />
+      </>
+    );
+  }
   const filter: ColisFilter =
     searchParams.filter === "ongoing" || searchParams.filter === "delivered" || searchParams.filter === "todo"
       ? searchParams.filter
@@ -70,7 +133,7 @@ export default async function ParcelsPage({
       : {}),
   };
 
-  const [visible, listTotal] = await Promise.all([
+  const [visible, listTotal, eligible] = await Promise.all([
     prisma.parcel.findMany({
       where,
       include: { order: true },
@@ -79,6 +142,8 @@ export default async function ParcelsPage({
       take: PAGE_SIZE,
     }),
     prisma.parcel.count({ where }),
+    // Colis Ozon pouvant entrer dans un bon de livraison (cases à cocher).
+    carrier === "ozon" ? eligibleOzonCodes() : Promise.resolve(new Set<string>()),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
@@ -96,25 +161,17 @@ export default async function ParcelsPage({
     return `/parcels?${params.toString()}`;
   };
 
-  const carrierName = carrier === "forcelog" ? "Forcelog" : "Ozon Express";
-
   return (
     <>
-      <PageHeader
-        title="Colis"
-        subtitle={`${range.label} · ${buckets.all} colis, ${buckets.delivered} livrés, ${buckets.todo} à traiter`}
-        actions={
-          <Segmented
-            label="Transporteur"
-            className="w-fit"
-            items={(["forcelog", "ozon"] as const).map((c) => ({
-              href: `/parcels?${new URLSearchParams({ carrier: c, ...periodKeep })}`,
-              label: c === "forcelog" ? "Forcelog" : "Ozon",
-              active: carrier === c,
-            }))}
-          />
-        }
-      />
+      {header(`${range.label} · ${buckets.all} colis, ${buckets.delivered} livrés, ${buckets.todo} à traiter`)}
+
+      {eligible.size > 0 && (
+        <p className="rounded-[10px] bg-pill-blue-bg px-3.5 py-3 text-sm text-pill-blue-fg">
+          {eligible.size} colis Ozon pas encore dans un bon de livraison : cochez-les pour créer le bon.
+        </p>
+      )}
+      <form id="bl-form" action={createOzonDeliveryNote} className="hidden" />
+      <SelectionBar formId="bl-form" buttonLabel="Créer un bon de livraison" />
 
       <PeriodFilter action="/parcels" keep={{ carrier, filter, q }} range={range} />
 
@@ -156,7 +213,17 @@ export default async function ParcelsPage({
                 className="relative flex flex-col gap-2.5 p-4 transition-colors hover:bg-cream md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_96px_104px] md:items-center md:gap-5 md:px-5 md:py-3.5"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  {eligible.has(parcel.code) && (
+                    <input
+                      type="checkbox"
+                      name="codes"
+                      value={parcel.code}
+                      form="bl-form"
+                      aria-label={`Ajouter ${parcel.code} au bon de livraison`}
+                      className="relative z-10 mt-1 h-5 w-5 shrink-0 cursor-pointer accent-ink md:h-4 md:w-4"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
                     {/* Lien étiré : toute la ligne est cliquable, sans imbriquer le bouton Relancer dans le lien */}
                     <a href={detailHref} className="block truncate font-semibold no-underline after:absolute after:inset-0 md:font-medium">
                       {parcel.receiver || "Destinataire inconnu"}

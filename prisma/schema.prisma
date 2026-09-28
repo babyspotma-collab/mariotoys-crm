@@ -205,3 +205,33 @@ model CrbtInvoice {
 
   @@index([carrier])
 }
+
+// Bons de livraison créés depuis le CRM (Ozon Express uniquement : l'API
+// Forcelog n'en propose pas, voir lib/forcelog.ts). Un colis ne peut être
+// que dans un seul bon.
+model DeliveryNote {
+  id          String   @id @default(cuid())
+  carrier     Carrier
+  ref         String   @unique // référence du transporteur (ex: BL-280926-…)
+  parcelCodes String[]
+  createdAt   DateTime @default(now())
+
+  @@index([carrier, createdAt])
+}
+
+// Historique des demandes de ramassage faites depuis le CRM.
+// status : SENT (acceptée par l'API Forcelog), FAILED (refusée, voir
+// message), DECLARED (Ozon : faite sur leur site, notée à la main).
+model PickupRequest {
+  id        String   @id @default(cuid())
+  carrier   Carrier
+  status    String
+  phone     String
+  city      String
+  address   String
+  comment   String?
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@index([carrier, createdAt])
+}

@@ -115,7 +115,9 @@ export async function addParcel(input: OzonAddParcelInput): Promise<OzonAddParce
     "parcel-note": input.note ?? "",
     "parcel-price": String(input.price),
     "parcel-nature": input.nature ?? "",
-    "parcel-stock": "1", // valeur par défaut documentée (1 = stock, 0 = ramassage)
+    // 0 = ramassage : Ozon vient chercher les colis chez le client (adresse
+    // variable, donnée dans chaque demande de ramassage). 1 = stock Ozon.
+    "parcel-stock": "0",
     "parcel-open": "1", // 1 = ouvrir le colis (documenté comme défaut)
     "parcel-fragile": input.fragile ? "1" : "0",
   });
@@ -202,8 +204,9 @@ export async function getCities(): Promise<OzonCity[]> {
 }
 
 // ─── Bon de livraison (BL) — flow en 4 étapes ──────────────────────────────
-// Forme des réponses non vérifiée en pratique (pas encore de vrai BL créé
-// via cette intégration) — extraction défensive comme pour addParcel.
+// Étapes confirmées par la doc officielle (client.ozoneexpress.ma/doc) ;
+// forme exacte des réponses non vérifiée (créer un BL de test a un effet
+// réel chez Ozon) — extraction défensive comme pour addParcel.
 
 const REF_KEYS = ["ref", "Ref", "REF"];
 
@@ -237,7 +240,14 @@ export function getDeliveryNotePdfUrl(ref: string, variant: DeliveryNotePdfVaria
     variant === "a4"
       ? "pdf-delivery-note-tickets"
       : variant === "10x10"
-        ? "pdf-delivery-note-tickets-4-2"
+        ? "pdf-delivery-note-tickets-4-4"
         : "pdf-delivery-note";
-  return `https://client.ozonexpress.ma/${path}?dn-ref=${encodeURIComponent(ref)}`;
+  // Domaine avec "e" (ozoneexpress) et chemins tels que dans la doc
+  // officielle client.ozoneexpress.ma/doc ; PDF accessible sans session.
+  return `https://client.ozoneexpress.ma/${path}?dn-ref=${encodeURIComponent(ref)}`;
 }
+
+// Pas de demande de ramassage dans l'API Ozon : uniquement sur le tableau
+// de bord web. Le CRM ouvre cette page et note la demande (solution
+// "simple" choisie par l'utilisateur).
+export const OZON_PICKUP_URL = "https://client.ozoneexpress.ma/pickup-request";

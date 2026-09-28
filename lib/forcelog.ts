@@ -48,7 +48,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const text = await res.text();
   let json: any;
   try {
-    json = text ? JSON.parse(text) : {};
+    // La doc Forcelog montre des réponses avec une virgule finale
+    // ("MESSAGE": "...", }) : tolérée pour ne pas prendre un succès pour
+    // une erreur.
+    json = text ? JSON.parse(text.replace(/,\s*([}\]])/g, "$1")) : {};
   } catch {
     throw new Error(`Réponse Forcelog non-JSON (${res.status}): ${text.slice(0, 300)}`);
   }
@@ -396,3 +399,38 @@ export function replyClaim(parcelCode: string, message: string) {
     body: JSON.stringify({ PARCEL_CODE: parcelCode, MESSAGE: message }),
   });
 }
+
+export type PickupRequestInput = {
+  phone: string; // 14 caractères max (doc Forcelog)
+  city: string; // code ou nom de ville, 50 max
+  address: string; // 100 max
+  comment?: string; // 100 max
+  stickers?: boolean; // "avez-vous des stickers"
+};
+
+// Doc officielle (customer.forcelog.ma/index/Documentation/API, lue le
+// 28/09/2026) : POST /customer/Pickups/CreateRequest -> { "ADD-PICKUP":
+// { RESULT, MESSAGE } }. Aucun identifiant de demande n'est renvoyé et
+// aucun endpoint ne liste les demandes : l'historique est tenu par le CRM
+// (modèle PickupRequest).
+export async function createPickupRequest(input: PickupRequestInput): Promise<string> {
+  const json = await request<{ "ADD-PICKUP"?: { MESSAGE?: string } }>("/customer/Pickups/CreateRequest", {
+    method: "POST",
+    body: JSON.stringify({
+      PHONE: input.phone,
+      CITY: input.city,
+      ADDRESS: input.address,
+      COMMENT: input.comment || undefined,
+      STICKERS: input.stickers ?? false,
+    }),
+  });
+  return String(json["ADD-PICKUP"]?.MESSAGE ?? "Demande de ramassage envoyée.");
+}
+
+// Pas de bon de livraison dans l'API Forcelog : création uniquement sur
+// leur tableau de bord web (connexion protégée par reCAPTCHA).
+export const FORCELOG_DELIVERY_NOTE_URLS = {
+  create: "https://customer.forcelog.ma/index/DeliveryNotes/AddNew",
+  list: "https://customer.forcelog.ma/index/DeliveryNotes",
+  pickups: "https://customer.forcelog.ma/index/PickUpRequests",
+};
