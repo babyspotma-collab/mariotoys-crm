@@ -3,8 +3,8 @@ import { formatDateTimeMa } from "@/lib/format";
 import { fixUtf8Filename } from "@/lib/filename";
 
 export const STEP_LABELS: Record<string, string> = {
-  READING: "lecture de la photo",
-  GENERATING: "génération des visuels",
+  READING: "analyse de la photo (Claude)",
+  GENERATING: "génération du visuel (Gemini)",
   SHOPIFY: "création Shopify",
 };
 
