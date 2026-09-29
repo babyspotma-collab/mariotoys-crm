@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { fixUtf8Filename } from "@/lib/filename";
 
 export type UploadState = { error: string | null };
 
@@ -21,7 +22,8 @@ export async function uploadProductPhotos(
   }
 
   for (const file of files) {
-    const blob = await put(`product-jobs/uploads/${file.name}`, file, {
+    const filename = fixUtf8Filename(file.name);
+    const blob = await put(`product-jobs/uploads/${filename}`, file, {
       access: "public",
       addRandomSuffix: true,
     });
@@ -29,7 +31,7 @@ export async function uploadProductPhotos(
     await prisma.productJob.create({
       data: {
         originalPhotoUrl: blob.url,
-        originalFilename: file.name,
+        originalFilename: filename,
         status: "EN_ATTENTE",
       },
     });

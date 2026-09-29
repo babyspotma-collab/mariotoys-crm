@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   const claim = await prisma.productJob.updateMany({
     where: { id: next.id, status: "EN_ATTENTE" },
-    data: { status: "EN_COURS", claimedAt: new Date() },
+    data: { status: "EN_COURS", claimedAt: new Date(), step: "READING" },
   });
 
   if (claim.count === 0) {

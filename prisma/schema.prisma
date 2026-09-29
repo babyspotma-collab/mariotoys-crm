@@ -153,6 +153,10 @@ model ProductJob {
   compareAtPrice   Decimal? @db.Decimal(10, 2) // prix barré affiché : entier se terminant par 9, remise 10-30% vs sellPrice
   missingFields    String[] @default([]) // ex: ["cost","sku"] — infos non lisibles sur la photo, produit créé quand même en CREE_A_COMPLETER
   note             String? // signal non bloquant du worker (ex: Gemini a refusé de générer un visuel, photo originale recadrée utilisée à la place)
+  // Étape en cours pendant EN_COURS, envoyée par le worker : READING
+  // (lecture de la photo), GENERATING (génération des visuels), SHOPIFY
+  // (création du produit). Sans objet une fois le job terminé.
+  step             String?
 
   generatedImageUrls Json? // array de Vercel Blob URLs, rempli par le worker une fois les visuels générés
 
@@ -234,4 +238,17 @@ model PickupRequest {
   createdAt DateTime @default(now())
 
   @@index([carrier, createdAt])
+}
+
+// Battement de cœur du worker (une seule ligne, id "worker") : mis à jour
+// toutes les 30 s et à chaque changement d'étape par
+// POST /api/product-jobs/heartbeat. Sert à l'indicateur "Worker actif /
+// inactif" de la page Création produits.
+model WorkerStatus {
+  id         String   @id @default("worker")
+  lastSeenAt DateTime
+  state      String // "idle" | "busy"
+  jobId      String?
+  filename   String?
+  step       String?
 }
