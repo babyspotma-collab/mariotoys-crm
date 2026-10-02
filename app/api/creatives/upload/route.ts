@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
         if (!pathname.startsWith(UPLOAD_PATH_PREFIX) || pathname.includes("..")) {
           throw new Error("Chemin d'upload non autorisé");
         }
-        const validUntil = Date.now() + 10 * 60_000;
+        // 2 h (et non quelques minutes) : Blob compare validUntil à SON horloge,
+        // et un serveur dont l'horloge retarde (PC de dev mal réglé) verrait
+        // un délai court comme déjà expiré.
+        const validUntil = Date.now() + 2 * 60 * 60_000;
         const token = await issueSignedToken({
           pathname,
           operations: ["put"],
