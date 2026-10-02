@@ -235,3 +235,98 @@ model PickupRequest {
 
   @@index([carrier, createdAt])
 }
+
+// Créatives produit (voir app/creatives) — publicités marketing générées par
+// Gemini web via le programme local (dossier worker/, jamais sur Vercel).
+// Une demande = une photo + les infos saisies dans le formulaire ; une
+// CreativeImage par angle marketing (voir lib/creative-angles.ts). Le prompt
+// final de chaque angle est assemblé et figé côté CRM à la création de la
+// demande (champ prompt) : le programme local l'envoie tel quel et "Régénérer"
+// rejoue exactement le même prompt.
+//
+// Statut global (calculé depuis les images, voir lib/creatives.ts) :
+// EN_ATTENTE (rien de commencé) -> EN_COURS -> TERMINEE (toutes les images
+// générées, hors angles ignorés) | PARTIELLE (au moins une en échec, les
+// autres terminées) | ECHEC (aucune image terminée, au moins une en échec).
+model CreativeRequest {
+  id             String                @id @default(cuid())
+  status         CreativeRequestStatus @default(EN_ATTENTE)
+
+  sourcePhotoUrl String // Vercel Blob — photo produit déposée par l'utilisateur
+  sourceFilename String // affichage/traçabilité uniquement
+
+  // Champs du formulaire (tous facultatifs sauf le nom du produit).
+  productName    String
+  pointFort1     String?
+  pointFort2     String?
+  pointFort3     String?
+  price          Decimal? @db.Decimal(10, 2) // MAD
+  offerLine      String?
+  format         String   @default("4:5")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  images         CreativeImage[]
+
+  @@index([createdAt])
+}
+
+// IGNOREE : angle volontairement non généré parce que son contenu essentiel
+// manque (ex : angle "Offre et prix" sans prix) — la raison est dans
+// errorMessage et affichée dans le formulaire puis sur la page résultats.
+model CreativeImage {
+  id           String                @id @default(cuid())
+  requestId    String
+  request      CreativeRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  angleKey     String // clé stable de l'angle (voir lib/creative-angles.ts)
+  position     Int // ordre d'affichage 1..5
+  prompt       String? // prompt final envoyé à Gemini ; null si IGNOREE
+
+  status       CreativeImageStatus   @default(EN_ATTENTE)
+  attempts     Int                   @default(0)
+  errorMessage String? // raison de l'échec / de l'angle ignoré
+  imageUrl     String? // Vercel Blob — image générée
+
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([requestId, angleKey])
+  @@index([status])
+}
+
+enum CreativeRequestStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  PARTIELLE
+  ECHEC
+}
+
+enum CreativeImageStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  ECHEC
+  IGNOREE
+}
+
+// Battement de cœur du programme local — une seule ligne (id "main"),
+// réécrite à chaque envoi. "En ligne" = lastSeenAt de moins de 60 s.
+// issue : SESSION_EXPIRED | QUOTA | CAPTCHA quand Gemini bloque le programme
+// (pause automatique, reprise seule), null sinon.
+model WorkerHeartbeat {
+  id           String   @id
+  lastSeenAt   DateTime
+  state        String // idle | busy | paused
+  jobType      String? // product | creative
+  jobId        String?
+  label        String? // nom de fichier / produit en cours
+  step         String?
+  issue        String?
+  issueMessage String?
+  updatedAt    DateTime @updatedAt
+}

@@ -5,7 +5,7 @@ import { SESSION_COOKIE, isValidSessionToken } from "@/lib/auth";
 // endpoints appelés par des systèmes externes (Shopify, cron Vercel, le
 // worker mariotoys-images-automation sur le PC de l'utilisateur) qui ont
 // leur propre vérification (HMAC / secret de cron / WORKER_SECRET).
-const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/cron", "/api/product-jobs"];
+const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/cron", "/api/product-jobs", "/api/worker"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -3,12 +3,13 @@
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
-import { ChartBar, Package, Receipt, ShoppingBag, SignOut, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { ChartBar, Images, Package, Receipt, ShoppingBag, SignOut, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
 const NAV = [
   { href: "/", label: "Commandes", short: "Commandes", Icon: ShoppingBag },
   { href: "/parcels", label: "Colis", short: "Colis", Icon: Package },
   { href: "/product-jobs", label: "Création produits", short: "Produits", Icon: Sparkle },
+  { href: "/creatives", label: "Créatives", short: "Créatives", Icon: Images },
   { href: "/billing", label: "Facturation", short: "Factures", Icon: Receipt },
   { href: "/stats", label: "Statistiques", short: "Stats", Icon: ChartBar },
 ];
