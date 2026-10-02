@@ -196,8 +196,8 @@ export default function CreativeResults({
               </div>
 
               <div className="flex flex-col gap-2.5 p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <span className="min-w-0 truncate text-sm font-medium">
                     {img.position}. {angleLabel(img.angleKey)}
                   </span>
                   <Pill tone={pill.tone}>{pill.label}</Pill>
@@ -205,13 +205,15 @@ export default function CreativeResults({
                 {img.status === "ECHEC" && img.imageUrl && img.errorMessage && (
                   <p className="text-xs text-pill-red-fg">{img.errorMessage}</p>
                 )}
+                {/* flex-wrap + largeur minimale : sur une carte étroite les deux
+                    boutons passent l'un sous l'autre au lieu d'être coupés. */}
                 {img.status !== "IGNOREE" && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => download(img)}
                       disabled={!img.imageUrl}
-                      className="btn-secondary h-10 flex-1 text-[13px]"
+                      className="btn-secondary h-10 min-w-[9.5rem] flex-1 text-[13px]"
                     >
                       <DownloadSimple size={16} aria-hidden="true" />
                       Télécharger
@@ -220,7 +222,7 @@ export default function CreativeResults({
                       type="button"
                       onClick={() => regenerate(img)}
                       disabled={busy}
-                      className="btn-ghost h-10 flex-1 text-[13px]"
+                      className="btn-ghost h-10 min-w-[9.5rem] flex-1 text-[13px]"
                     >
                       <ArrowClockwise size={16} aria-hidden="true" />
                       Régénérer
