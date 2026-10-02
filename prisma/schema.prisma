@@ -153,6 +153,10 @@ model ProductJob {
   compareAtPrice   Decimal? @db.Decimal(10, 2) // prix barré affiché : entier se terminant par 9, remise 10-30% vs sellPrice
   missingFields    String[] @default([]) // ex: ["cost","sku"] — infos non lisibles sur la photo, produit créé quand même en CREE_A_COMPLETER
   note             String? // signal non bloquant du worker (ex: Gemini a refusé de générer un visuel, photo originale recadrée utilisée à la place)
+  // Étape en cours pendant EN_COURS, envoyée par le worker : READING
+  // (lecture de la photo), GENERATING (génération des visuels), SHOPIFY
+  // (création du produit). Sans objet une fois le job terminé.
+  step             String?
 
   generatedImageUrls Json? // array de Vercel Blob URLs, rempli par le worker une fois les visuels générés
 
@@ -314,19 +318,26 @@ enum CreativeImageStatus {
   IGNOREE
 }
 
-// Battement de cœur du programme local — une seule ligne (id "main"),
-// réécrite à chaque envoi. "En ligne" = lastSeenAt de moins de 60 s.
-// issue : SESSION_EXPIRED | QUOTA | CAPTCHA quand Gemini bloque le programme
-// (pause automatique, reprise seule), null sinon.
-model WorkerHeartbeat {
-  id           String   @id
+// Battement de cœur du worker (une seule ligne, id "worker") : mis à jour
+// toutes les 30 s et à chaque changement d'étape par
+// POST /api/product-jobs/heartbeat. Sert à l'indicateur "Worker actif /
+// inactif" de la page Création produits.
+//
+// Colonnes ci-dessous ajoutées pour les Créatives (facultatives, ignorées par
+// la page Création produits) — alimentées par POST /api/worker/heartbeat :
+//   activity     : ce que fait le worker pour les Créatives (texte libre) ;
+//                  state/jobId/filename/step restent réservés aux jobs produit.
+//   issue        : SESSION_EXPIRED | QUOTA | CAPTCHA quand Gemini bloque le
+//                  programme (pause automatique, reprise seule), null sinon.
+//   issueMessage : détail lisible du blocage.
+model WorkerStatus {
+  id           String   @id @default("worker")
   lastSeenAt   DateTime
-  state        String // idle | busy | paused
-  jobType      String? // product | creative
+  state        String // "idle" | "busy"
   jobId        String?
-  label        String? // nom de fichier / produit en cours
+  filename     String?
   step         String?
+  activity     String?
   issue        String?
   issueMessage String?
-  updatedAt    DateTime @updatedAt
 }

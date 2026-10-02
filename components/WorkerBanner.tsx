@@ -50,12 +50,11 @@ export default function WorkerBanner({ initial }: { initial: WorkerStatus }) {
   }
 
   if (status.online) {
-    const working = status.state === "busy" && status.label;
     return (
       <div role="status" className="flex items-center gap-2 text-[13px] text-muted">
         <span className="h-2 w-2 shrink-0 rounded-full bg-pill-green-fg" aria-hidden="true" />
         <span className="font-medium text-ink">Programme local en ligne</span>
-        {working && <span className="truncate">· en cours : {status.label}</span>}
+        {status.activity && <span className="truncate">· {status.activity}</span>}
       </div>
     );
   }

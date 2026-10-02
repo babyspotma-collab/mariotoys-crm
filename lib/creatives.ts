@@ -75,26 +75,27 @@ export async function recomputeRequestStatus(requestId: string): Promise<Creativ
 export type WorkerStatus = {
   online: boolean;
   lastSeenAt: string | null;
-  state: string | null;
-  label: string | null;
-  step: string | null;
+  // Ce que fait le programme pour les Créatives, ou pour la file produit
+  // (nom de fichier en cours), null s'il attend.
+  activity: string | null;
   issue: "SESSION_EXPIRED" | "QUOTA" | "CAPTCHA" | null;
   issueMessage: string | null;
 };
 
+// Lit la ligne WorkerStatus (id "worker"), la même que celle de l'indicateur
+// de la page Création produits : un seul battement de cœur pour les deux files.
 export async function getWorkerStatus(): Promise<WorkerStatus> {
-  const hb = await prisma.workerHeartbeat.findUnique({ where: { id: "main" } });
+  const hb = await prisma.workerStatus.findUnique({ where: { id: "worker" } });
   if (!hb) {
-    return { online: false, lastSeenAt: null, state: null, label: null, step: null, issue: null, issueMessage: null };
+    return { online: false, lastSeenAt: null, activity: null, issue: null, issueMessage: null };
   }
   const online = Date.now() - hb.lastSeenAt.getTime() < WORKER_ONLINE_WINDOW_MS;
   const issue = hb.issue === "SESSION_EXPIRED" || hb.issue === "QUOTA" || hb.issue === "CAPTCHA" ? hb.issue : null;
+  const activity = hb.activity ?? (hb.state === "busy" && hb.filename ? `photo ${hb.filename}` : null);
   return {
     online,
     lastSeenAt: hb.lastSeenAt.toISOString(),
-    state: hb.state,
-    label: hb.label,
-    step: hb.step,
+    activity,
     // Un problème signalé par un programme hors ligne n'a plus de sens.
     issue: online ? issue : null,
     issueMessage: online ? hb.issueMessage : null,

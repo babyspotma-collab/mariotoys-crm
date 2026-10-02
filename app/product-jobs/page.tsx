@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/db";
-import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
+import { ArrowClockwise, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import Pill, { type PillTone } from "@/components/Pill";
+import AutoRefresh from "@/components/AutoRefresh";
+import WorkerIndicator, { STEP_LABELS } from "@/components/WorkerIndicator";
+import { fixUtf8Filename } from "@/lib/filename";
+import { STUCK_AFTER_MS } from "@/lib/product-jobs";
+import { retryJob } from "./actions";
 import UploadPhotosForm from "./UploadPhotosForm";
 import { formatDh } from "@/lib/format";
 
@@ -10,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
   EN_ATTENTE: { tone: "gray", label: "En attente" },
-  EN_COURS: { tone: "blue", label: "Génération en cours" },
+  EN_COURS: { tone: "blue", label: "En cours" },
   CREE: { tone: "green", label: "Créé en brouillon" },
   CREE_A_COMPLETER: { tone: "amber", label: "À compléter" },
   ERREUR: { tone: "red", label: "Erreur" },
@@ -29,6 +34,10 @@ export default async function ProductJobsPage() {
         subtitle="Déposez vos photos : prix et référence sont lus sur l'image, la fiche est créée en brouillon sur Shopify."
       />
 
+      <WorkerIndicator />
+      {/* État du worker et avancement des jobs rafraîchis toutes les 15 s */}
+      <AutoRefresh seconds={15} />
+
       <UploadPhotosForm />
 
       <section className="flex flex-col gap-3">
@@ -42,7 +51,25 @@ export default async function ProductJobsPage() {
         ) : (
           <ul className="card divide-y divide-line-soft">
             {jobs.map((job) => {
-              const pill = STATUS_PILL[job.status] ?? { tone: "gray" as const, label: job.status };
+              const base = STATUS_PILL[job.status] ?? { tone: "gray" as const, label: job.status };
+              // En cours : on affiche l'étape envoyée par le worker.
+              const pill =
+                job.status === "EN_COURS" && job.step && STEP_LABELS[job.step]
+                  ? { tone: base.tone, label: `En cours : ${STEP_LABELS[job.step]}` }
+                  : base;
+              const filename = fixUtf8Filename(job.originalFilename);
+              // Relancer : job en erreur, ou bloqué "En cours" (worker arrêté en route).
+              const canRetry =
+                job.status === "ERREUR" ||
+                (job.status === "EN_COURS" && !!job.claimedAt && Date.now() - job.claimedAt.getTime() > STUCK_AFTER_MS);
+              const retry = canRetry && (
+                <form action={retryJob.bind(null, job.id)}>
+                  <button type="submit" className="btn-secondary h-9 px-3 text-[13px] md:h-8">
+                    <ArrowClockwise size={14} aria-hidden="true" />
+                    Relancer
+                  </button>
+                </form>
+              );
               const meta =
                 job.status === "ERREUR"
                   ? job.errorMessage ?? "Erreur inconnue"
@@ -58,18 +85,19 @@ export default async function ProductJobsPage() {
                 <li key={job.id} className="flex gap-3.5 p-4 md:items-center md:gap-5 md:px-5">
                   <img
                     src={thumb}
-                    alt={job.originalFilename}
+                    alt={filename}
                     loading="lazy"
                     className="h-14 w-14 shrink-0 rounded-[10px] border border-line-soft bg-cream object-cover md:h-[60px] md:w-[60px]"
                   />
                   <div className="flex min-w-0 flex-grow flex-col gap-1">
-                    <div className="truncate text-sm font-medium">{job.originalFilename}</div>
+                    <div className="truncate text-sm font-medium">{filename}</div>
                     <div className={`text-[13px] tabular-nums md:truncate ${job.status === "ERREUR" ? "text-pill-red-fg" : "text-muted"}`}>
                       {meta}
                     </div>
-                    {job.note && <div className="text-xs text-muted md:truncate">{job.note}</div>}
+                    {job.note && <div className="text-xs text-pill-amber-fg md:line-clamp-2">{job.note}</div>}
                     <div className="mt-1 flex flex-wrap items-center gap-3 md:hidden">
                       <Pill tone={pill.tone}>{pill.label}</Pill>
+                      {retry}
                       {job.shopifyProductUrl && (
                         <a href={job.shopifyProductUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold no-underline">
                           {job.status === "CREE_A_COMPLETER" ? "Ajouter le prix" : "Voir sur Shopify"}
@@ -82,6 +110,7 @@ export default async function ProductJobsPage() {
                     <Pill tone={pill.tone}>{pill.label}</Pill>
                   </div>
                   <div className="hidden w-[150px] shrink-0 justify-end md:flex">
+                    {retry}
                     {job.shopifyProductUrl && (
                       <a href={job.shopifyProductUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 px-3 text-[13px]">
                         {job.status === "CREE_A_COMPLETER" ? "Ajouter le prix" : "Voir sur Shopify"}

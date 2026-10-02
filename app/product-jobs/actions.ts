@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { fixUtf8Filename } from "@/lib/filename";
+import { STUCK_AFTER_MS } from "@/lib/product-jobs";
 
 export type UploadState = { error: string | null };
 
@@ -21,7 +23,8 @@ export async function uploadProductPhotos(
   }
 
   for (const file of files) {
-    const blob = await put(`product-jobs/uploads/${file.name}`, file, {
+    const filename = fixUtf8Filename(file.name);
+    const blob = await put(`product-jobs/uploads/${filename}`, file, {
       access: "public",
       addRandomSuffix: true,
     });
@@ -29,7 +32,7 @@ export async function uploadProductPhotos(
     await prisma.productJob.create({
       data: {
         originalPhotoUrl: blob.url,
-        originalFilename: file.name,
+        originalFilename: filename,
         status: "EN_ATTENTE",
       },
     });
@@ -37,4 +40,16 @@ export async function uploadProductPhotos(
 
   revalidatePath("/product-jobs");
   return { error: null };
+}
+
+// Remet un job en file d'attente : en erreur, ou bloqué en cours.
+export async function retryJob(jobId: string) {
+  await prisma.productJob.updateMany({
+    where: {
+      id: jobId,
+      OR: [{ status: "ERREUR" }, { status: "EN_COURS", claimedAt: { lt: new Date(Date.now() - STUCK_AFTER_MS) } }],
+    },
+    data: { status: "EN_ATTENTE", errorMessage: null, step: null, claimedAt: null, completedAt: null },
+  });
+  revalidatePath("/product-jobs");
 }
