@@ -47,14 +47,18 @@ def _run_claude(photo: Path, name: str) -> str:
     """Appelle Claude Code ; renvoie le texte de sa réponse."""
     prompt = PROMPT.format(photo=photo.name, name=name)
     try:
+        # Le prompt (plusieurs lignes) passe par l'entrée standard : donné en
+        # argument à un script .cmd (cas de `claude` installé par npm), il serait
+        # tronqué à la première fin de ligne.
         res = subprocess.run(
             [
-                claude_executable(), "-p", prompt,
+                claude_executable(), "-p",
                 "--output-format", "json",
                 "--allowedTools", "Read",
                 "--disallowedTools", "Bash", "Edit", "Write", "WebSearch", "WebFetch",
                 "--max-turns", CLAUDE_MAX_TURNS,
             ],
+            input=prompt,
             cwd=str(photo.parent),
             capture_output=True,
             text=True,
