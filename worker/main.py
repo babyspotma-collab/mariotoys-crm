@@ -34,6 +34,7 @@ from config import (
     PROVIDER,
     SINGLE_INSTANCE_PORT,
 )
+from creatives.hooks import process_hook_queue
 from creatives.pipeline import Paused, process_request
 from providers import get_provider
 from state import Activity
@@ -108,7 +109,11 @@ def main() -> int:
             if needs_chrome:
                 gemini_session.ensure_chrome_running()
 
-            if blocked is not None:
+            # Suggestions d'accroches du formulaire : rapides (Claude, pas Gemini),
+            # traitées même quand Gemini est en pause.
+            if ENABLE_CREATIVES and process_hook_queue(activity):
+                worked = True
+            elif blocked is not None:
                 if time.monotonic() - last_check >= PAUSE_RETRY_S:
                     last_check = time.monotonic()
                     still = provider.check_ready()

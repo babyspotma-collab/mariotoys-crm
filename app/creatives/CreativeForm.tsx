@@ -1,13 +1,25 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { uploadPresigned } from "@vercel/blob/client";
 import { ImageSquare } from "@phosphor-icons/react/dist/ssr";
-import { buildAngles, buildFields } from "@/lib/creative-angles";
+import { HOOK_MAX_WORDS, buildAngles, buildFields, cleanText, countWords, describeHook } from "@/lib/creative-angles";
 import { MAX_SOURCE_PHOTO_BYTES, SOURCE_PHOTO_TYPES, UPLOAD_PATH_PREFIX } from "@/lib/creative-upload";
-import { createCreativeRequest } from "./actions";
+import { createCreativeRequest, requestHookSuggestions } from "./actions";
 
 type Photo = { url: string; filename: string };
+
+// Suggestions d'accroches : proposées à la demande (clic), jamais appliquées
+// toutes seules. L'utilisateur en choisit une, la modifie, ou écrit la sienne.
+type Suggestions = { status: "idle" | "loading" | "ready" | "error"; hooks: string[]; message: string | null };
+const NO_SUGGESTIONS: Suggestions = { status: "idle", hooks: [], message: null };
+const SUGGESTION_TIMEOUT_MS = 150_000;
+
+const SOURCE_LABEL = {
+  accroche: "",
+  point_fort_1: "point fort 1",
+  nom_produit: "nom du produit",
+} as const;
 
 // Étape 1 : dépôt de la photo (envoi direct vers Blob). Étape 2 : formulaire,
 // puis "Générer" crée la demande — rien n'est lancé avant ce clic.
@@ -20,20 +32,70 @@ export default function CreativeForm() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [productName, setProductName] = useState("");
+  const [hook, setHook] = useState("");
   const [pf1, setPf1] = useState("");
   const [pf2, setPf2] = useState("");
   const [pf3, setPf3] = useState("");
   const [price, setPrice] = useState("");
   const [offerLine, setOfferLine] = useState("");
 
-  // Mêmes règles que le serveur : prévient des angles qui seront ignorés.
-  const skipped = useMemo(
-    () =>
-      buildAngles(
-        buildFields({ productName, pointFort1: pf1, pointFort2: pf2, pointFort3: pf3, price, offerLine })
-      ).filter((a) => a.skipReason),
-    [productName, pf1, pf2, pf3, price, offerLine]
+  const [suggest, setSuggest] = useState<Suggestions>(NO_SUGGESTIONS);
+  // Jeton de la recherche en cours : annulée si on change de photo ou quitte la page.
+  const suggestToken = useRef<{ cancelled: boolean } | null>(null);
+  useEffect(() => () => void (suggestToken.current && (suggestToken.current.cancelled = true)), []);
+
+  // Mêmes règles que le serveur : prévient des angles qui seront ignorés et du
+  // titre qui sera utilisé si l'accroche reste vide.
+  const fields = useMemo(
+    () => buildFields({ productName, hook, pointFort1: pf1, pointFort2: pf2, pointFort3: pf3, price, offerLine }),
+    [productName, hook, pf1, pf2, pf3, price, offerLine]
   );
+  const skipped = useMemo(() => buildAngles(fields).filter((a) => a.skipReason), [fields]);
+  const hookInfo = useMemo(() => describeHook(fields), [fields]);
+  const hookWords = countWords(cleanText(hook, 60));
+
+  async function suggestHooks() {
+    if (!photo || !productName.trim()) return;
+    if (suggestToken.current) suggestToken.current.cancelled = true;
+    const token = { cancelled: false };
+    suggestToken.current = token;
+    setSuggest({ status: "loading", hooks: [], message: null });
+
+    const created = await requestHookSuggestions({ photoUrl: photo.url, productName });
+    if (token.cancelled) return;
+    if (!created.id) {
+      setSuggest({ status: "error", hooks: [], message: created.error });
+      return;
+    }
+    const startedAt = Date.now();
+    while (!token.cancelled) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (token.cancelled) return;
+      if (Date.now() - startedAt > SUGGESTION_TIMEOUT_MS) {
+        setSuggest({
+          status: "error",
+          hooks: [],
+          message: "Le programme local ne répond pas. Vérifiez qu'il est lancé (voir le bandeau en haut de la page).",
+        });
+        return;
+      }
+      try {
+        const res = await fetch(`/api/creatives/hooks/${created.id}`, { cache: "no-store" });
+        if (!res.ok) continue;
+        const data = (await res.json()) as { status: string; hooks: string[]; errorMessage: string | null };
+        if (data.status === "TERMINEE") {
+          setSuggest({ status: "ready", hooks: data.hooks, message: null });
+          return;
+        }
+        if (data.status === "ECHEC") {
+          setSuggest({ status: "error", hooks: [], message: data.errorMessage ?? "La suggestion a échoué." });
+          return;
+        }
+      } catch {
+        // Réseau coupé un instant : on réessaie au prochain tour.
+      }
+    }
+  }
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -70,6 +132,7 @@ export default function CreativeForm() {
         photoUrl: photo.url,
         filename: photo.filename,
         productName,
+        hook,
         pointFort1: pf1,
         pointFort2: pf2,
         pointFort3: pf3,
@@ -141,7 +204,16 @@ export default function CreativeForm() {
           alt="Photo produit déposée"
           className="aspect-square w-full rounded-[10px] border border-line-soft bg-cream object-contain"
         />
-        <button type="button" onClick={() => setPhoto(null)} className="btn-ghost h-9 text-[13px]" disabled={pending}>
+        <button
+          type="button"
+          onClick={() => {
+            if (suggestToken.current) suggestToken.current.cancelled = true;
+            setSuggest(NO_SUGGESTIONS);
+            setPhoto(null);
+          }}
+          className="btn-ghost h-9 text-[13px]"
+          disabled={pending}
+        >
           Changer de photo
         </button>
       </div>
@@ -166,6 +238,60 @@ export default function CreativeForm() {
             required
             placeholder="ex : Circuit Hot Wheels Tornado"
           />
+        </div>
+
+        <div>
+          <label htmlFor="c-hook" className="label">
+            Accroche <span className="font-normal text-muted">(facultatif)</span>
+          </label>
+          <input
+            id="c-hook"
+            className="input"
+            value={hook}
+            onChange={(e) => setHook(e.target.value)}
+            maxLength={60}
+            placeholder="ex : Fini les couches ?"
+          />
+          {hookWords > HOOK_MAX_WORDS ? (
+            <p className="hint text-pill-amber-fg">
+              {hookWords} mots : au-delà de {HOOK_MAX_WORDS}, Gemini risque de raccourcir ou déformer le titre.
+            </p>
+          ) : hook.trim() ? (
+            <p className="hint">Écrite telle quelle, une seule fois, dans les images Problème, Plaisir et Cadeau.</p>
+          ) : (
+            <p className="hint">
+              Une phrase courte ({HOOK_MAX_WORDS} mots maximum). Sans accroche, le titre des images sera «&nbsp;
+              {hookInfo.text || "…"}&nbsp;»{hookInfo.text ? ` (${SOURCE_LABEL[hookInfo.source]})` : ""}.
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={suggestHooks}
+            disabled={!productName.trim() || suggest.status === "loading" || pending}
+            className="btn-secondary mt-2 h-10 w-full text-[13px] md:w-auto"
+          >
+            {suggest.status === "loading" ? "Analyse de la photo…" : "Suggérer 3 accroches"}
+          </button>
+
+          {suggest.status === "ready" && (
+            <div className="mt-2 flex flex-col gap-2">
+              <p className="hint !mt-0">Propositions : touchez-en une pour la placer dans le champ, puis modifiez-la si besoin.</p>
+              {suggest.hooks.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setHook(h)}
+                  className={`rounded-[10px] border px-3.5 py-2.5 text-left text-sm transition-colors ${
+                    hook === h ? "border-ink bg-cream-dark font-medium" : "border-line-input bg-white hover:bg-cream"
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          )}
+          {suggest.status === "error" && <p className="alert-error mt-2">{suggest.message}</p>}
         </div>
 
         <fieldset className="flex flex-col gap-3">

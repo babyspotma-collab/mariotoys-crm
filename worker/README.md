@@ -38,6 +38,10 @@ Ne te sers pas de ce compte Google pour autre chose pendant les générations.
 
 Logs : `logs/worker.log` (2 Mo × 5, tournant), `logs/crash.log`.
 
+## Suggestions d'accroches (formulaire Créatives)
+
+Le bouton « Suggérer 3 accroches » du formulaire dépose une demande ; ce programme la traite avec **Claude** (`claude -p`, ton abonnement, la même commande que la file produit — aucune clé API) : il regarde la photo et le nom du produit et propose 3 accroches de 6 mots maximum, sans prix, chiffre ni promesse inventés. Le CRM les nettoie et les affiche ; **tu en choisis une, tu la modifies ou tu écris la tienne, puis tu cliques sur « Générer »**. Aucune accroche n'est jamais utilisée sans ta validation. Ce traitement n'utilise pas Gemini : il répond même quand Gemini est en pause. Il demande que la commande `claude` soit connectée à ton compte sur ce PC.
+
 ## Fonctionnement
 
 Chaque tour : Création produits d'abord (si activée), sinon Créatives. Pour chaque image : nouvelle conversation Gemini, **2 nouvelles tentatives** en cas d'échec, puis `ECHEC` avec la raison exacte dans le CRM. Les images trop lourdes (> 4,4 Mo, limite Vercel) sont ré-encodées en JPEG haute qualité.

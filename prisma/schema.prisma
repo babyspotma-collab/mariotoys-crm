@@ -318,6 +318,33 @@ enum CreativeImageStatus {
   IGNOREE
 }
 
+// Suggestions d'accroches pour le formulaire Créatives : le formulaire dépose
+// une demande (photo + nom du produit), le programme local la lit via
+// /api/worker/creatives/hooks/next, fait analyser la photo par Claude (abonnement
+// de l'utilisateur, aucune clé payante côté CRM) et renvoie 3 accroches courtes.
+// Elles ne sont JAMAIS utilisées automatiquement : elles s'affichent dans le
+// formulaire, l'utilisateur en choisit une (ou écrit la sienne) puis valide.
+// Lignes purgées après 24 h.
+model CreativeHookRequest {
+  id           String             @id @default(cuid())
+  status       CreativeHookStatus @default(EN_ATTENTE)
+  photoUrl     String // Vercel Blob (même photo que la demande Créatives)
+  productName  String
+  hooks        Json? // string[] — 3 accroches proposées, renseigné par le programme local
+  errorMessage String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([status, createdAt])
+}
+
+enum CreativeHookStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  ECHEC
+}
+
 // Battement de cœur du worker (une seule ligne, id "worker") : mis à jour
 // toutes les 30 s et à chaque changement d'étape par
 // POST /api/product-jobs/heartbeat. Sert à l'indicateur "Worker actif /

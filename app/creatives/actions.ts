@@ -5,11 +5,13 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { CREATIVE_FORMAT, buildAngles, buildFields, cleanText, parsePrice } from "@/lib/creative-angles";
 import { hasSession, isOwnUploadUrl, recomputeRequestStatus } from "@/lib/creatives";
+import { HOOK_MAX_PENDING, expireStaleHookRequests, purgeOldHookRequests } from "@/lib/creative-hooks";
 
 export type CreateCreativeInput = {
   photoUrl: string;
   filename: string;
   productName: string;
+  hook: string; // accroche validée par l'utilisateur (facultative)
   pointFort1: string;
   pointFort2: string;
   pointFort3: string;
@@ -36,9 +38,12 @@ export async function createCreativeRequest(input: CreateCreativeInput): Promise
   const pointFort2 = cleanText(input.pointFort2, 40);
   const pointFort3 = cleanText(input.pointFort3, 40);
   const offerLine = cleanText(input.offerLine, 80);
+  // L'accroche n'est jamais déduite ni complétée ici : celle de l'utilisateur,
+  // ou rien (titre neutre issu du formulaire, voir lib/creative-angles.ts).
+  const hook = cleanText(input.hook, 60);
 
   const angles = buildAngles(
-    buildFields({ productName, pointFort1, pointFort2, pointFort3, price, offerLine }),
+    buildFields({ productName, hook, pointFort1, pointFort2, pointFort3, price, offerLine }),
     CREATIVE_FORMAT
   );
 
@@ -68,6 +73,32 @@ export async function createCreativeRequest(input: CreateCreativeInput): Promise
 
   revalidatePath("/creatives");
   redirect(`/creatives/${request.id}`);
+}
+
+// Clic sur "Suggérer des accroches" : dépose une demande que le programme local
+// traite (Claude regarde la photo). Rien n'est généré tout seul : les accroches
+// proposées s'affichent, l'utilisateur en choisit une ou écrit la sienne.
+export async function requestHookSuggestions(input: {
+  photoUrl: string;
+  productName: string;
+}): Promise<{ id: string | null; error: string | null }> {
+  if (!(await hasSession())) return { id: null, error: "Session expirée, reconnectez-vous." };
+  if (!isOwnUploadUrl(input.photoUrl)) return { id: null, error: "Photo invalide, redéposez-la." };
+
+  const productName = cleanText(input.productName, 80);
+  if (!productName) return { id: null, error: "Renseignez d'abord le nom du produit." };
+
+  await expireStaleHookRequests();
+  await purgeOldHookRequests();
+  const pending =await prisma.creativeHookRequest.count({ where: { status: { in: ["EN_ATTENTE", "EN_COURS"] } } });
+  if (pending >= HOOK_MAX_PENDING) {
+    return { id: null, error: "Trop de suggestions en cours, réessayez dans une minute." };
+  }
+
+  const request = await prisma.creativeHookRequest.create({
+    data: { photoUrl: input.photoUrl, productName },
+  });
+  return { id: request.id, error: null };
 }
 
 // "Régénérer" : même prompt, nouvelle tentative complète. L'ancienne image

@@ -207,6 +207,25 @@ class StateTests(unittest.TestCase):
         self.assertIsNone(self.sent[-1]["issue"])
 
 
+class GeminiFileNameTests(unittest.TestCase):
+    def test_etiquette_avec_slash_donne_un_nom_de_fichier_sur(self):
+        from providers.gemini_web import _safe_handle
+
+        handle = _safe_handle("TEST-pot — image 1/5")
+        for forbidden in ("/", "\\", ":", " ", "—"):
+            self.assertNotIn(forbidden, handle)
+        with tempfile.TemporaryDirectory() as d:
+            # Le chemin final doit pouvoir être écrit directement dans le dossier temporaire.
+            target = Path(d) / f"{handle}_1_1.png"
+            target.write_bytes(b"x")
+            self.assertEqual(list(Path(d).iterdir()), [target])
+
+    def test_etiquette_vide(self):
+        from providers.gemini_web import _safe_handle
+
+        self.assertEqual(_safe_handle(" / "), "image")
+
+
 class ProviderRegistryTests(unittest.TestCase):
     def test_mock_et_inconnu(self):
         self.assertEqual(get_provider("mock").name, "mock")

@@ -46,6 +46,12 @@ _FULLSIZE_BUTTON = re.compile(r"(télécharger|download).*(taille réelle|full[-
 _MIME_BY_FORMAT = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
 
 
+def _safe_handle(label: str) -> str:
+    """Nom de fichier sûr dérivé de l'étiquette (« TEST-pot — image 1/5 »
+    contient un « / » qui serait pris pour un sous-dossier)."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", label).strip("_") or "image"
+
+
 def _describe(data: bytes) -> tuple[str, int, int]:
     """(mime, largeur, hauteur) — lève ValueError si ce n'est pas une image."""
     with Image.open(io.BytesIO(data)) as im:
@@ -157,7 +163,7 @@ class GeminiWebProvider(ImageProvider):
         logging.info("[%s] photo et prompt envoyés à Gemini (%s)", label, page.url)
 
         with tempfile.TemporaryDirectory(prefix="creative-") as tmp:
-            files = _collect_images(page, baseline, before_text, label.replace(" ", "_"), 1, Path(tmp))
+            files = _collect_images(page, baseline, before_text, _safe_handle(label), 1, Path(tmp))
             canvas_bytes = files[0].read_bytes()
             mime, width, height = _describe(canvas_bytes)
 

@@ -140,6 +140,45 @@ def upload_image(image_id: str, data: bytes, mime: str) -> str:
     return _check(res, "upload image").json().get("url", "")
 
 
+# ─── Suggestions d'accroches (formulaire Créatives) ─────────────────────────
+
+
+def next_hook_request() -> dict | None:
+    """Réclame la plus ancienne demande de suggestion (None s'il n'y en a pas)."""
+    res = _check(
+        requests.get(f"{CRM_BASE_URL}/api/worker/creatives/hooks/next", headers=_headers(), timeout=HTTP_TIMEOUT_S),
+        "hooks/next",
+    )
+    return res.json().get("request")
+
+
+def complete_hook(request_id: str, hooks: list[str]) -> None:
+    _check(
+        requests.post(
+            f"{CRM_BASE_URL}/api/worker/creatives/hooks/{request_id}/complete",
+            headers=_headers(),
+            json={"hooks": hooks},
+            timeout=HTTP_TIMEOUT_S,
+        ),
+        "hooks/complete",
+    )
+
+
+def fail_hook(request_id: str, message: str) -> None:
+    try:
+        _check(
+            requests.post(
+                f"{CRM_BASE_URL}/api/worker/creatives/hooks/{request_id}/fail",
+                headers=_headers(),
+                json={"errorMessage": message[:300]},
+                timeout=HTTP_TIMEOUT_S,
+            ),
+            "hooks/fail",
+        )
+    except (requests.RequestException, CrmError) as exc:
+        logging.error("Échec de suggestion non signalé au CRM (%s) : %s", exc, message)
+
+
 def download_to(url: str, dest: Path) -> Path:
     """Télécharge une photo (Blob public) vers dest."""
     res = requests.get(url, timeout=HTTP_TIMEOUT_S)
