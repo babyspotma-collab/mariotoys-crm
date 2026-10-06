@@ -17,6 +17,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
+  // Signe de vie du worker : au repos il n'envoie plus de battement de cœur
+  // (voir heartbeat/route.ts), c'est cet appel, toutes les 10 min, qui le
+  // remplace. Il n'arrive que quand le worker n'a pas de job en cours.
+  const seen = { lastSeenAt: new Date(), state: "idle", jobId: null, filename: null, step: null };
+  await prisma.workerStatus.upsert({ where: { id: "worker" }, create: { id: "worker", ...seen }, update: seen });
+
   const next = await prisma.productJob.findFirst({
     where: { status: "EN_ATTENTE" },
     orderBy: { createdAt: "asc" },

@@ -8,9 +8,10 @@ export const STEP_LABELS: Record<string, string> = {
   SHOPIFY: "création Shopify",
 };
 
-// Le worker bat toutes les 30 s : au-delà de 90 s sans nouvelle (3
-// battements manqués), on le considère inactif.
-const ACTIVE_WITHIN_MS = 90_000;
+// Pour ménager la base, le worker ne donne signe de vie que toutes les
+// 10 min au repos (son appel à /api/product-jobs/next) et toutes les 5 min
+// pendant un job (battement de cœur). Inactif = 2 passages manqués + marge.
+const ACTIVE_WITHIN_MS = 25 * 60_000;
 
 export default async function WorkerIndicator() {
   const status = await prisma.workerStatus.findUnique({ where: { id: "worker" } });

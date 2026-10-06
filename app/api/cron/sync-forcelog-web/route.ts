@@ -63,14 +63,31 @@ export async function POST(req: NextRequest) {
   const parcels = body.parcels ?? [];
   const invoices = body.invoices ?? [];
 
+  // Consommation de la base : cette synchro tourne toutes les 2 h avec TOUS
+  // les colis et factures du compte. Plutôt qu'une lecture + une écriture
+  // par ligne (≈ 1 000 requêtes par passage), on lit l'existant en 3
+  // requêtes, on compare en mémoire et on n'écrit que ce qui est nouveau
+  // ou a changé. Les règles de rattachement sont inchangées.
+  const [existingParcels, freeOrders, existingInvoices] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "FORCELOG" },
+      select: { code: true, orderId: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true, statusCode: true },
+    }),
+    // Commandes encore sans colis Forcelog, candidates au rattachement par téléphone.
+    prisma.order.findMany({ where: { parcels: { none: { carrier: "FORCELOG" } } }, select: { id: true, phone: true } }),
+    prisma.crbtInvoice.findMany({ where: { carrier: "FORCELOG" } }),
+  ]);
+  const parcelByCode = new Map(existingParcels.map((x) => [x.code, x]));
+  const orderIdByPhone = new Map<string, string>();
+  for (const o of freeOrders) if (o.phone && !orderIdByPhone.has(o.phone)) orderIdByPhone.set(o.phone, o.id);
+  const invoiceByRef = new Map(existingInvoices.map((x) => [x.ref, x]));
+
   let parcelsUpserted = 0;
+  let parcelsUnchanged = 0;
   let parcelsLinked = 0;
 
   for (const p of parcels) {
-    const existing = await prisma.parcel.findUnique({
-      where: { carrier_code: { carrier: "FORCELOG", code: p.code } },
-      select: { orderId: true, deliveredAt: true },
-    });
+    const existing = parcelByCode.get(p.code);
 
     // Posé une seule fois, au run où le statut entre dans la catégorie
     // "delivered" — jamais réécrit ensuite, même si le statut change à
@@ -78,47 +95,30 @@ export async function POST(req: NextRequest) {
     const justDelivered = p.statusCode ? DELIVERED_CODES.includes(p.statusCode) : false;
     const deliveredAt = existing?.deliveredAt ?? (justDelivered ? new Date() : null);
 
-    if (!p.phone) {
-      await prisma.parcel.upsert({
-        where: { carrier_code: { carrier: "FORCELOG", code: p.code } },
-        create: {
-          carrier: "FORCELOG",
-          code: p.code,
-          receiver: p.receiver,
-          phone: p.phone,
-          cityName: p.cityName,
-          price: p.price,
-          status: p.status,
-          statusCode: p.statusCode,
-          carrierCreatedAt: parseForcelogDate(p.carrierCreatedAt),
-          deliveredAt,
-        },
-        update: {
-          receiver: p.receiver,
-          cityName: p.cityName,
-          price: p.price,
-          status: p.status,
-          statusCode: p.statusCode,
-          deliveredAt,
-        },
-      });
-      parcelsUpserted++;
-      continue;
-    }
-
     // Ne cherche une commande à rattacher que si ce colis n'en a pas déjà
     // une — un rattachement une fois établi n'est jamais remis en cause
     // par un run ultérieur.
     let orderId = existing?.orderId ?? null;
-    if (!orderId) {
-      const order = await prisma.order.findFirst({
-        where: { phone: p.phone, parcels: { none: { carrier: "FORCELOG" } } },
-        select: { id: true },
-      });
-      if (order) {
-        orderId = order.id;
+    if (!orderId && p.phone) {
+      const found = orderIdByPhone.get(p.phone);
+      if (found) {
+        orderId = found;
+        orderIdByPhone.delete(p.phone); // cette commande a maintenant son colis
         parcelsLinked++;
       }
+    }
+
+    const unchanged =
+      !!existing &&
+      existing.orderId === orderId &&
+      existing.receiver === p.receiver &&
+      existing.cityName === p.cityName &&
+      Number(existing.price) === Number(p.price) &&
+      existing.status === p.status &&
+      (existing.statusCode ?? null) === (p.statusCode ?? null);
+    if (unchanged) {
+      parcelsUnchanged++;
+      continue;
     }
 
     await prisma.parcel.upsert({
@@ -150,9 +150,26 @@ export async function POST(req: NextRequest) {
   }
 
   let invoicesUpserted = 0;
+  let invoicesUnchanged = 0;
   for (const inv of invoices) {
     const cDate = parseForcelogDate(inv.cDate);
     if (!cDate) continue; // date de création obligatoire, ligne ignorée sinon
+
+    const payDate = parseForcelogDate(inv.payDate);
+    const old = invoiceByRef.get(inv.ref);
+    if (
+      old &&
+      (old.payDate?.getTime() ?? null) === (payDate?.getTime() ?? null) &&
+      old.statut === inv.statut &&
+      old.parcelsCount === inv.parcelsCount &&
+      (old.fees ?? null) === (inv.fees ?? null) &&
+      Number(old.feesAmount ?? 0) === Number(inv.feesAmount ?? 0) &&
+      Number(old.balance ?? 0) === Number(inv.balance ?? 0) &&
+      Number(old.amount) === Number(inv.amount)
+    ) {
+      invoicesUnchanged++;
+      continue;
+    }
 
     await prisma.crbtInvoice.upsert({
       where: { ref: inv.ref },
@@ -160,7 +177,7 @@ export async function POST(req: NextRequest) {
         carrier: "FORCELOG",
         ref: inv.ref,
         cDate,
-        payDate: parseForcelogDate(inv.payDate),
+        payDate,
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         fees: inv.fees,
@@ -169,7 +186,7 @@ export async function POST(req: NextRequest) {
         amount: inv.amount,
       },
       update: {
-        payDate: parseForcelogDate(inv.payDate),
+        payDate,
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         fees: inv.fees,
@@ -194,8 +211,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     parcelsReceived: parcels.length,
     parcelsUpserted,
+    parcelsUnchanged,
     parcelsLinked,
     invoicesUpserted,
+    invoicesUnchanged,
     autoConfirm,
   });
 }

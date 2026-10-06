@@ -35,8 +35,8 @@ export default async function ProductJobsPage() {
       />
 
       <WorkerIndicator />
-      {/* État du worker et avancement des jobs rafraîchis toutes les 15 s */}
-      <AutoRefresh seconds={15} />
+      {/* Rafraîchi toutes les 30 s, seulement s'il y a un job à suivre et si l'onglet est visible */}
+      <AutoRefresh seconds={30} active={jobs.some((j) => j.status === "EN_ATTENTE" || j.status === "EN_COURS")} />
 
       <UploadPhotosForm />
 

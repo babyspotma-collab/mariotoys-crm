@@ -54,16 +54,29 @@ export async function POST(req: NextRequest) {
 
   const parcels = body.parcels ?? [];
   const invoices = body.invoices ?? [];
+  // Même principe que sync-forcelog-web : on lit l'existant en 3 requêtes,
+  // on compare en mémoire et on n'écrit que le nouveau ou le modifié (au
+  // lieu d'une lecture + une écriture par ligne toutes les 2 h).
+  const [existingParcels, freeOrders, existingInvoices] = await Promise.all([
+    prisma.parcel.findMany({
+      where: { carrier: "OZON" },
+      select: { code: true, orderId: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true },
+    }),
+    prisma.order.findMany({ where: { parcels: { none: { carrier: "OZON" } } }, select: { id: true, phone: true } }),
+    prisma.crbtInvoice.findMany({ where: { carrier: "OZON" } }),
+  ]);
+  const parcelByCode = new Map(existingParcels.map((x) => [x.code, x]));
+  const orderIdByPhone = new Map<string, string>();
+  for (const o of freeOrders) if (o.phone && !orderIdByPhone.has(o.phone)) orderIdByPhone.set(o.phone, o.id);
+  const invoiceByRef = new Map(existingInvoices.map((x) => [x.ref, x]));
+
   let parcelsUpserted = 0;
+  let parcelsUnchanged = 0;
   let parcelsLinked = 0;
 
   for (const p of parcels) {
     const carrierCreatedAt = parseOzonDate(p.carrierCreatedAt);
-
-    const existing = await prisma.parcel.findUnique({
-      where: { carrier_code: { carrier: "OZON", code: p.code } },
-      select: { orderId: true, deliveredAt: true },
-    });
+    const existing = parcelByCode.get(p.code);
 
     // Posé une seule fois, au run où le statut entre dans la catégorie
     // "delivered" — jamais réécrit ensuite (sert au délai moyen de
@@ -72,42 +85,27 @@ export async function POST(req: NextRequest) {
     const justDelivered = DELIVERED_STATUSES.includes(p.status);
     const deliveredAt = existing?.deliveredAt ?? (justDelivered ? new Date() : null);
 
-    if (!p.phone) {
-      await prisma.parcel.upsert({
-        where: { carrier_code: { carrier: "OZON", code: p.code } },
-        create: {
-          carrier: "OZON",
-          code: p.code,
-          receiver: p.receiver,
-          phone: p.phone,
-          cityName: p.cityName,
-          price: p.price,
-          status: p.status,
-          carrierCreatedAt,
-          deliveredAt,
-        },
-        update: {
-          receiver: p.receiver,
-          cityName: p.cityName,
-          price: p.price,
-          status: p.status,
-          deliveredAt,
-        },
-      });
-      parcelsUpserted++;
-      continue;
-    }
-
+    // Rattachement par téléphone, jamais remis en cause une fois établi.
     let orderId = existing?.orderId ?? null;
-    if (!orderId) {
-      const order = await prisma.order.findFirst({
-        where: { phone: p.phone, parcels: { none: { carrier: "OZON" } } },
-        select: { id: true },
-      });
-      if (order) {
-        orderId = order.id;
+    if (!orderId && p.phone) {
+      const found = orderIdByPhone.get(p.phone);
+      if (found) {
+        orderId = found;
+        orderIdByPhone.delete(p.phone);
         parcelsLinked++;
       }
+    }
+
+    const unchanged =
+      !!existing &&
+      existing.orderId === orderId &&
+      existing.receiver === p.receiver &&
+      existing.cityName === p.cityName &&
+      Number(existing.price) === Number(p.price) &&
+      existing.status === p.status;
+    if (unchanged) {
+      parcelsUnchanged++;
+      continue;
     }
 
     await prisma.parcel.upsert({
@@ -137,6 +135,7 @@ export async function POST(req: NextRequest) {
   }
 
   let invoicesUpserted = 0;
+  let invoicesUnchanged = 0;
   for (const inv of invoices) {
     const cDate = parseOzonDate(inv.cDate);
     if (!cDate) continue; // date de création obligatoire, ligne ignorée sinon
@@ -144,20 +143,34 @@ export async function POST(req: NextRequest) {
     // Frais : seulement si le script a pu les calculer — sinon on ne touche
     // pas à la valeur déjà en base (null plutôt qu'un 0 trompeur).
     const fees = typeof inv.feesAmount === "number" && inv.feesAmount >= 0 ? { feesAmount: inv.feesAmount } : {};
+    const payDate = parseOzonDate(inv.payDate);
+    const old = invoiceByRef.get(inv.ref);
+    if (
+      old &&
+      (old.payDate?.getTime() ?? null) === (payDate?.getTime() ?? null) &&
+      old.statut === inv.statut &&
+      old.parcelsCount === inv.parcelsCount &&
+      Number(old.amount) === Number(inv.amount) &&
+      (fees.feesAmount === undefined || (old.feesAmount !== null && Number(old.feesAmount) === fees.feesAmount))
+    ) {
+      invoicesUnchanged++;
+      continue;
+    }
+
     await prisma.crbtInvoice.upsert({
       where: { ref: inv.ref },
       create: {
         ref: inv.ref,
         carrier: "OZON",
         cDate,
-        payDate: parseOzonDate(inv.payDate),
+        payDate,
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         amount: inv.amount,
         ...fees,
       },
       update: {
-        payDate: parseOzonDate(inv.payDate),
+        payDate,
         statut: inv.statut,
         parcelsCount: inv.parcelsCount,
         amount: inv.amount,
@@ -180,8 +193,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     parcelsReceived: parcels.length,
     parcelsUpserted,
+    parcelsUnchanged,
     parcelsLinked,
     invoicesUpserted,
+    invoicesUnchanged,
     autoConfirm,
   });
 }

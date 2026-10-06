@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-// Battement de cœur du worker (mariotoys-images-automation) : toutes les
-// 30 s et à chaque changement d'étape. Même garde WORKER_SECRET que les
-// autres endpoints product-jobs.
+// Battement de cœur du worker (mariotoys-images-automation). Pour ménager
+// la base, il n'est envoyé que pendant un job : à chaque changement d'étape
+// et toutes les 5 min. Au repos, c'est l'appel à /next (toutes les 10 min)
+// qui sert de signe de vie. Même garde WORKER_SECRET que les autres
+// endpoints product-jobs.
 const STEPS = ["READING", "GENERATING", "SHOPIFY"];
 
 export async function POST(req: NextRequest) {
