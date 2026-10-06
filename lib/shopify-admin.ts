@@ -36,7 +36,7 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+export async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const token = await getAccessToken();
   const res = await fetch(`https://${STORE}/admin/api/${API_VERSION}/graphql.json`, {
     method: "POST",
