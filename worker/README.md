@@ -7,7 +7,7 @@ Un seul programme Python, sur un de tes PC, qui traite **deux files** du CRM, un
 | Création produits | `product_jobs/` | Ton code existant, logique inchangée : Claude lit la photo, Gemini fait le visuel, Shopify crée le brouillon. **Désactivée par défaut.** |
 | Créatives | `creatives/` | 5 publicités marketing par photo, générées une à une par Gemini web. |
 
-Il ne tourne jamais sur Vercel (Chrome/Playwright n'y sont pas adaptés) : il interroge le CRM toutes les 10 s.
+Il ne tourne jamais sur Vercel (Chrome/Playwright n'y sont pas adaptés) : il interroge le CRM toutes les 10 minutes au repos, et toutes les 10 s pendant les 5 minutes qui suivent un travail (réglages `IDLE_POLL_INTERVAL_S`, `POLL_INTERVAL_S`, `ACTIVE_WINDOW_S` dans `config.py`). Ce rythme lent au repos laisse la base du CRM (Neon, plan gratuit) s'endormir : une première demande peut donc attendre jusqu'à 10 minutes avant d'être prise.
 
 ## Installation (une fois)
 

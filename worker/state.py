@@ -1,6 +1,7 @@
-"""État partagé envoyé au CRM par le battement de cœur (toutes les 20 s et à
-chaque changement). Une seule ligne côté CRM (WorkerStatus) pour les deux
-files :
+"""État partagé envoyé au CRM par le battement de cœur : à chaque changement,
+puis toutes les HEARTBEAT_INTERVAL_S tant que le programme travaille ou est
+bloqué (jamais au repos, voir config.py). Une seule ligne côté CRM
+(WorkerStatus) pour les deux files :
 
   - job produit en cours : state "busy" + jobId + filename (+ step), comme
     l'ancien worker (la page Création produits les lit à l'identique) ;
@@ -57,8 +58,16 @@ class Activity:
     def send(self) -> None:
         crm.heartbeat(self.payload())
 
+    def is_resting(self) -> bool:
+        """Ni job produit, ni activité Créatives, ni blocage en cours."""
+        with self._lock:
+            d = self._data
+            return d["state"] == "idle" and not d["activity"] and not d["issue"]
+
     def loop(self) -> None:
-        """Fil d'arrière-plan : un battement toutes les HEARTBEAT_INTERVAL_S."""
+        """Fil d'arrière-plan : un battement toutes les HEARTBEAT_INTERVAL_S,
+        seulement en activité ou en blocage."""
         while True:
-            self.send()
             time.sleep(HEARTBEAT_INTERVAL_S)
+            if not self.is_resting():
+                self.send()

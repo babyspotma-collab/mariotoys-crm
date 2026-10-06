@@ -1,6 +1,7 @@
 """Programme local du CRM Mario Toys — une seule boucle, deux files.
 
-Chaque tour (toutes les POLL_INTERVAL_S secondes quand il est libre) :
+Chaque tour (toutes les IDLE_POLL_INTERVAL_S secondes au repos, toutes les
+POLL_INTERVAL_S pendant ACTIVE_WINDOW_S après un travail — voir config.py) :
   1. Création produits (si ENABLE_PRODUCT_JOBS) — traitée en premier ;
   2. sinon Créatives (si ENABLE_CREATIVES).
 UN job à la fois, une seule session Gemini (le Chrome de chrome-profile/).
@@ -26,8 +27,10 @@ import traceback
 import crm
 import gemini_session
 from config import (
+    ACTIVE_WINDOW_S,
     ENABLE_CREATIVES,
     ENABLE_PRODUCT_JOBS,
+    IDLE_POLL_INTERVAL_S,
     LOGS_DIR,
     PAUSE_RETRY_S,
     POLL_INTERVAL_S,
@@ -72,6 +75,12 @@ def acquire_single_instance_lock() -> socket.socket | None:
         return None
 
 
+def poll_interval(now: float, last_work: float | None) -> int:
+    """Sondage rapide juste après un travail, lent sinon (voir config.py)."""
+    recently_active = last_work is not None and now - last_work < ACTIVE_WINDOW_S
+    return POLL_INTERVAL_S if recently_active else IDLE_POLL_INTERVAL_S
+
+
 def main() -> int:
     setup_logging()
 
@@ -102,16 +111,28 @@ def main() -> int:
     # Si pas None : (problème, détail) — le programme est en pause.
     blocked: tuple[str, str] | None = None
     last_check = 0.0
+    last_work: float | None = None  # dernier job traité (sondage rapide ensuite)
+    last_poll: float | None = None  # dernier appel aux files du CRM
 
     while True:
         worked = False
+        # Les files du CRM ne sont interrogées qu'à l'intervalle voulu ; le
+        # re-test local de Gemini en pause, lui, ne touche pas le CRM.
+        now = time.monotonic()
+        interval = poll_interval(now, last_work)
+        poll_due = last_poll is None or now - last_poll >= interval
         try:
             if needs_chrome:
                 gemini_session.ensure_chrome_running()
 
+            if poll_due:
+                last_poll = now
+                if activity.is_resting():
+                    activity.send()  # signe de vie au repos (un seul par sondage)
+
             # Suggestions d'accroches du formulaire : rapides (Claude, pas Gemini),
             # traitées même quand Gemini est en pause.
-            if ENABLE_CREATIVES and process_hook_queue(activity):
+            if poll_due and ENABLE_CREATIVES and process_hook_queue(activity):
                 worked = True
             elif blocked is not None:
                 if time.monotonic() - last_check >= PAUSE_RETRY_S:
@@ -125,7 +146,7 @@ def main() -> int:
                         blocked = still
                         logging.warning("Toujours bloqué : %s — %s", still[0], still[1])
                         activity.issue(*still)
-            else:
+            elif poll_due:
                 if ENABLE_PRODUCT_JOBS:
                     from product_jobs.process import process_product_queue
 
@@ -143,9 +164,14 @@ def main() -> int:
         except Exception:  # noqa: BLE001 — la boucle ne doit jamais s'arrêter
             logging.error("Erreur dans la boucle :\n%s", traceback.format_exc())
 
-        # Enchaîne sans attendre tant qu'il y a du travail ; sinon sondage normal.
-        if not worked:
-            time.sleep(POLL_INTERVAL_S if blocked is None else 5)
+        # Enchaîne sans attendre tant qu'il y a du travail (et reste en
+        # sondage rapide ensuite) ; sinon attend le prochain sondage. En
+        # pause, se réveille au plus tard pour le re-test de Gemini.
+        if worked:
+            last_work = time.monotonic()
+            last_poll = None
+        else:
+            time.sleep(interval if blocked is None else min(interval, PAUSE_RETRY_S))
 
 
 if __name__ == "__main__":

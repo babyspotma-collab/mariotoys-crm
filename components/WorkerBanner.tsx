@@ -18,13 +18,16 @@ const ISSUE_TEXT: Record<NonNullable<WorkerStatus["issue"]>, { title: string; hi
   },
 };
 
-// Bandeau d'état du programme local, rafraîchi toutes les 10 s.
+// Bandeau d'état du programme local. Pour ne pas réveiller la base
+// inutilement (Neon) : rafraîchi toutes les 60 s, seulement si l'onglet est
+// visible, et tout de suite au retour sur l'onglet.
 export default function WorkerBanner({ initial }: { initial: WorkerStatus }) {
   const [status, setStatus] = useState(initial);
 
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/creatives/worker-status", { cache: "no-store" });
         if (res.ok && !cancelled) setStatus(await res.json());
@@ -32,10 +35,12 @@ export default function WorkerBanner({ initial }: { initial: WorkerStatus }) {
         // Réseau coupé : on garde le dernier état connu.
       }
     };
-    const id = setInterval(tick, 10_000);
+    const id = setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", tick);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, []);
 

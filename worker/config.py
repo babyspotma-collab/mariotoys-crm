@@ -67,8 +67,16 @@ ENABLE_CREATIVES = _flag("ENABLE_CREATIVES", True)
 # Fournisseur d'images pour les Créatives : "gemini-web" (navigateur) ou "mock".
 PROVIDER = (os.environ.get("PROVIDER") or "gemini-web").strip().lower()
 
-POLL_INTERVAL_S = _int("POLL_INTERVAL_S", 10)  # sondage des files quand le programme est libre
-HEARTBEAT_INTERVAL_S = _int("HEARTBEAT_INTERVAL_S", 20)
+# Consommation de la base du CRM (Neon, plan gratuit : la base s'endort
+# après ~5 min sans requête et le quota compte le temps d'éveil). Le
+# programme ne sonde donc vite (POLL_INTERVAL_S) que pendant
+# ACTIVE_WINDOW_S après son dernier travail — quelqu'un utilise le CRM — et
+# retombe sinon à IDLE_POLL_INTERVAL_S. Le battement de cœur n'est envoyé
+# qu'en activité ou en blocage ; au repos, un seul signe de vie par sondage.
+POLL_INTERVAL_S = _int("POLL_INTERVAL_S", 10)  # sondage des files juste après un travail
+IDLE_POLL_INTERVAL_S = _int("IDLE_POLL_INTERVAL_S", 600)  # sondage des files au repos
+ACTIVE_WINDOW_S = _int("ACTIVE_WINDOW_S", 300)  # durée du sondage rapide après un travail
+HEARTBEAT_INTERVAL_S = _int("HEARTBEAT_INTERVAL_S", 300)
 PAUSE_RETRY_S = _int("PAUSE_RETRY_S", 60)  # en pause (session expirée, quota, captcha) : re-test toutes les 60 s
 IMAGE_RETRIES = _int("IMAGE_RETRIES", 2)  # nouvelles tentatives par image (chacune dans un nouveau chat)
 HTTP_TIMEOUT_S = 30

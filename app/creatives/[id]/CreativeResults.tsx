@@ -23,7 +23,9 @@ const IMAGE_PILL: Record<string, { tone: PillTone; label: string }> = {
   IGNOREE: { tone: "amber", label: "Ignorée" },
 };
 
-const POLL_MS = 5000;
+// 15 s, et seulement tant que la demande est en attente ou en cours (voir
+// plus bas) : une demande terminée ne coûte plus aucune requête.
+const POLL_MS = 15000;
 
 function slug(s: string): string {
   return (
@@ -82,13 +84,19 @@ export default function CreativeResults({
     }
   }, [requestId]);
 
-  // Rafraîchissement automatique tant que l'onglet est visible.
+  // Rafraîchissement automatique tant que l'onglet est visible ET qu'il
+  // reste quelque chose à attendre (demande ou image en attente / en cours).
+  const pending =
+    status === "EN_ATTENTE" ||
+    status === "EN_COURS" ||
+    images.some((i) => i.status === "EN_ATTENTE" || i.status === "EN_COURS");
   useEffect(() => {
+    if (!pending) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") refresh();
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [refresh, pending]);
 
   const done = images.filter((i) => i.status === "TERMINEE" && i.imageUrl);
 
