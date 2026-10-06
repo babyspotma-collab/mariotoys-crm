@@ -7,7 +7,10 @@ import { UPLOAD_PATH_PREFIX } from "@/lib/creative-upload";
 
 // Au-delà de ce délai sans battement de cœur, le programme local est
 // considéré hors ligne.
-export const WORKER_ONLINE_WINDOW_MS = 60_000;
+// 25 min, comme l'indicateur de la page Création produits : pour ménager la
+// base (Neon), le programme ne donne signe de vie que toutes les 10 min au
+// repos (son appel à /api/product-jobs/next) et toutes les 5 min en job.
+export const WORKER_ONLINE_WINDOW_MS = 25 * 60_000;
 // Image restée "en cours" plus longtemps que ça (programme planté en plein
 // travail) : remise en attente par /api/worker/creatives/next.
 export const IMAGE_STALE_AFTER_MS = 15 * 60_000;
