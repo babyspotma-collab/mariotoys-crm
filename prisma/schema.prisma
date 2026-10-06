@@ -240,15 +240,131 @@ model PickupRequest {
   @@index([carrier, createdAt])
 }
 
+// Créatives produit (voir app/creatives) — publicités marketing générées par
+// Gemini web via le programme local (dossier worker/, jamais sur Vercel).
+// Une demande = une photo + les infos saisies dans le formulaire ; une
+// CreativeImage par angle marketing (voir lib/creative-angles.ts). Le prompt
+// final de chaque angle est assemblé et figé côté CRM à la création de la
+// demande (champ prompt) : le programme local l'envoie tel quel et "Régénérer"
+// rejoue exactement le même prompt.
+//
+// Statut global (calculé depuis les images, voir lib/creatives.ts) :
+// EN_ATTENTE (rien de commencé) -> EN_COURS -> TERMINEE (toutes les images
+// générées, hors angles ignorés) | PARTIELLE (au moins une en échec, les
+// autres terminées) | ECHEC (aucune image terminée, au moins une en échec).
+model CreativeRequest {
+  id             String                @id @default(cuid())
+  status         CreativeRequestStatus @default(EN_ATTENTE)
+
+  sourcePhotoUrl String // Vercel Blob — photo produit déposée par l'utilisateur
+  sourceFilename String // affichage/traçabilité uniquement
+
+  // Champs du formulaire (tous facultatifs sauf le nom du produit).
+  productName    String
+  pointFort1     String?
+  pointFort2     String?
+  pointFort3     String?
+  price          Decimal? @db.Decimal(10, 2) // MAD
+  offerLine      String?
+  format         String   @default("4:5")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  images         CreativeImage[]
+
+  @@index([createdAt])
+}
+
+// IGNOREE : angle volontairement non généré parce que son contenu essentiel
+// manque (ex : angle "Offre et prix" sans prix) — la raison est dans
+// errorMessage et affichée dans le formulaire puis sur la page résultats.
+model CreativeImage {
+  id           String                @id @default(cuid())
+  requestId    String
+  request      CreativeRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  angleKey     String // clé stable de l'angle (voir lib/creative-angles.ts)
+  position     Int // ordre d'affichage 1..5
+  prompt       String? // prompt final envoyé à Gemini ; null si IGNOREE
+
+  status       CreativeImageStatus   @default(EN_ATTENTE)
+  attempts     Int                   @default(0)
+  errorMessage String? // raison de l'échec / de l'angle ignoré
+  imageUrl     String? // Vercel Blob — image générée
+
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([requestId, angleKey])
+  @@index([status])
+}
+
+enum CreativeRequestStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  PARTIELLE
+  ECHEC
+}
+
+enum CreativeImageStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  ECHEC
+  IGNOREE
+}
+
+// Suggestions d'accroches pour le formulaire Créatives : le formulaire dépose
+// une demande (photo + nom du produit), le programme local la lit via
+// /api/worker/creatives/hooks/next, fait analyser la photo par Claude (abonnement
+// de l'utilisateur, aucune clé payante côté CRM) et renvoie 3 accroches courtes.
+// Elles ne sont JAMAIS utilisées automatiquement : elles s'affichent dans le
+// formulaire, l'utilisateur en choisit une (ou écrit la sienne) puis valide.
+// Lignes purgées après 24 h.
+model CreativeHookRequest {
+  id           String             @id @default(cuid())
+  status       CreativeHookStatus @default(EN_ATTENTE)
+  photoUrl     String // Vercel Blob (même photo que la demande Créatives)
+  productName  String
+  hooks        Json? // string[] — 3 accroches proposées, renseigné par le programme local
+  errorMessage String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([status, createdAt])
+}
+
+enum CreativeHookStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINEE
+  ECHEC
+}
+
 // Battement de cœur du worker (une seule ligne, id "worker") : mis à jour
 // toutes les 30 s et à chaque changement d'étape par
 // POST /api/product-jobs/heartbeat. Sert à l'indicateur "Worker actif /
 // inactif" de la page Création produits.
+//
+// Colonnes ci-dessous ajoutées pour les Créatives (facultatives, ignorées par
+// la page Création produits) — alimentées par POST /api/worker/heartbeat :
+//   activity     : ce que fait le worker pour les Créatives (texte libre) ;
+//                  state/jobId/filename/step restent réservés aux jobs produit.
+//   issue        : SESSION_EXPIRED | QUOTA | CAPTCHA quand Gemini bloque le
+//                  programme (pause automatique, reprise seule), null sinon.
+//   issueMessage : détail lisible du blocage.
 model WorkerStatus {
-  id         String   @id @default("worker")
-  lastSeenAt DateTime
-  state      String // "idle" | "busy"
-  jobId      String?
-  filename   String?
-  step       String?
+  id           String   @id @default("worker")
+  lastSeenAt   DateTime
+  state        String // "idle" | "busy"
+  jobId        String?
+  filename     String?
+  step         String?
+  activity     String?
+  issue        String?
+  issueMessage String?
 }

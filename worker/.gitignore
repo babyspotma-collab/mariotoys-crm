@@ -1,0 +1,10 @@
+# Jamais commités : secrets, session Google, données de travail, environnement Python.
+.env
+venv/
+chrome-profile/
+logs/
+queue_tmp/
+a_valider/
+__pycache__/
+*.pyc
+mock-control.json

@@ -16,3 +16,6 @@ npm-debug.log*
 
 # Fichiers de maquette design (référence locale, pas du code)
 maquette/
+
+# Sauvegardes locales de la base (données clients) — jamais commitées
+backups/
