@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { applyAutoConfirmations } from "@/lib/auto-confirm";
+import { applyAutoConfirmations, orderCanMatchParcel } from "@/lib/auto-confirm";
 import { ozonCategoryById } from "@/lib/ozon-categories";
 
 const DELIVERED_STATUSES = ozonCategoryById("delivered").statuses;
@@ -62,12 +62,18 @@ export async function POST(req: NextRequest) {
       where: { carrier: "OZON" },
       select: { code: true, orderId: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true },
     }),
-    prisma.order.findMany({ where: { parcels: { none: { carrier: "OZON" } } }, select: { id: true, phone: true } }),
+    prisma.order.findMany({
+      where: { parcels: { none: { carrier: "OZON" } } },
+      select: { id: true, phone: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
     prisma.crbtInvoice.findMany({ where: { carrier: "OZON" } }),
   ]);
   const parcelByCode = new Map(existingParcels.map((x) => [x.code, x]));
-  const orderIdByPhone = new Map<string, string>();
-  for (const o of freeOrders) if (o.phone && !orderIdByPhone.has(o.phone)) orderIdByPhone.set(o.phone, o.id);
+  // Par téléphone, de la plus récente à la plus ancienne (un client régulier
+  // a plusieurs commandes : voir orderCanMatchParcel).
+  const ordersByPhone = new Map<string, typeof freeOrders>();
+  for (const o of freeOrders) if (o.phone) ordersByPhone.set(o.phone, [...(ordersByPhone.get(o.phone) ?? []), o]);
   const invoiceByRef = new Map(existingInvoices.map((x) => [x.ref, x]));
 
   let parcelsUpserted = 0;
@@ -88,10 +94,12 @@ export async function POST(req: NextRequest) {
     // Rattachement par téléphone, jamais remis en cause une fois établi.
     let orderId = existing?.orderId ?? null;
     if (!orderId && p.phone) {
-      const found = orderIdByPhone.get(p.phone);
+      // La commande la plus récente passée dans les 30 jours avant le colis.
+      const candidates = ordersByPhone.get(p.phone) ?? [];
+      const found = candidates.find((o) => orderCanMatchParcel(o.createdAt, carrierCreatedAt));
       if (found) {
-        orderId = found;
-        orderIdByPhone.delete(p.phone);
+        orderId = found.id;
+        candidates.splice(candidates.indexOf(found), 1); // cette commande a maintenant son colis
         parcelsLinked++;
       }
     }

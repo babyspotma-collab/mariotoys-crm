@@ -20,6 +20,18 @@ import { normalizeMoroccanPhone } from "@/lib/phone";
 // Une commande ne peut pas correspondre à un colis créé avant elle ; 1 jour
 // de marge car la date côté transporteur n'a pas de fuseau fiable.
 const CLOCK_SLACK_MS = 24 * 60 * 60 * 1000;
+// ...ni à un colis créé bien après elle : depuis l'import de tout
+// l'historique Shopify (07/10/2026), un client régulier a d'anciennes
+// commandes avec le même téléphone. Un colis ne peut concerner qu'une
+// commande passée dans les 30 jours qui le précèdent.
+const MATCH_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Vrai si une commande créée à `orderCreatedAt` peut être celle du colis créé à `parcelCreatedAt` (date inconnue : on raisonne par rapport à maintenant). */
+export function orderCanMatchParcel(orderCreatedAt: Date, parcelCreatedAt: Date | null): boolean {
+  const ref = (parcelCreatedAt ?? new Date()).getTime();
+  const t = orderCreatedAt.getTime();
+  return t <= ref + CLOCK_SLACK_MS && t >= ref - MATCH_WINDOW_MS;
+}
 
 export function normalizeName(name: string): string {
   return name
@@ -84,8 +96,7 @@ export async function findAutoConfirmations(): Promise<{ toConfirm: AutoConfirmM
     if ((p.order && p.order.status !== "NOUVELLE") || ownCodes.has(p.code)) continue;
 
     const parcel: ParcelRef = { id: p.id, carrier: p.carrier, code: p.code, receiver: p.receiver, phone: p.phone };
-    const before = (o: (typeof orders)[number]) =>
-      !p.carrierCreatedAt || o.createdAt.getTime() <= p.carrierCreatedAt.getTime() + CLOCK_SLACK_MS;
+    const before = (o: (typeof orders)[number]) => orderCanMatchParcel(o.createdAt, p.carrierCreatedAt);
     // Une commande confirmée qui a déjà son propre colis n'est plus candidate.
     const free = (o: (typeof orders)[number]) =>
       o.status === "NOUVELLE" ||
