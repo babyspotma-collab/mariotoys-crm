@@ -48,6 +48,15 @@ export async function createParcel(
     return { error: "Confirmez d'abord la commande avant de créer son colis." };
   }
 
+  // Commande remise à un livreur de l'entreprise (Livraison Casa) : jamais de
+  // colis transporteur en plus, sous peine de double livraison. Il faut
+  // d'abord la retirer de Livraisons Casa (page /livraisons).
+  if (order.localDelivery) {
+    return {
+      error: `Cette commande est en Livraison Casa${order.localCourier ? ` chez ${order.localCourier}` : ""} : aucun colis ne peut être créé. Retirez-la d'abord de Livraisons Casa (page « Livraisons Casa »).`,
+    };
+  }
+
   // Protection anti-doublon : jamais un 2e colis chez le transporteur pour
   // une commande qui en a déjà un (ex. nouvel essai après une erreur
   // d'affichage alors que le colis avait bien été créé).

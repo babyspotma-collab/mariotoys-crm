@@ -3,11 +3,12 @@
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
-import { ChartBar, Images, Package, Receipt, ShoppingBag, SignOut, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { ChartBar, Images, Moped, Package, Receipt, ShoppingBag, SignOut, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
 const NAV = [
   { href: "/", label: "Commandes", short: "Commandes", Icon: ShoppingBag },
   { href: "/parcels", label: "Colis", short: "Colis", Icon: Package },
+  { href: "/livraisons", label: "Livraisons Casa", short: "Casa", Icon: Moped },
   { href: "/product-jobs", label: "Création produits", short: "Produits", Icon: Sparkle },
   { href: "/creatives", label: "Créatives", short: "Créatives", Icon: Images },
   { href: "/billing", label: "Facturation", short: "Factures", Icon: Receipt },
@@ -99,12 +100,13 @@ export default function Sidebar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[10.5px] no-underline ${
+              // 7 onglets : libellés plus petits et tronqués plutôt que débordants.
+              className={`flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 text-[10px] no-underline ${
                 active ? "font-semibold text-ink" : "text-muted"
               }`}
             >
               <Icon size={22} weight={active ? "fill" : "regular"} aria-hidden="true" />
-              <span className="leading-none">{short}</span>
+              <span className="max-w-full truncate leading-none">{short}</span>
             </a>
           );
         })}

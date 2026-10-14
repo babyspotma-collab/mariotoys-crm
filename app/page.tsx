@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
-import { cancelOrder, confirmOrder } from "./orders/actions";
+import { cancelOrder, confirmOrder, startLocalDelivery } from "./orders/actions";
 import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
 import AutoConfirmPanel from "@/components/AutoConfirmPanel";
+import CasaMenu from "@/components/CasaMenu";
 import ConfirmButton from "@/components/ConfirmButton";
 import EmptyState from "@/components/EmptyState";
 import MoreMenu from "@/components/MoreMenu";
@@ -15,6 +16,7 @@ import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { findAutoConfirmations } from "@/lib/auto-confirm";
+import { LOCAL_STATUS, isLocalStatus } from "@/lib/local-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,10 @@ const TABS: Tab[] = ["todo", "noparcel", "ok", "all"];
 // Cycle : À confirmer (NOUVELLE) -> Confirmée (CONFIRMEE, comptée dans les
 // statistiques) -> Colis créé (CONFIRMEE + colis chez le transporteur).
 // "Colis créé" n'est pas un statut en base : on le déduit du colis.
-const NO_PARCEL = { forcelogCode: null, ozonCode: null, parcels: { none: {} } };
+// Une commande remise à un livreur de l'entreprise (Livraison Casa, page
+// /livraisons) n'a pas de colis transporteur et n'en attend pas : elle ne
+// compte pas dans "Confirmées sans colis".
+const NO_PARCEL = { forcelogCode: null, ozonCode: null, parcels: { none: {} }, localDelivery: false };
 
 const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
   NOUVELLE: { tone: "gray", label: "Nouvelle" },
@@ -166,7 +171,7 @@ export default async function DashboardPage({
             return (
               <li
                 key={order.id}
-                className="flex flex-col gap-3 p-4 md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_172px] md:items-center md:gap-5 md:px-5 md:py-3.5"
+                className="flex flex-col gap-3 p-4 md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_272px] md:items-center md:gap-5 md:px-5 md:py-3.5"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -206,6 +211,8 @@ export default async function DashboardPage({
                           Confirmer
                         </button>
                       </form>
+                      {/* Livraison Casa = confirme ET remet à un livreur, sans colis transporteur */}
+                      <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />
                       <MoreMenu>
                         <form action={cancelOrder.bind(null, order.id)}>
                           <ConfirmButton
@@ -218,10 +225,25 @@ export default async function DashboardPage({
                         </form>
                       </MoreMenu>
                     </>
-                  ) : order.status === "CONFIRMEE" && !hasParcel ? (
-                    <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
-                      Créer le colis
+                  ) : order.status === "CONFIRMEE" && order.localDelivery ? (
+                    // Remise à un livreur de l'entreprise : badge vers /livraisons à la
+                    // place de "Créer le colis" (couleur = statut local de la livraison).
+                    <a
+                      href="/livraisons"
+                      className="no-underline"
+                      title={isLocalStatus(order.localStatus) ? `Livraison Casa : ${LOCAL_STATUS[order.localStatus].label}` : "Livraison Casa"}
+                    >
+                      <Pill tone={isLocalStatus(order.localStatus) ? LOCAL_STATUS[order.localStatus].tone : "gray"}>
+                        Casa · {order.localCourier ?? "?"}
+                      </Pill>
                     </a>
+                  ) : order.status === "CONFIRMEE" && !hasParcel ? (
+                    <>
+                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
+                        Créer le colis
+                      </a>
+                      <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />
+                    </>
                   ) : order.status === "CONFIRMEE" ? (
                     <Pill tone="green">Colis créé</Pill>
                   ) : (

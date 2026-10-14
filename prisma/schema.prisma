@@ -63,6 +63,17 @@ model Order {
   ozonStatusChangedAt DateTime? // mis à jour uniquement quand ozonStatus a réellement changé de valeur
   ozonSyncFailCount   Int       @default(0)
 
+  // Livraison Casablanca (voir app/livraisons) : commande remise directement
+  // à un livreur de l'entreprise (Amine, Nizar, ...) au lieu d'être envoyée par
+  // Forcelog/Ozon. Aucun colis transporteur n'existe pour ces commandes ; le
+  // suivi se fait à la main depuis /livraisons (pas de synchronisation).
+  // localDelivery = false => les champs local* sont vides.
+  localDelivery        Boolean              @default(false)
+  localCourier         String? // nom du livreur (40 caractères max, voir lib/local-delivery.ts)
+  localStatus          LocalDeliveryStatus?
+  localAssignedAt      DateTime? // dernière remise au livreur
+  localStatusChangedAt DateTime? // dernier changement de statut local
+
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -72,6 +83,7 @@ model Order {
   @@index([status])
   @@index([forcelogCode])
   @@index([ozonCode])
+  @@index([localDelivery, localStatus])
 }
 
 model OrderItem {
@@ -97,6 +109,15 @@ enum OrderSource {
 enum Carrier {
   FORCELOG
   OZON
+}
+
+// Suivi d'une livraison Casablanca (livreur de l'entreprise) :
+// A_LIVRER (chez le livreur) -> LIVREE ou RETOUR ; un retour ou une livraison
+// peut être remis chez le livreur (A_LIVRER) depuis /livraisons.
+enum LocalDeliveryStatus {
+  A_LIVRER
+  LIVREE
+  RETOUR
 }
 
 // Vue directe et complète de ce qui existe réellement chez chaque

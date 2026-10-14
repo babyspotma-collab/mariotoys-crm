@@ -66,6 +66,32 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     );
   }
 
+  // Remise à un livreur de l'entreprise (Livraison Casa) : pas de colis
+  // transporteur ici (la création est aussi refusée côté action).
+  if (order.localDelivery) {
+    return (
+      <>
+        <PageHeader
+          back={{ href: "/", label: "Commandes" }}
+          title={`Commande ${order.orderNumber}`}
+          subtitle="Livraison Casa"
+        />
+        <div className="card flex flex-col gap-3 p-4 md:p-6">
+          <p className="text-sm">
+            Cette commande est remise à {order.localCourier ? <strong>{order.localCourier}</strong> : "un livreur"} (Livraison
+            Casa) : aucun colis Forcelog ou Ozon ne peut être créé.
+          </p>
+          <p className="text-sm text-muted">
+            Pour l&apos;envoyer par un transporteur, retirez-la d&apos;abord de Livraisons Casa.
+          </p>
+          <a href="/livraisons" className="btn-secondary w-fit">
+            Voir Livraisons Casa
+          </a>
+        </div>
+      </>
+    );
+  }
+
   // Étape 1 : la commande n'est pas encore confirmée. Confirmer ne fait que
   // changer son statut (statistiques) ; le colis se crée à l'étape 2.
   if (order.status === "NOUVELLE") {
