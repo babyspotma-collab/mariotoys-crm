@@ -17,6 +17,7 @@ import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { findAutoConfirmations } from "@/lib/auto-confirm";
 import { LOCAL_STATUS, isLocalStatus } from "@/lib/local-delivery";
+import { cancelConfirmMessage } from "@/lib/order-cancel";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,37 @@ function orderNumberLabel(orderNumber: string) {
   // Les commandes Shopify stockent déjà orderNumber au format "#7325" —
   // ne jamais re-préfixer un second "#" (bug corrigé : "##7325").
   return orderNumber;
+}
+
+// Menu ⋯ "Annuler la commande" (commandes NOUVELLE et CONFIRMEE). La
+// confirmation prévient si un colis existe chez le transporteur (le CRM ne
+// l'annule pas) et si la commande est retirée de Livraisons Casa.
+function CancelMenu({
+  order,
+  hasCarrierParcel,
+}: {
+  order: { id: string; orderNumber: string; customerName: string; localDelivery: boolean; localCourier: string | null };
+  hasCarrierParcel: boolean;
+}) {
+  return (
+    <MoreMenu rowAnchored>
+      <form action={cancelOrder.bind(null, order.id)}>
+        <ConfirmButton
+          message={cancelConfirmMessage({
+            orderNumber: orderNumberLabel(order.orderNumber),
+            customerName: order.customerName,
+            hasCarrierParcel,
+            localDelivery: order.localDelivery,
+            localCourier: order.localCourier,
+          })}
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-accent hover:bg-pill-red-bg"
+        >
+          <XCircle size={16} aria-hidden="true" />
+          Annuler la commande
+        </ConfirmButton>
+      </form>
+    </MoreMenu>
+  );
 }
 
 export default async function DashboardPage({
@@ -171,66 +203,56 @@ export default async function DashboardPage({
             return (
               <li
                 key={order.id}
-                className="flex flex-col gap-3 p-4 md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_272px] md:items-center md:gap-5 md:px-5 md:py-3.5"
+                className="relative flex flex-col gap-3 p-4 lg:grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_272px] xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1.6fr)_96px_320px] lg:items-center lg:gap-5 lg:px-5 lg:py-3.5"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold md:font-medium">
+                    <div className="truncate font-semibold lg:font-medium">
                       {order.customerName}
                       {order.source === "MANUEL" && <span className="ml-2 text-xs font-normal text-muted">Manuel</span>}
                     </div>
                     <div className="mt-0.5 truncate text-[13px] tabular-nums text-muted">
-                      <span className="md:hidden">{order.city} · </span>
+                      <span className="lg:hidden">{order.city} · </span>
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
-                      <span className="hidden md:inline"> · {phone}</span>
+                      <span className="hidden lg:inline"> · {phone}</span>
                     </div>
                     {order.autoConfirmedAt && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
                     )}
                   </div>
-                  <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>
+                  <div className="shrink-0 font-semibold tabular-nums lg:hidden">{formatDh(order.totalPrice)}</div>
                 </div>
-                <div className="hidden truncate text-sm text-body md:block">{order.city}</div>
-                <div className="line-clamp-2 text-[13px] text-body md:line-clamp-1 md:text-sm">{itemsLabel}</div>
-                <div className="hidden text-right text-sm font-semibold tabular-nums md:block">{formatDh(order.totalPrice)}</div>
+                <div className="hidden truncate text-sm text-body lg:block">{order.city}</div>
+                <div className="line-clamp-2 text-[13px] text-body lg:line-clamp-1 lg:text-sm">{itemsLabel}</div>
+                <div className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatDh(order.totalPrice)}</div>
 
-                <div className="flex items-center gap-2 md:justify-end md:gap-1">
+                <div className="flex items-center gap-2 lg:justify-end lg:gap-1">
                   {isNew ? (
                     <>
                       <a
                         href={`tel:${phone}`}
                         aria-label={`Appeler ${order.customerName} au ${phone}`}
                         title={phone}
-                        className="btn-secondary w-11 px-0 md:hidden"
+                        className="btn-secondary w-11 px-0 lg:hidden"
                       >
                         <Phone size={18} aria-hidden="true" />
                       </a>
                       {/* Confirmer = statut seulement, aucun envoi au transporteur */}
-                      <form action={confirmOrder.bind(null, order.id)} className="flex flex-1 md:flex-none">
-                        <button type="submit" className="btn-primary w-full md:h-9 md:px-3.5 md:text-[13px]">
+                      <form action={confirmOrder.bind(null, order.id)} className="flex flex-1 lg:flex-none">
+                        <button type="submit" className="btn-primary w-full lg:h-9 lg:px-3.5 lg:text-[13px]">
                           Confirmer
                         </button>
                       </form>
                       {/* Livraison Casa = confirme ET remet à un livreur, sans colis transporteur */}
                       <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />
-                      <MoreMenu>
-                        <form action={cancelOrder.bind(null, order.id)}>
-                          <ConfirmButton
-                            message={`Annuler la commande ${orderNumberLabel(order.orderNumber)} de ${order.customerName} ?`}
-                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-accent hover:bg-pill-red-bg"
-                          >
-                            <XCircle size={16} aria-hidden="true" />
-                            Annuler la commande
-                          </ConfirmButton>
-                        </form>
-                      </MoreMenu>
+                      <CancelMenu order={order} hasCarrierParcel={hasParcel} />
                     </>
                   ) : order.status === "CONFIRMEE" && order.localDelivery ? (
                     // Remise à un livreur de l'entreprise : badge vers /livraisons à la
                     // place de "Créer le colis" (couleur = statut local de la livraison).
                     <a
                       href="/livraisons"
-                      className="no-underline"
+                      className="block min-w-0 max-w-[190px] no-underline"
                       title={isLocalStatus(order.localStatus) ? `Livraison Casa : ${LOCAL_STATUS[order.localStatus].label}` : "Livraison Casa"}
                     >
                       <Pill tone={isLocalStatus(order.localStatus) ? LOCAL_STATUS[order.localStatus].tone : "gray"}>
@@ -239,7 +261,7 @@ export default async function DashboardPage({
                     </a>
                   ) : order.status === "CONFIRMEE" && !hasParcel ? (
                     <>
-                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 md:h-9 md:flex-none md:px-3.5 md:text-[13px]">
+                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 lg:h-9 lg:flex-none lg:px-3.5 lg:text-[13px]">
                         Créer le colis
                       </a>
                       <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />
@@ -249,10 +271,14 @@ export default async function DashboardPage({
                   ) : (
                     <Pill tone={pill.tone}>{pill.label}</Pill>
                   )}
+                  {/* Une commande confirmée peut être annulée, quelle que soit sa situation
+                      (à créer, colis créé, badge Casa). Le colis éventuel chez le
+                      transporteur n'est pas touché : le message le rappelle. */}
+                  {order.status === "CONFIRMEE" && <CancelMenu order={order} hasCarrierParcel={hasParcel} />}
                 </div>
 
                 {order.forcelogError && (
-                  <p className="alert-error text-xs md:col-span-full">Erreur Forcelog : {order.forcelogError}</p>
+                  <p className="alert-error text-xs lg:col-span-full">Erreur Forcelog : {order.forcelogError}</p>
                 )}
               </li>
             );

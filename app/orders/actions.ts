@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { startLocalDelivery as startLocalDeliveryDb } from "@/lib/local-delivery-db";
+import { cancelOrderRecord } from "@/lib/order-cancel";
 
+// Annule la commande (NOUVELLE ou CONFIRMEE). Ne touche pas au colis éventuel
+// chez le transporteur ; retire la commande de Livraisons Casa si besoin
+// (voir lib/order-cancel.ts).
 export async function cancelOrder(orderId: string) {
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: "ANNULEE" },
-  });
+  await cancelOrderRecord(orderId);
   revalidatePath("/");
+  revalidatePath("/livraisons");
+  revalidatePath(`/orders/${orderId}/confirm`);
 }
 
 // Confirmer = uniquement passer la commande en CONFIRMEE (comptée dans les
