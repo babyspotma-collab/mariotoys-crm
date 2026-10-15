@@ -211,10 +211,16 @@ export default async function DashboardPage({
                       {order.customerName}
                       {order.source === "MANUEL" && <span className="ml-2 text-xs font-normal text-muted">Manuel</span>}
                     </div>
+                    {/* Numéro du client toujours visible, juste sous le nom (cliquable : appel) */}
+                    <a
+                      href={`tel:${phone}`}
+                      className="mt-0.5 block truncate text-[13px] font-medium tabular-nums text-body no-underline hover:underline"
+                    >
+                      {phone}
+                    </a>
                     <div className="mt-0.5 truncate text-[13px] tabular-nums text-muted">
                       <span className="lg:hidden">{order.city} · </span>
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
-                      <span className="hidden lg:inline"> · {phone}</span>
                     </div>
                     {order.autoConfirmedAt && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
