@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   const [existingParcels, freeOrders, existingInvoices] = await Promise.all([
     prisma.parcel.findMany({
       where: { carrier: "FORCELOG" },
-      select: { code: true, orderId: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true, statusCode: true },
+      select: { code: true, orderId: true, detachedAt: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true, statusCode: true },
     }),
     // Commandes encore sans colis Forcelog, candidates au rattachement par téléphone.
     prisma.order.findMany({
@@ -104,8 +104,10 @@ export async function POST(req: NextRequest) {
     // Ne cherche une commande à rattacher que si ce colis n'en a pas déjà
     // une — un rattachement une fois établi n'est jamais remis en cause
     // par un run ultérieur.
+    // Exception : un colis retiré de sa commande à la main (bouton "Annuler le
+    // colis", detachedAt) n'est plus jamais rattaché automatiquement.
     let orderId = existing?.orderId ?? null;
-    if (!orderId && p.phone) {
+    if (!orderId && p.phone && !existing?.detachedAt) {
       // La commande la plus récente passée dans les 30 jours avant le colis.
       const candidates = ordersByPhone.get(p.phone) ?? [];
       const found = candidates.find((o) => orderCanMatchParcel(o.createdAt, parseForcelogDate(p.carrierCreatedAt)));

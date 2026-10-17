@@ -72,6 +72,7 @@ export async function findAutoConfirmations(): Promise<{ toConfirm: AutoConfirmM
         receiver: true,
         phone: true,
         carrierCreatedAt: true,
+        detachedAt: true,
         order: { select: { status: true } },
       },
     }),
@@ -91,6 +92,9 @@ export async function findAutoConfirmations(): Promise<{ toConfirm: AutoConfirmM
   const toReview: ReviewItem[] = [];
 
   for (const p of parcels) {
+    // Colis retiré de sa commande à la main (bouton "Annuler le colis") : il ne
+    // doit ni confirmer une commande ni apparaître "À vérifier".
+    if (p.detachedAt) continue;
     // Colis déjà rattaché à une commande traitée (confirmée ou annulée),
     // ou créé depuis le CRM : il appartient déjà à sa commande.
     if ((p.order && p.order.status !== "NOUVELLE") || ownCodes.has(p.code)) continue;

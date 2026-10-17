@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const [existingParcels, freeOrders, existingInvoices] = await Promise.all([
     prisma.parcel.findMany({
       where: { carrier: "OZON" },
-      select: { code: true, orderId: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true },
+      select: { code: true, orderId: true, detachedAt: true, deliveredAt: true, receiver: true, cityName: true, price: true, status: true },
     }),
     prisma.order.findMany({
       where: { parcels: { none: { carrier: "OZON" } } },
@@ -92,8 +92,10 @@ export async function POST(req: NextRequest) {
     const deliveredAt = existing?.deliveredAt ?? (justDelivered ? new Date() : null);
 
     // Rattachement par téléphone, jamais remis en cause une fois établi.
+    // Exception : un colis retiré de sa commande à la main (bouton "Annuler le
+    // colis", detachedAt) n'est plus jamais rattaché automatiquement.
     let orderId = existing?.orderId ?? null;
-    if (!orderId && p.phone) {
+    if (!orderId && p.phone && !existing?.detachedAt) {
       // La commande la plus récente passée dans les 30 jours avant le colis.
       const candidates = ordersByPhone.get(p.phone) ?? [];
       const found = candidates.find((o) => orderCanMatchParcel(o.createdAt, carrierCreatedAt));

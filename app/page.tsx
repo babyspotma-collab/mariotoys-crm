@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
-import { cancelOrder, confirmOrder, startLocalDelivery } from "./orders/actions";
-import { Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { cancelOrder, confirmOrder, detachParcel, startLocalDelivery } from "./orders/actions";
+import { ArrowCounterClockwise, Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
 import AutoConfirmPanel from "@/components/AutoConfirmPanel";
 import CasaMenu from "@/components/CasaMenu";
 import ConfirmButton from "@/components/ConfirmButton";
@@ -18,6 +18,7 @@ import { normalizeMoroccanPhone } from "@/lib/phone";
 import { findAutoConfirmations } from "@/lib/auto-confirm";
 import { LOCAL_STATUS, isLocalStatus } from "@/lib/local-delivery";
 import { cancelConfirmMessage } from "@/lib/order-cancel";
+import { detachConfirmMessage } from "@/lib/parcel-detach";
 
 export const dynamic = "force-dynamic";
 
@@ -48,15 +49,42 @@ function orderNumberLabel(orderNumber: string) {
 // Menu ⋯ "Annuler la commande" (commandes NOUVELLE et CONFIRMEE). La
 // confirmation prévient si un colis existe chez le transporteur (le CRM ne
 // l'annule pas) et si la commande est retirée de Livraisons Casa.
+//
+// Quand un colis existe chez Forcelog/Ozon (parcel), le menu propose aussi
+// "Annuler le colis" : le colis est retiré de la commande, qui redevient
+// "Confirmée sans colis" (le CRM n'annule pas le colis chez le transporteur,
+// voir lib/parcel-detach.ts).
 function CancelMenu({
   order,
   hasCarrierParcel,
+  parcel,
 }: {
   order: { id: string; orderNumber: string; customerName: string; localDelivery: boolean; localCourier: string | null };
   hasCarrierParcel: boolean;
+  parcel?: { carrier: "FORCELOG" | "OZON" | null; code: string | null; status: string | null } | null;
 }) {
   return (
     <MoreMenu rowAnchored>
+      {parcel && (
+        <form action={detachParcel.bind(null, order.id)}>
+          <ConfirmButton
+            message={detachConfirmMessage({
+              orderNumber: orderNumberLabel(order.orderNumber),
+              customerName: order.customerName,
+              carrier: parcel.carrier,
+              code: parcel.code,
+              status: parcel.status,
+            })}
+            className="flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left text-sm text-ink hover:bg-cream"
+          >
+            <span className="flex items-center gap-2">
+              <ArrowCounterClockwise size={16} aria-hidden="true" />
+              Annuler le colis
+            </span>
+            <span className="pl-6 text-xs text-muted">Redevient « Confirmée sans colis »</span>
+          </ConfirmButton>
+        </form>
+      )}
       <form action={cancelOrder.bind(null, order.id)}>
         <ConfirmButton
           message={cancelConfirmMessage({
@@ -111,7 +139,7 @@ export default async function DashboardPage({
   const [orders, listTotal, counts, noParcelCount, auto] = await Promise.all([
     prisma.order.findMany({
       where: listWhere,
-      include: { items: true, parcels: { select: { id: true }, take: 1 } },
+      include: { items: true, parcels: { select: { id: true, code: true, carrier: true, status: true }, take: 1 } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -199,6 +227,15 @@ export default async function DashboardPage({
             const itemsLabel = order.items.map((i) => `${i.title} ×${i.quantity}`).join(", ");
             const isNew = order.status === "NOUVELLE";
             const hasParcel = !!(order.forcelogCode || order.ozonCode || order.parcels.length);
+            // Colis chez le transporteur (pour "Annuler le colis") : code et statut connus de la commande, sinon de sa ligne Parcel.
+            const linked = order.parcels[0];
+            const parcelInfo = hasParcel
+              ? {
+                  carrier: (order.forcelogCode ? "FORCELOG" : order.ozonCode ? "OZON" : linked?.carrier ?? null) as "FORCELOG" | "OZON" | null,
+                  code: order.forcelogCode ?? order.ozonCode ?? linked?.code ?? null,
+                  status: order.forcelogCode ? order.forcelogStatus : order.ozonCode ? order.ozonStatus : linked?.status ?? null,
+                }
+              : null;
             const phone = normalizeMoroccanPhone(order.phone);
             return (
               <li
@@ -251,7 +288,7 @@ export default async function DashboardPage({
                       </form>
                       {/* Livraison Casa = confirme ET remet à un livreur, sans colis transporteur */}
                       <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />
-                      <CancelMenu order={order} hasCarrierParcel={hasParcel} />
+                      <CancelMenu order={order} hasCarrierParcel={hasParcel} parcel={parcelInfo} />
                     </>
                   ) : order.status === "CONFIRMEE" && order.localDelivery ? (
                     // Remise à un livreur de l'entreprise : badge vers /livraisons à la
@@ -280,7 +317,7 @@ export default async function DashboardPage({
                   {/* Une commande confirmée peut être annulée, quelle que soit sa situation
                       (à créer, colis créé, badge Casa). Le colis éventuel chez le
                       transporteur n'est pas touché : le message le rappelle. */}
-                  {order.status === "CONFIRMEE" && <CancelMenu order={order} hasCarrierParcel={hasParcel} />}
+                  {order.status === "CONFIRMEE" && <CancelMenu order={order} hasCarrierParcel={hasParcel} parcel={parcelInfo} />}
                 </div>
 
                 {order.forcelogError && (

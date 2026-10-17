@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { startLocalDelivery as startLocalDeliveryDb } from "@/lib/local-delivery-db";
 import { cancelOrderRecord } from "@/lib/order-cancel";
+import { detachParcelFromOrder } from "@/lib/parcel-detach";
 
 // Annule la commande (NOUVELLE ou CONFIRMEE). Ne touche pas au colis éventuel
 // chez le transporteur ; retire la commande de Livraisons Casa si besoin
@@ -24,6 +25,16 @@ export async function confirmOrder(orderId: string) {
     data: { status: "CONFIRMEE" },
   });
   revalidatePath("/");
+  revalidatePath(`/orders/${orderId}/confirm`);
+}
+
+// "Annuler le colis" : retire le colis Forcelog/Ozon de la commande, qui redevient
+// "Confirmée sans colis". Ne change QUE le CRM : le colis chez le transporteur
+// doit être annulé là-bas (voir lib/parcel-detach.ts).
+export async function detachParcel(orderId: string) {
+  await detachParcelFromOrder(orderId);
+  revalidatePath("/");
+  revalidatePath("/parcels");
   revalidatePath(`/orders/${orderId}/confirm`);
 }
 

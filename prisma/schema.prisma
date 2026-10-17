@@ -142,6 +142,11 @@ model Parcel {
   carrierCreatedAt DateTime? // date de création/ramassage côté transporteur, si connue
   deliveredAt      DateTime? // posée une seule fois, au run de sync où le statut entre dans la catégorie "delivered" — jamais réécrite ensuite (voir app/api/cron/sync-*-web) ; sert au délai moyen de livraison (Statistiques)
   syncedAt         DateTime  @updatedAt
+  // Posé quand l'utilisateur retire ce colis de sa commande à la main (bouton
+  // "Annuler le colis" de la page Commandes, voir lib/parcel-detach.ts) : les
+  // synchronisations Forcelog/Ozon et la confirmation automatique ne le
+  // rattachent alors PLUS à une commande par téléphone. Null = comportement normal.
+  detachedAt       DateTime?
 
   @@unique([carrier, code])
   @@index([carrier, status])
