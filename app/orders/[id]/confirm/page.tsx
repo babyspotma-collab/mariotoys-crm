@@ -8,16 +8,26 @@ import { buildProductNature } from "@/lib/parcel-limits";
 import PageHeader from "@/components/PageHeader";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { confirmOrder } from "@/app/orders/actions";
+import { safeReturnPath } from "@/lib/return-path";
 import ConfirmForm from "./ConfirmForm";
 
-export default async function ConfirmOrderPage({ params }: { params: { id: string } }) {
+export default async function ConfirmOrderPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { from?: string };
+}) {
+  // Page Commandes d'où l'on vient (onglet, période, recherche, page) : on y
+  // revient après la création du colis, au lieu de retomber sur "À confirmer".
+  const returnTo = safeReturnPath(searchParams.from);
   const order = await prisma.order.findUnique({
     where: { id: params.id },
     include: { items: true },
   });
 
   if (!order) notFound();
-  if (order.status === "ANNULEE") redirect("/");
+  if (order.status === "ANNULEE") redirect(returnTo);
 
   // Récapitulatif des articles, commun aux trois états de la fiche.
   const summary = (
@@ -49,7 +59,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     const carrierPath = order.ozonCode === existing ? "ozon" : "forcelog";
     return (
       <>
-        <PageHeader back={{ href: "/", label: "Commandes" }} title={`Commande ${order.orderNumber}`} subtitle="Colis créé" />
+        <PageHeader back={{ href: returnTo, label: "Commandes" }} title={`Commande ${order.orderNumber}`} subtitle="Colis créé" />
         <div className="card flex flex-col gap-3 p-4 md:p-6">
           <p className="text-sm">
             Cette commande a déjà un colis :{" "}
@@ -72,7 +82,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     return (
       <>
         <PageHeader
-          back={{ href: "/", label: "Commandes" }}
+          back={{ href: returnTo, label: "Commandes" }}
           title={`Commande ${order.orderNumber}`}
           subtitle="Livraison Casa"
         />
@@ -111,7 +121,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
     return (
       <>
         <PageHeader
-          back={{ href: "/", label: "Commandes" }}
+          back={{ href: returnTo, label: "Commandes" }}
           title={`Commande ${order.orderNumber}`}
           subtitle={
             <>
@@ -138,7 +148,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
               <button type="submit" className="btn-primary flex-1 md:flex-none">
                 Confirmer la commande
               </button>
-              <a href="/" className="btn-ghost">
+              <a href={returnTo} className="btn-ghost">
                 Plus tard
               </a>
             </form>
@@ -174,7 +184,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
   return (
     <>
       <PageHeader
-        back={{ href: "/", label: "Commandes" }}
+        back={{ href: returnTo, label: "Commandes" }}
         title={`Commande ${order.orderNumber}`}
         subtitle={
           <>
@@ -200,6 +210,7 @@ export default async function ConfirmOrderPage({ params }: { params: { id: strin
 
         <ConfirmForm
           orderId={order.id}
+          returnTo={returnTo}
           forcelogCities={forcelogCities}
           ozonCities={ozonCities}
           initialValues={{

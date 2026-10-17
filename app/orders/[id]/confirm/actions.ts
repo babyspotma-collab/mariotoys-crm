@@ -8,6 +8,7 @@ import { addParcel as addOzonParcel, getCities as getOzonCities } from "@/lib/oz
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { existingParcelCode } from "@/lib/existing-parcel";
 import { tooLongError } from "@/lib/parcel-limits";
+import { safeReturnPath } from "@/lib/return-path";
 
 export type ConfirmState = { error: string | null };
 
@@ -188,5 +189,7 @@ export async function createParcel(
   }
 
   revalidatePath("/");
-  redirect("/");
+  // Retour sur la page Commandes d'où l'on venait (onglet "Confirmées" par
+  // défaut), pas sur "À confirmer". L'adresse vient du formulaire : contrôlée.
+  redirect(safeReturnPath(formData.get("returnTo")));
 }

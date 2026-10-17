@@ -19,6 +19,7 @@ import { findAutoConfirmations } from "@/lib/auto-confirm";
 import { LOCAL_STATUS, isLocalStatus } from "@/lib/local-delivery";
 import { cancelConfirmMessage } from "@/lib/order-cancel";
 import { detachConfirmMessage } from "@/lib/parcel-detach";
+import { confirmHref } from "@/lib/return-path";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,9 @@ export default async function DashboardPage({
     return `/?${params.toString()}`;
   };
   const tabHref = (id: Tab) => url({ tab: id });
+  // Cette page telle qu'affichée (onglet, période, recherche, numéro de page) :
+  // "Créer le colis" la mémorise pour y revenir une fois le colis créé.
+  const backHref = url({ page: page > 1 ? String(page) : undefined });
 
   return (
     <>
@@ -304,7 +308,8 @@ export default async function DashboardPage({
                     </a>
                   ) : order.status === "CONFIRMEE" && !hasParcel ? (
                     <>
-                      <a href={`/orders/${order.id}/confirm`} className="btn-primary flex-1 lg:h-9 lg:flex-none lg:px-3.5 lg:text-[13px]">
+                      {/* from = cette page (onglet, période, recherche, page) : retour ici après la création du colis */}
+                      <a href={confirmHref(order.id, backHref)} className="btn-primary flex-1 lg:h-9 lg:flex-none lg:px-3.5 lg:text-[13px]">
                         Créer le colis
                       </a>
                       <CasaMenu action={startLocalDelivery.bind(null, order.id)} compact />

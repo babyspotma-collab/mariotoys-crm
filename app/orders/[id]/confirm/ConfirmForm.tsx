@@ -30,11 +30,13 @@ function SubmitButton() {
 
 export default function ConfirmForm({
   orderId,
+  returnTo,
   forcelogCities,
   ozonCities,
   initialValues,
 }: {
   orderId: string;
+  returnTo: string; // page Commandes d'origine : on y revient après la création du colis
   forcelogCities: ForcelogCity[];
   ozonCities: OzonCity[];
   initialValues: InitialValues;
@@ -89,6 +91,8 @@ export default function ConfirmForm({
 
   return (
     <form action={formAction} className="card flex flex-col lg:order-1">
+      {/* Page Commandes d'origine : createParcel y redirige après la création (contrôlée côté serveur) */}
+      <input type="hidden" name="returnTo" value={returnTo} />
       <fieldset className="flex flex-col gap-3 p-4 md:p-6">
         <legend className="sr-only">Transporteur</legend>
         <h2 className="text-sm font-semibold">Transporteur</h2>
@@ -262,7 +266,7 @@ export default function ConfirmForm({
         {state.error && <p className="alert-error">{state.error}</p>}
         <div className="flex gap-2">
           <SubmitButton />
-          <a href="/" className="btn-ghost">
+          <a href={returnTo} className="btn-ghost">
             Plus tard
           </a>
         </div>
