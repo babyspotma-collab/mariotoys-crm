@@ -10,6 +10,7 @@ import { changeCourier, removeLocalDelivery, setLocalStatus } from "@/lib/local-
 function refresh(orderId: string) {
   revalidatePath("/livraisons");
   revalidatePath("/");
+  revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}/confirm`);
 }
 

@@ -12,6 +12,7 @@ import { detachParcelFromOrder } from "@/lib/parcel-detach";
 export async function cancelOrder(orderId: string) {
   await cancelOrderRecord(orderId);
   revalidatePath("/");
+  revalidatePath("/orders");
   revalidatePath("/livraisons");
   revalidatePath(`/orders/${orderId}/confirm`);
 }
@@ -25,6 +26,7 @@ export async function confirmOrder(orderId: string) {
     data: { status: "CONFIRMEE" },
   });
   revalidatePath("/");
+  revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}/confirm`);
 }
 
@@ -34,6 +36,7 @@ export async function confirmOrder(orderId: string) {
 export async function detachParcel(orderId: string) {
   await detachParcelFromOrder(orderId);
   revalidatePath("/");
+  revalidatePath("/orders");
   revalidatePath("/parcels");
   revalidatePath(`/orders/${orderId}/confirm`);
 }
@@ -45,6 +48,7 @@ export async function detachParcel(orderId: string) {
 export async function startLocalDelivery(orderId: string, formData: FormData) {
   await startLocalDeliveryDb(orderId, formData.get("courier"));
   revalidatePath("/");
+  revalidatePath("/orders");
   revalidatePath("/livraisons");
   revalidatePath(`/orders/${orderId}/confirm`);
 }

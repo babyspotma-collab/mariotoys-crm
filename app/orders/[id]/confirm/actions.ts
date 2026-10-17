@@ -189,6 +189,7 @@ export async function createParcel(
   }
 
   revalidatePath("/");
+  revalidatePath("/orders");
   // Retour sur la page Commandes d'où l'on venait (onglet "Confirmées" par
   // défaut), pas sur "À confirmer". L'adresse vient du formulaire : contrôlée.
   redirect(safeReturnPath(formData.get("returnTo")));

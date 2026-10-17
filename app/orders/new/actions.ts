@@ -54,5 +54,5 @@ export async function createManualOrder(
 
   // Rejoint la liste "Nouvelles" du dashboard — suit le même workflow
   // Confirmer que les commandes Shopify, sans étape spéciale.
-  redirect("/");
+  redirect("/orders");
 }

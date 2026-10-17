@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
-import { ChartBar, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { ChartBar, House, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosphor-icons/react/dist/ssr";
 
 // Les pages « Création produits » (/product-jobs) et « Créatives » (/creatives)
 // existent toujours (et le programme local aussi) : seuls leurs liens sont
@@ -12,7 +12,8 @@ import { ChartBar, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosph
 //   { href: "/creatives", label: "Créatives", short: "Créatives", Icon: Images }
 // (importer Sparkle et Images depuis "@phosphor-icons/react/dist/ssr").
 const NAV = [
-  { href: "/", label: "Commandes", short: "Commandes", Icon: ShoppingBag },
+  { href: "/", label: "Accueil", short: "Accueil", Icon: House },
+  { href: "/orders", label: "Commandes", short: "Commandes", Icon: ShoppingBag },
   { href: "/parcels", label: "Colis", short: "Colis", Icon: Package },
   { href: "/livraisons", label: "Livraisons Casa", short: "Casa", Icon: Moped },
   { href: "/billing", label: "Facturation", short: "Factures", Icon: Receipt },
@@ -20,7 +21,9 @@ const NAV = [
 ];
 
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/orders");
+  // "/" = Accueil (page d'ensemble) : actif seulement sur "/" lui-même.
+  // "/orders" couvre aussi /orders/new et /orders/[id]/confirm.
+  if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

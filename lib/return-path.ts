@@ -7,8 +7,8 @@
 // chemin interne (jamais un autre site) — sinon on retombe sur l'onglet
 // "Confirmées".
 
-// Onglet "Confirmées" de la page Commandes.
-export const DEFAULT_RETURN_PATH = "/?tab=ok";
+// Onglet "Confirmées" de la page Commandes (/orders ; "/" est l'Accueil).
+export const DEFAULT_RETURN_PATH = "/orders?tab=ok";
 
 export function safeReturnPath(raw: unknown, fallback: string = DEFAULT_RETURN_PATH): string {
   if (typeof raw !== "string") return fallback;
