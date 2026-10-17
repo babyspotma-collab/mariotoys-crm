@@ -3,7 +3,9 @@ import assert from "node:assert";
 import { COURIER_MAX_LENGTH, DEFAULT_COURIERS, LOCAL_STATUS, cleanCourier, isLocalStatus } from "./local-delivery";
 
 // Livreurs par défaut : écriture officielle, quelle que soit la saisie
-assert.deepEqual([...DEFAULT_COURIERS], ["Amine", "Nizar"]);
+assert.deepEqual([...DEFAULT_COURIERS], ["Amine", "Nizar", "Retrait Dépot", "Retrait Magasin"]);
+assert.equal(cleanCourier("retrait depot"), "Retrait Dépot");
+assert.equal(cleanCourier("RETRAIT MAGASIN"), "Retrait Magasin");
 assert.equal(cleanCourier("Amine"), "Amine");
 assert.equal(cleanCourier("amine"), "Amine");
 assert.equal(cleanCourier("  NIZAR  "), "Nizar");

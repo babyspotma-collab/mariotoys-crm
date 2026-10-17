@@ -9,7 +9,7 @@ import type { PillTone } from "@/components/Pill";
 export type LocalStatus = "A_LIVRER" | "LIVREE" | "RETOUR";
 
 // Livreurs proposés en un clic ; tout autre nom est accepté ("Autre livreur").
-export const DEFAULT_COURIERS = ["Amine", "Nizar"] as const;
+export const DEFAULT_COURIERS = ["Amine", "Nizar", "Retrait Dépot", "Retrait Magasin"] as const;
 
 export const COURIER_MAX_LENGTH = 40;
 
