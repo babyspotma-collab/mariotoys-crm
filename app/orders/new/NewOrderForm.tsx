@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
 import ProductPicker from "./ProductPicker";
+import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 import { formatDh } from "@/lib/format";
 import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 
@@ -21,6 +22,7 @@ function SubmitButton() {
 export default function NewOrderForm() {
   const initialState: NewOrderState = { error: null };
   const [state, formAction] = useFormState(createManualOrder, initialState);
+  const [shipping, setShipping] = useState<number>(0);
   const [lines, setLines] = useState<Line[]>([{ title: "", price: 0, quantity: 1 }]);
 
   function updateLine(index: number, patch: Partial<Line>) {
@@ -35,7 +37,8 @@ export default function NewOrderForm() {
     setLines((prev) => prev.filter((_, i) => i !== index));
   }
 
-  const total = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+  const subtotal = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+  const total = subtotal + shipping;
 
   return (
     <form action={formAction} className="card flex flex-col">
@@ -134,11 +137,38 @@ export default function NewOrderForm() {
         </button>
       </fieldset>
 
+      <fieldset className="flex flex-col gap-3 border-t border-line-soft p-4 md:p-6">
+        <legend className="sr-only">Livraison</legend>
+        <h2 className="text-sm font-semibold">Livraison</h2>
+        <input type="hidden" name="shipping" value={shipping} />
+        <div role="radiogroup" aria-label="Frais de livraison" className="flex flex-wrap gap-2">
+          {SHIPPING_OPTIONS.map((fee) => {
+            const on = shipping === fee;
+            return (
+              <button
+                key={fee}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setShipping(fee)}
+                className={`rounded-[10px] border px-4 py-2 text-sm font-medium transition-colors ${
+                  on ? "border-ink bg-ink text-white" : "border-line bg-white text-body hover:bg-cream"
+                }`}
+              >
+                {fee === 0 ? "Gratuite" : `${fee} DH`}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
       <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+56px)] flex flex-col gap-3 rounded-b-[14px] border-t border-line bg-white/95 p-4 backdrop-blur md:static md:bottom-auto md:px-6">
         {state.error && <p className="alert-error">{state.error}</p>}
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-col">
-            <span className="text-xs text-muted">Total</span>
+            <span className="text-xs text-muted">
+              Total{shipping > 0 ? ` (dont livraison ${formatDh(shipping)})` : " (livraison gratuite)"}
+            </span>
             <span className="text-lg font-semibold tabular-nums">{formatDh(total)}</span>
           </div>
           <SubmitButton />

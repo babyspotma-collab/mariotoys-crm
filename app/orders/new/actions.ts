@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 
 export type NewOrderState = { error: string | null };
 
@@ -34,7 +35,14 @@ export async function createManualOrder(
     return { error: "Ajoutez au moins un article." };
   }
 
-  const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  // Frais de livraison choisis dans le formulaire : gratuit, 20 ou 40 DH.
+  // Comme pour une commande Shopify, ils sont inclus dans le total à encaisser.
+  const shipping = Number(formData.get("shipping") ?? 0);
+  if (!SHIPPING_OPTIONS.includes(shipping as (typeof SHIPPING_OPTIONS)[number])) {
+    return { error: "Frais de livraison invalides." };
+  }
+
+  const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0) + shipping;
 
   const orderNumber = `M-${Date.now().toString(36).toUpperCase()}`;
 
