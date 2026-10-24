@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         : (li.title as string),
     quantity: li.quantity as number,
     price: li.price as string,
+    shopifyVariantId: li.variant_id ? `gid://shopify/ProductVariant/${li.variant_id}` : null,
   }));
 
   await prisma.order.upsert({

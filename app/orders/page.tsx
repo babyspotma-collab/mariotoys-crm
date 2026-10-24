@@ -20,6 +20,28 @@ import { LOCAL_STATUS, isLocalStatus } from "@/lib/local-delivery";
 import { cancelConfirmMessage } from "@/lib/order-cancel";
 import { detachConfirmMessage } from "@/lib/parcel-detach";
 import { confirmHref } from "@/lib/return-path";
+import { readAlbaseetSale, readStockInfo } from "@/lib/stock-albaseet";
+
+// Une ligne sous les articles : vendu dans ALBASEET+, ou où se trouve le stock
+// (dépôts comptés pour la vente en ligne d'abord). Détail sur la fiche commande.
+function StockSummary({ items }: { items: { stockInfo: unknown; albaseetSale: unknown }[] }) {
+  if (items.length === 0) return null;
+  const vendus = items.filter((i) => readAlbaseetSale(i.albaseetSale)).length;
+  if (vendus === items.length) return <div className="mt-0.5 text-xs font-medium text-pill-green-fg">✓ Vendu dans ALBASEET+</div>;
+  const infos = items.map((i) => readStockInfo(i.stockInfo));
+  if (infos.every((s) => !s)) return null;
+  if (infos.some((s) => s && !s.relie)) return <div className="mt-0.5 text-xs text-pill-amber-fg">Article non relié à ALBASEET+</div>;
+  const depots = new Map<string, number>();
+  for (const s of infos)
+    for (const a of s?.articles ?? []) for (const d of a.depots) if (d.quantite > 0 && d.enLigne) depots.set(d.depot, (depots.get(d.depot) ?? 0) + d.quantite);
+  const top = [...depots].sort((a, b) => b[1] - a[1]).slice(0, 2);
+  return (
+    <div className={`mt-0.5 truncate text-xs ${top.length ? "text-muted" : "text-accent"}`}>
+      {vendus > 0 ? `${vendus}/${items.length} vendu(s) · ` : ""}
+      {top.length ? `📍 ${top.map(([d, q]) => `${d} (${q})`).join(", ")}` : "Pas de stock en magasin"}
+    </div>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -270,7 +292,10 @@ export default async function DashboardPage({
                   <div className="shrink-0 font-semibold tabular-nums lg:hidden">{formatDh(order.totalPrice)}</div>
                 </div>
                 <div className="hidden truncate text-sm text-body lg:block">{order.city}</div>
-                <div className="line-clamp-2 text-[13px] text-body lg:line-clamp-1 lg:text-sm">{itemsLabel}</div>
+                <a href={`/orders/${order.id}?from=${encodeURIComponent(backHref)}`} className="min-w-0 text-body no-underline hover:underline">
+                  <div className="line-clamp-2 text-[13px] lg:line-clamp-1 lg:text-sm">{itemsLabel}</div>
+                  <StockSummary items={order.items} />
+                </a>
                 <div className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatDh(order.totalPrice)}</div>
 
                 <div className="flex items-center gap-2 lg:justify-end lg:gap-1">

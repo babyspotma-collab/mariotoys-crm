@@ -93,6 +93,14 @@ model OrderItem {
   title    String
   quantity Int
   price    Decimal @db.Decimal(10, 2)
+
+  // Liaison avec le logiciel de stock ALBASEET+ (programme local du PC de bureau,
+  // voir app/api/worker/stock) — il retrouve l'article ALBASEET+ relié à cette
+  // variante, renvoie où il se trouve, puis la facture ALBASEET+ quand il est vendu.
+  shopifyVariantId String? // gid://shopify/ProductVariant/... (null pour les anciennes commandes : le programme se rabat sur le titre)
+  stockInfo        Json? // { relie, articles: [{ nom, code, depots: [{ depot, quantite, enLigne }] }] }
+  albaseetSale     Json? // { facture, depot, date, vendeur } dès que l'article est vendu dans ALBASEET+, sinon null
+  stockCheckedAt   DateTime? // dernier passage du programme local
 }
 
 enum OrderStatus {

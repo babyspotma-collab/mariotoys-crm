@@ -25,7 +25,7 @@ type Node = {
   phone: string | null;
   totalPriceSet: { shopMoney: { amount: string } };
   shippingAddress: { firstName: string | null; lastName: string | null; address1: string | null; city: string | null; phone: string | null } | null;
-  lineItems: { nodes: { title: string; variantTitle: string | null; quantity: number; originalUnitPriceSet: { shopMoney: { amount: string } } }[] };
+  lineItems: { nodes: { title: string; variantTitle: string | null; quantity: number; variant: { id: string } | null; originalUnitPriceSet: { shopMoney: { amount: string } } }[] };
 };
 
 const QUERY = `
@@ -36,7 +36,7 @@ const QUERY = `
         legacyResourceId name createdAt cancelledAt phone
         totalPriceSet { shopMoney { amount } }
         shippingAddress { firstName lastName address1 city phone }
-        lineItems(first: 50) { nodes { title variantTitle quantity originalUnitPriceSet { shopMoney { amount } } } }
+        lineItems(first: 50) { nodes { title variantTitle quantity variant { id } originalUnitPriceSet { shopMoney { amount } } } }
       }
     }
   }`;
@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
           title: li.variantTitle && li.variantTitle !== "Default Title" ? `${li.title} (variante : ${li.variantTitle})` : li.title,
           quantity: li.quantity,
           price: li.originalUnitPriceSet.shopMoney.amount,
+          shopifyVariantId: li.variant?.id ?? null,
         }));
       }),
     });
