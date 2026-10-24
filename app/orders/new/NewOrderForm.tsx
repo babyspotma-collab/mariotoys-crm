@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
-import type { ShopifyProductSummary } from "@/lib/shopify-admin";
+import ProductPicker from "./ProductPicker";
 import { formatDh } from "@/lib/format";
 import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 
@@ -18,20 +18,13 @@ function SubmitButton() {
   );
 }
 
-export default function NewOrderForm({ products }: { products: ShopifyProductSummary[] }) {
+export default function NewOrderForm() {
   const initialState: NewOrderState = { error: null };
   const [state, formAction] = useFormState(createManualOrder, initialState);
   const [lines, setLines] = useState<Line[]>([{ title: "", price: 0, quantity: 1 }]);
 
   function updateLine(index: number, patch: Partial<Line>) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
-  }
-
-  // Nom libre : le catalogue Shopify (50 premiers produits) n'est qu'une
-  // suggestion ; si le nom tapé correspond exactement, le prix est repris.
-  function setTitle(index: number, title: string) {
-    const product = products.find((p) => p.title.toLowerCase() === title.trim().toLowerCase());
-    updateLine(index, product ? { title, price: product.price } : { title });
   }
 
   function addLine() {
@@ -91,27 +84,16 @@ export default function NewOrderForm({ products }: { products: ShopifyProductSum
           <span />
         </div>
 
-        <datalist id="catalogue-produits">
-          {products.map((p) => (
-            <option key={p.id} value={p.title} />
-          ))}
-        </datalist>
-
         <div className="flex flex-col gap-4 md:gap-2">
           {lines.map((line, i) => (
             <div
               key={i}
               className="grid grid-cols-[80px_minmax(0,1fr)_44px] gap-2 md:grid-cols-[minmax(0,1fr)_80px_120px_40px]"
             >
-              <input
+              <ProductPicker
                 value={line.title}
-                onChange={(e) => setTitle(i, e.target.value)}
-                list="catalogue-produits"
-                required
-                autoComplete="off"
-                aria-label="Nom de l'article"
-                placeholder="Nom de l'article"
-                className="input col-span-3 md:col-span-1"
+                onChange={(title) => updateLine(i, { title })}
+                onPick={(p) => updateLine(i, { title: p.title, price: p.price })}
               />
               <input
                 type="number"

@@ -67,13 +67,23 @@ type ProductNode = {
 // sur l'ensemble des produits (pas besoin de restreindre à des collections
 // précises comme il faudrait le faire pour un compte Shopify partagé
 // entre plusieurs marques (non applicable ici).
-export async function listProducts(searchTerm = ""): Promise<ShopifyProductSummary[]> {
-  const term = searchTerm.trim();
-  const query = term ? `title:*${term}*` : undefined;
+// Chaque mot tapé doit se retrouver dans le titre (ordre libre). Les caractères
+// spéciaux de la syntaxe de recherche Shopify sont retirés.
+export function productSearchQuery(searchTerm: string): string | undefined {
+  const words = searchTerm
+    .replace(/[*:"'\\()<>=~^]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6);
+  return words.length ? words.map((w) => `title:*${w}*`).join(" ") : undefined;
+}
+
+export async function listProducts(searchTerm = "", limit = 50): Promise<ShopifyProductSummary[]> {
+  const query = productSearchQuery(searchTerm);
 
   const data = await gql<{ products: { edges: { node: ProductNode }[] } }>(
-    `query ($query: String) {
-      products(first: 50, query: $query) {
+    `query ($query: String, $limit: Int!) {
+      products(first: $limit, query: $query) {
         edges {
           node {
             id
@@ -84,7 +94,7 @@ export async function listProducts(searchTerm = ""): Promise<ShopifyProductSumma
         }
       }
     }`,
-    { query }
+    { query, limit: Math.min(Math.max(limit, 1), 50) }
   );
 
   return data.products.edges.map(({ node: n }) => ({
