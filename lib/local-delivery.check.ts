@@ -1,6 +1,6 @@
 // Vérification rapide : npx tsx lib/local-delivery.check.ts
 import assert from "node:assert";
-import { COURIER_MAX_LENGTH, DEFAULT_COURIERS, LOCAL_STATUS, cleanCourier, isLocalStatus } from "./local-delivery";
+import { COURIER_MAX_LENGTH, DEFAULT_COURIERS, NOTE_MAX_LENGTH, cleanNote, LOCAL_STATUS, cleanCourier, isLocalStatus } from "./local-delivery";
 
 // Livreurs par défaut : écriture officielle, quelle que soit la saisie
 assert.deepEqual([...DEFAULT_COURIERS], ["Amine", "Nizar", "Retrait Dépot", "Retrait Magasin"]);
@@ -9,6 +9,12 @@ assert.equal(cleanCourier("RETRAIT MAGASIN"), "Retrait Magasin");
 assert.equal(cleanCourier("Amine"), "Amine");
 assert.equal(cleanCourier("amine"), "Amine");
 assert.equal(cleanCourier("  NIZAR  "), "Nizar");
+assert.equal(cleanNote("  Client absent, rappeler  "), "Client absent, rappeler");
+assert.equal(cleanNote("a\r\n\r\n\r\n\r\nb"), "a\n\nb", "retours à la ligne limités");
+assert.equal(cleanNote("   "), null, "vide = remarque effacée");
+assert.equal(cleanNote(undefined), null);
+assert.equal(cleanNote("x".repeat(500))?.length, NOTE_MAX_LENGTH);
+assert.equal(cleanNote("a\u0007b"), "a b", "caractères de contrôle retirés");
 assert.equal(cleanCourier("Aminé"), "Amine", "accents ignorés pour reconnaître un livreur par défaut");
 
 // Autre livreur : conservé tel que saisi, nettoyé

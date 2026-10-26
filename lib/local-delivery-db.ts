@@ -8,7 +8,7 @@
 // (sauf la remise initiale, qui exige justement qu'elle ne le soit pas).
 
 import { prisma } from "@/lib/db";
-import { cleanCourier, type LocalStatus } from "@/lib/local-delivery";
+import { cleanCourier, cleanNote, type LocalStatus } from "@/lib/local-delivery";
 
 // Aucun colis transporteur d'aucune sorte : ni code Forcelog/Ozon, ni ligne
 // Parcel liée. Même définition que "Confirmées sans colis" (app/page.tsx).
@@ -82,6 +82,15 @@ export async function changeCourier(orderId: string, rawCourier: unknown): Promi
   return done.count === 1 ? { ok: true } : { ok: false, reason: "Commande retirée de Livraisons Casa." };
 }
 
+// Remarque libre sur une commande en livraison Casa (vide = effacée).
+export async function setLocalNote(orderId: string, rawNote: unknown): Promise<LocalResult> {
+  const res = await prisma.order.updateMany({
+    where: { id: orderId, localDelivery: true },
+    data: { localNote: cleanNote(rawNote) },
+  });
+  return res.count === 1 ? { ok: true } : { ok: false, reason: "Commande retirée de Livraisons Casa." };
+}
+
 // Retire la commande de Livraisons Casa : tous les champs local* sont vidés,
 // la commande reste CONFIRMEE (donc de nouveau "Confirmée sans colis").
 export async function removeLocalDelivery(orderId: string): Promise<LocalResult> {
@@ -93,6 +102,7 @@ export async function removeLocalDelivery(orderId: string): Promise<LocalResult>
       localStatus: null,
       localAssignedAt: null,
       localStatusChangedAt: null,
+      localNote: null,
     },
   });
   return res.count === 1 ? { ok: true } : { ok: false, reason: "Commande déjà retirée." };

@@ -41,6 +41,26 @@ export function cleanCourier(raw: unknown): string {
   return known ?? text;
 }
 
+export const NOTE_MAX_LENGTH = 300;
+
+// Nettoie une remarque de livraison : retours à la ligne conservés (3 de suite
+// au maximum), autres caractères de contrôle retirés, 300 caractères maximum.
+// Renvoie null si elle est vide (la remarque est alors effacée).
+export function cleanNote(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const text = raw
+    .replace(/\r\n?/g, "\n")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ ?\n ?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, NOTE_MAX_LENGTH)
+    .trim();
+  return text || null;
+}
+
 export function isLocalStatus(value: unknown): value is LocalStatus {
   return value === "A_LIVRER" || value === "LIVREE" || value === "RETOUR";
 }
