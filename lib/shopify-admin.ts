@@ -8,6 +8,8 @@ const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
 const API_VERSION = process.env.SHOPIFY_API_VERSION || "2026-07";
 
+import { indexCatalogue, matchProducts, type CatalogueEntry } from "@/lib/product-match";
+
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 async function getAccessToken(): Promise<string> {
@@ -76,6 +78,79 @@ export function productSearchQuery(searchTerm: string): string | undefined {
     .filter(Boolean)
     .slice(0, 6);
   return words.length ? words.map((w) => `title:*${w}*`).join(" ") : undefined;
+}
+
+// ── Recherche sur TOUT le catalogue ─────────────────────────────────────────
+// La recherche native de Shopify ignore les accents (« pate » ne trouve pas
+// « Pâte ») et ne trouve qu'en début de mot. On charge donc une fois la liste
+// des titres (id, titre, prix, statut — sans images), gardée 10 minutes en
+// mémoire, puis on filtre localement (lib/product-match.ts). Les images ne sont
+// demandées que pour les quelques propositions affichées.
+const CATALOGUE_TTL_MS = 10 * 60 * 1000;
+type Catalogue = { index: ReturnType<typeof indexCatalogue>; loadedAt: number };
+let catalogue: Catalogue | null = null;
+let catalogueLoading: Promise<Catalogue> | null = null;
+
+async function loadCatalogue(): Promise<Catalogue> {
+  const entries: CatalogueEntry[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < 40; page++) {
+    const data: {
+      products: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        edges: { node: { id: string; title: string; status: string; priceRangeV2: { minVariantPrice: { amount: string } } } }[];
+      };
+    } = await gql(
+      `query ($after: String) {
+        products(first: 250, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id title status priceRangeV2 { minVariantPrice { amount } } } }
+        }
+      }`,
+      { after }
+    );
+    for (const { node: n } of data.products.edges) {
+      entries.push({ id: n.id, title: n.title, status: n.status, price: Math.round(parseFloat(n.priceRangeV2.minVariantPrice.amount)) });
+    }
+    if (!data.products.pageInfo.hasNextPage) break;
+    after = data.products.pageInfo.endCursor;
+  }
+  return { index: indexCatalogue(entries), loadedAt: Date.now() };
+}
+
+async function getCatalogue(): Promise<Catalogue> {
+  if (catalogue && Date.now() - catalogue.loadedAt < CATALOGUE_TTL_MS) return catalogue;
+  catalogueLoading ??= loadCatalogue()
+    .then((c) => (catalogue = c))
+    .finally(() => {
+      catalogueLoading = null;
+    });
+  try {
+    return await catalogueLoading;
+  } catch (err) {
+    if (catalogue) return catalogue; // Shopify indisponible : on garde l'ancienne liste
+    throw err;
+  }
+}
+
+/** Chauffe le cache (appelé à l'ouverture du formulaire) sans attendre le résultat. */
+export async function warmCatalogue(): Promise<void> {
+  await getCatalogue();
+}
+
+export type ProductSuggestion = ShopifyProductSummary & { status: string };
+
+/** Propositions pour la saisie `query` : meilleures correspondances d'abord, avec leur image. */
+export async function searchProducts(query: string, limit = 10): Promise<ProductSuggestion[]> {
+  const { index } = await getCatalogue();
+  const found = matchProducts(index, query, limit);
+  if (found.length === 0) return [];
+  const data = await gql<{ nodes: ({ id: string; featuredImage: { url: string } | null } | null)[] }>(
+    `query ($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id featuredImage { url } } } }`,
+    { ids: found.map((p) => p.id) }
+  );
+  const images = new Map(data.nodes.filter((n): n is NonNullable<typeof n> => !!n).map((n) => [n.id, n.featuredImage?.url ?? null]));
+  return found.map((p) => ({ ...p, image: images.get(p.id) ?? null }));
 }
 
 export async function listProducts(searchTerm = "", limit = 50): Promise<ShopifyProductSummary[]> {
