@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { createParcel, type ConfirmState } from "./actions";
 import type { ForcelogCity } from "@/lib/forcelog";
 import type { OzonCity } from "@/lib/ozon";
+import { formatDh } from "@/lib/format";
 import { limitFor, type LimitedField } from "@/lib/parcel-limits";
 
 type InitialValues = {
@@ -16,6 +17,7 @@ type InitialValues = {
   comment: string;
   productNature: string;
   price: number;
+  paidOnline: boolean;
   fragile: boolean;
 };
 
@@ -44,6 +46,7 @@ export default function ConfirmForm({
   const action = createParcel.bind(null, orderId);
   const initialState: ConfirmState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  const [paidOnline, setPaidOnline] = useState(initialValues.paidOnline);
   const [carrier, setCarrier] = useState<"FORCELOG" | "OZON">("FORCELOG");
   // Champs limités en longueur selon le transporteur (voir lib/parcel-limits.ts) :
   // contrôlés pour afficher le compteur et bloquer la saisie au-delà.
@@ -240,19 +243,41 @@ export default function ConfirmForm({
           </div>
           <div>
             <label className="label" htmlFor="price">
-              Prix (DH)
+              {paidOnline ? "À encaisser (DH)" : "Prix (DH)"}
             </label>
-            <input
-              id="price"
-              name="price"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              defaultValue={initialValues.price}
-              className="input tabular-nums"
-            />
+            {paidOnline ? (
+              <input id="price" type="number" value={0} disabled readOnly className="input tabular-nums" aria-describedby="paid-note" />
+            ) : (
+              <input
+                id="price"
+                name="price"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                defaultValue={initialValues.price}
+                className="input tabular-nums"
+              />
+            )}
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="paidOnline"
+              checked={paidOnline}
+              onChange={(e) => setPaidOnline(e.target.checked)}
+              className="h-4 w-4 accent-ink"
+            />
+            Payée en ligne par carte
+          </label>
+          {paidOnline && (
+            <p id="paid-note" className="hint">
+              Le colis part à 0 DH chez le transporteur (le client a déjà payé {formatDh(initialValues.price)}).
+            </p>
+          )}
         </div>
 
         <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">

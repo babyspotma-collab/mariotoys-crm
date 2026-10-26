@@ -56,6 +56,7 @@ export async function createManualOrder(
       city,
       address,
       totalPrice,
+      paidOnline: formData.get("paidOnline") === "on",
       items: { create: items.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price })) },
     },
   });

@@ -22,6 +22,10 @@ model Order {
   city             String
   phone            String
   totalPrice       Decimal     @db.Decimal(10, 2)
+  // Payée en ligne par carte : rien à encaisser à la livraison. Le colis part
+  // alors à 0 DH chez Forcelog/Ozon, mais totalPrice reste le vrai montant de
+  // la commande (chiffre d'affaires).
+  paidOnline       Boolean     @default(false)
   status           OrderStatus @default(NOUVELLE)
   // Posé quand la commande est passée en CONFIRMEE par lib/auto-confirm.ts
   // (un colis Forcelog/Ozon correspondant a été trouvé), null sinon —
