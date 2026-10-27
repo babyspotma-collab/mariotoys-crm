@@ -6,10 +6,13 @@ import EmptyState from "@/components/EmptyState";
 import MoreMenu from "@/components/MoreMenu";
 import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
+import PeriodFilter from "@/components/PeriodFilter";
 import Pill from "@/components/Pill";
 import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
-import { formatDateTimeMa, formatDh } from "@/lib/format";
+import StatCard from "@/components/StatCard";
+import { periodParams, periodRange } from "@/lib/date-range";
+import { formatDateTimeMa, formatDh, formatInt } from "@/lib/format";
 import { DEFAULT_COURIERS, LOCAL_STATUS, cleanCourier, isLocalStatus, type LocalStatus } from "@/lib/local-delivery";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { markDelivered, markReturned, putBackWithCourier, reassignCourier, removeFromLocalDelivery } from "./actions";
@@ -29,8 +32,11 @@ const TABS: { id: Tab; label: string; status: LocalStatus | null }[] = [
 export default async function LocalDeliveriesPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; courier?: string; q?: string; page?: string };
+  searchParams: { tab?: string; courier?: string; q?: string; page?: string; period?: string; from?: string; to?: string };
 }) {
+  // Période de la vue d'ensemble (par défaut le mois en cours, comme l'Accueil).
+  const range = periodRange(searchParams);
+  const periodKeep = periodParams(range);
   const tab = TABS.find((t) => t.id === searchParams.tab) ?? TABS[0];
   const courier = cleanCourier(searchParams.courier);
   const q = searchParams.q?.trim().slice(0, 60);
@@ -58,7 +64,7 @@ export default async function LocalDeliveriesPage({
 
   const listWhere = { ...filtersWhere, ...(tab.status ? { localStatus: tab.status } : {}) };
 
-  const [orders, listTotal, statusCounts, courierGroups, pendingGroups] = await Promise.all([
+  const [orders, listTotal, statusCounts, courierGroups, pendingGroups, periodGroups] = await Promise.all([
     prisma.order.findMany({
       where: listWhere,
       include: { items: true },
@@ -77,6 +83,17 @@ export default async function LocalDeliveriesPage({
       _count: true,
       _sum: { totalPrice: true },
     }),
+    // Vue d'ensemble : livrées / retours dont le statut a changé pendant la période.
+    prisma.order.groupBy({
+      by: ["localCourier", "localStatus"],
+      where: {
+        ...base,
+        localStatus: { in: ["LIVREE", "RETOUR"] },
+        localStatusChangedAt: { gte: range.start, lt: range.end },
+      },
+      _count: true,
+      _sum: { totalPrice: true },
+    }),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
@@ -89,6 +106,17 @@ export default async function LocalDeliveriesPage({
   const totalPending = Array.from(pendingBy.values()).reduce((s, v) => s + v.count, 0);
   const totalAmount = Array.from(pendingBy.values()).reduce((s, v) => s + v.amount, 0);
 
+  // Livrées (= argent encaissé) et retours de la période, au total et par livreur.
+  const periodOf = (status: LocalStatus, name?: string) => {
+    const rows = periodGroups.filter((g) => g.localStatus === status && (name === undefined || (g.localCourier ?? "") === name));
+    return {
+      count: rows.reduce((s, g) => s + g._count, 0),
+      amount: rows.reduce((s, g) => s + Number(g._sum.totalPrice ?? 0), 0),
+    };
+  };
+  const delivered = periodOf("LIVREE");
+  const returned = periodOf("RETOUR");
+
   // Livreurs affichés : ceux par défaut (même à 0) puis les autres, dans l'ordre.
   const courierNames = Array.from(
     new Set([...DEFAULT_COURIERS, ...courierGroups.map((g) => g.localCourier).filter((c): c is string => !!c)])
@@ -97,7 +125,7 @@ export default async function LocalDeliveriesPage({
   // Toute URL construite ici repart de la page 1 sauf "page" explicite.
   const url = (over: Record<string, string | undefined>) => {
     const params = new URLSearchParams();
-    const merged = { tab: tab.id, courier: courier || undefined, q, ...over };
+    const merged = { tab: tab.id, courier: courier || undefined, q, ...periodKeep, ...over };
     for (const [k, v] of Object.entries(merged)) if (v) params.set(k, v);
     const s = params.toString();
     return s ? `/livraisons?${s}` : "/livraisons";
@@ -116,6 +144,36 @@ export default async function LocalDeliveriesPage({
         title="Livraisons Casa"
         subtitle={`${totalPending} commande${totalPending > 1 ? "s" : ""} chez les livreurs · ${formatDh(totalAmount)} à récupérer`}
       />
+
+      {/* Vue d'ensemble : l'argent des livraisons payées (livrées) sur la période */}
+      <section aria-label="Vue d'ensemble" className="flex flex-col gap-3">
+        <PeriodFilter action="/livraisons" keep={{ tab: tab.id, courier: courier || undefined, q }} range={range} />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            label="Livraisons payées"
+            value={formatDh(delivered.amount)}
+            sub={`${formatInt(delivered.count)} livrée${delivered.count > 1 ? "s" : ""} · ${range.label}`}
+            href={url({ tab: "livrees", courier: undefined, page: undefined })}
+          />
+          <StatCard
+            label="À récupérer"
+            value={formatDh(totalAmount)}
+            sub={`${formatInt(totalPending)} chez les livreurs`}
+            href={url({ tab: "chez", courier: undefined, page: undefined })}
+          />
+          <StatCard
+            label="Retours"
+            value={formatInt(returned.count)}
+            sub={`${formatDh(returned.amount)} · ${range.label}`}
+            href={url({ tab: "retours", courier: undefined, page: undefined })}
+          />
+          <StatCard
+            label="Total livraisons"
+            value={formatInt(delivered.count + returned.count + totalPending)}
+            sub="livrées + retours + en cours"
+          />
+        </div>
+      </section>
 
       {/* Une carte par livreur : ce qu'il doit encore rapporter */}
       <section aria-label="Livreurs" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -140,6 +198,7 @@ export default async function LocalDeliveriesPage({
               <div className="shrink-0 text-right">
                 <div className="text-lg font-semibold tabular-nums">{formatDh(p.amount)}</div>
                 <div className="text-xs text-muted">à récupérer</div>
+                <div className="mt-1 text-xs tabular-nums text-pill-green-fg">{formatDh(periodOf("LIVREE", name).amount)} livrés</div>
               </div>
             </a>
           );
