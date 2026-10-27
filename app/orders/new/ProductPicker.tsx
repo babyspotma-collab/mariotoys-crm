@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import type { ShopifyProductSummary } from "@/lib/shopify-admin";
+import type { ProductSuggestion } from "@/lib/shopify-admin";
 import { formatDh } from "@/lib/format";
 
 // Champ "Nom de l'article" : le texte reste libre, et dès 2 lettres des
@@ -14,10 +14,10 @@ export default function ProductPicker({
 }: {
   value: string;
   onChange: (title: string) => void;
-  onPick: (product: ShopifyProductSummary) => void;
+  onPick: (product: ProductSuggestion) => void;
 }) {
   const listId = useId();
-  const [results, setResults] = useState<ShopifyProductSummary[]>([]);
+  const [results, setResults] = useState<ProductSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
@@ -39,7 +39,7 @@ export default function ProductPicker({
       try {
         const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error();
-        const data = (await res.json()) as { products: ShopifyProductSummary[] };
+        const data = (await res.json()) as { products: ProductSuggestion[] };
         setResults(data.products);
         setError(false);
         setActive(-1);
@@ -56,6 +56,12 @@ export default function ProductPicker({
     };
   }, [value]);
 
+  // Prépare le catalogue côté serveur dès l'ouverture du formulaire : la
+  // première recherche est alors instantanée.
+  useEffect(() => {
+    fetch("/api/products/search?warm=1").catch(() => {});
+  }, []);
+
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
@@ -64,7 +70,7 @@ export default function ProductPicker({
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  function pick(p: ShopifyProductSummary) {
+  function pick(p: ProductSuggestion) {
     onPick(p);
     setOpen(false);
     setResults([]);
@@ -133,7 +139,14 @@ export default function ProductPicker({
               ) : (
                 <span className="h-9 w-9 shrink-0 rounded-md bg-cream-dark" aria-hidden="true" />
               )}
-              <span className="min-w-0 flex-1 truncate">{p.title}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {p.title}
+                {p.status !== "ACTIVE" && (
+                  <span className="ml-2 rounded bg-cream-dark px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                    {p.status === "DRAFT" ? "brouillon" : "archivé"}
+                  </span>
+                )}
+              </span>
               <span className="shrink-0 tabular-nums text-muted">{formatDh(p.price)}</span>
             </li>
           ))}
