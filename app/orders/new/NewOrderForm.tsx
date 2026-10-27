@@ -160,6 +160,12 @@ export default function NewOrderForm() {
             );
           })}
         </div>
+
+        <label className="mt-1 flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+          <input type="checkbox" name="paidOnline" className="h-4 w-4 accent-ink" />
+          Payée en ligne par carte
+        </label>
+        <p className="hint -mt-1">Le client a déjà payé : le colis sera créé à 0 DH chez le transporteur.</p>
       </fieldset>
 
       <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+56px)] flex flex-col gap-3 rounded-b-[14px] border-t border-line bg-white/95 p-4 backdrop-blur md:static md:bottom-auto md:px-6">

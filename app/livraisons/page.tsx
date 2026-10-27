@@ -72,7 +72,7 @@ export default async function LocalDeliveriesPage({
     prisma.order.groupBy({ by: ["localCourier"], where: base, _count: true }),
     // Cartes livreurs : montant encore à récupérer et commandes en cours.
     prisma.order.groupBy({
-      by: ["localCourier"],
+      by: ["localCourier", "paidOnline"],
       where: { ...base, localStatus: "A_LIVRER" },
       _count: true,
       _sum: { totalPrice: true },
@@ -83,9 +83,15 @@ export default async function LocalDeliveriesPage({
   const countFor = (s: LocalStatus) => statusCounts.find((c) => c.localStatus === s)?._count ?? 0;
   const allCount = statusCounts.reduce((sum, c) => sum + c._count, 0);
 
-  const pendingBy = new Map(
-    pendingGroups.map((g) => [g.localCourier ?? "", { count: g._count, amount: Number(g._sum.totalPrice ?? 0) }])
-  );
+  // Montant à récupérer : les commandes payées en ligne comptent pour 0 DH.
+  const pendingBy = new Map<string, { count: number; amount: number }>();
+  for (const g of pendingGroups) {
+    const key = g.localCourier ?? "";
+    const cur = pendingBy.get(key) ?? { count: 0, amount: 0 };
+    cur.count += g._count;
+    cur.amount += g.paidOnline ? 0 : Number(g._sum.totalPrice ?? 0);
+    pendingBy.set(key, cur);
+  }
   const totalPending = Array.from(pendingBy.values()).reduce((s, v) => s + v.count, 0);
   const totalAmount = Array.from(pendingBy.values()).reduce((s, v) => s + v.amount, 0);
 
@@ -209,6 +215,9 @@ export default async function LocalDeliveriesPage({
                       {order.orderNumber} · {order.localCourier ?? "—"}
                       {order.localAssignedAt ? `, remise le ${formatDateTimeMa(order.localAssignedAt)}` : ""}
                     </div>
+                    {order.paidOnline && (
+                      <div className="mt-1 text-xs font-medium text-pill-green-fg">Payée en ligne — rien à encaisser</div>
+                    )}
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>
                 </div>

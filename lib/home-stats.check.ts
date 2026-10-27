@@ -2,7 +2,7 @@
 import assert from "node:assert";
 import { categoryById } from "./parcel-categories";
 import { ozonCategoryById } from "./ozon-categories";
-import { normalizeCity, parcelBucket, summarizeCarrier, summarizeCasa, summarizeOrders, topCities } from "./home-stats";
+import { mergePending, normalizeCity, parcelBucket, summarizeCarrier, summarizeCasa, summarizeOrders, topCities } from "./home-stats";
 
 // ── Top villes : les variantes d'une même ville sont fusionnées ──────────────
 assert.equal(normalizeCity("  Fès "), "fes");
@@ -106,7 +106,13 @@ assert.equal(c.pendingCount, 6);
 assert.equal(c.pendingAmount, 1200);
 assert.deepEqual(c.couriers.map((x) => x.name), ["Amine", "Nizar", "—"], "livreurs triés par montant à récupérer");
 assert.deepEqual([c.deliveredCount, c.deliveredAmount, c.returnedCount, c.returnedAmount], [7, 2100, 1, 120]);
-const c0 = summarizeCasa([], []);
+const merged = mergePending([
+  { localCourier: "Amine", paidOnline: false, _count: 2, _sum: { totalPrice: 300 } },
+  { localCourier: "Amine", paidOnline: true, _count: 1, _sum: { totalPrice: 500 } },
+  { localCourier: null, paidOnline: true, _count: 1, _sum: { totalPrice: 80 } },
+]);
+assert.deepEqual(merged, [{ courier: "Amine", count: 3, amount: 300 }, { courier: null, count: 1, amount: 0 }], "payée en ligne = 0 DH à récupérer, mais bien comptée");
+const c0 =summarizeCasa([], []);
 assert.deepEqual([c0.pendingCount, c0.pendingAmount, c0.deliveredCount, c0.returnedCount, c0.couriers.length], [0, 0, 0, 0, 0]);
 
 console.log("home-stats checks OK");

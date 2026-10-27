@@ -285,6 +285,7 @@ export default async function DashboardPage({
                       <span className="lg:hidden">{order.city} · </span>
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
                     </div>
+                    {order.paidOnline && <div className="mt-1 text-xs font-medium text-pill-green-fg">Payée en ligne par carte</div>}
                     {order.autoConfirmedAt && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
                     )}

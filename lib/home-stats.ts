@@ -185,6 +185,21 @@ export function summarizeCarrier(
 
 // ─── Livraison Casablanca ────────────────────────────────────────────────────
 
+/** Une ligne par livreur ; les commandes payées en ligne comptent pour 0 DH à récupérer. */
+export function mergePending(
+  groups: { localCourier: string | null; paidOnline: boolean; _count: number; _sum: { totalPrice: Money } }[]
+): { courier: string | null; count: number; amount: number }[] {
+  const by = new Map<string, { courier: string | null; count: number; amount: number }>();
+  for (const g of groups) {
+    const key = g.localCourier ?? "";
+    const cur = by.get(key) ?? { courier: g.localCourier, count: 0, amount: 0 };
+    cur.count += g._count;
+    cur.amount += g.paidOnline ? 0 : num(g._sum.totalPrice);
+    by.set(key, cur);
+  }
+  return [...by.values()];
+}
+
 export type CasaSummary = {
   pendingCount: number;
   pendingAmount: number;
@@ -240,7 +255,7 @@ export async function getHomeStats(range: Range): Promise<HomeStats> {
     }),
     // Chez les livreurs MAINTENANT (instantané, pas limité à la période).
     prisma.order.groupBy({
-      by: ["localCourier"],
+      by: ["localCourier", "paidOnline"],
       where: { localDelivery: true, localStatus: "A_LIVRER" },
       _count: true,
       _sum: { totalPrice: true },
@@ -267,7 +282,7 @@ export async function getHomeStats(range: Range): Promise<HomeStats> {
     forcelog: summarizeCarrier("FORCELOG", parcels, invoices),
     ozon: summarizeCarrier("OZON", parcels, invoices),
     casa: summarizeCasa(
-      casaPending.map((g) => ({ courier: g.localCourier, count: g._count, amount: g._sum.totalPrice })),
+      mergePending(casaPending),
       casaPeriod.map((g) => ({ status: g.localStatus, count: g._count, amount: g._sum.totalPrice }))
     ),
   };

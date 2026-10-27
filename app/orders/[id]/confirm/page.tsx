@@ -47,6 +47,7 @@ export default async function ConfirmOrderPage({
         <span className="text-sm text-muted">Total</span>
         <span className="text-lg font-semibold tabular-nums">{formatDh(order.totalPrice)}</span>
       </div>
+      {order.paidOnline && <p className="mt-2 text-xs font-medium text-pill-green-fg">Payée en ligne par carte — rien à encaisser.</p>}
     </aside>
   );
   const placedAt = <span className="tabular-nums">Passée le {formatDateTimeMa(order.createdAt)}</span>;
@@ -222,6 +223,7 @@ export default async function ConfirmOrderPage({
             comment: order.comment ?? "",
             productNature: defaultProductNature,
             price: Number(order.totalPrice),
+            paidOnline: order.paidOnline,
             fragile: order.fragile,
           }}
         />

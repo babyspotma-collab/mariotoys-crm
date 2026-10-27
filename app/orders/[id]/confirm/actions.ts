@@ -27,7 +27,10 @@ export async function createParcel(
   const productNature = String(formData.get("productNature") ?? "").trim();
   const priceRaw = String(formData.get("price") ?? "");
   const fragile = formData.get("fragile") === "on";
-  const price = Number(priceRaw);
+  // Payée en ligne par carte : le colis part à 0 DH (rien à encaisser), quel que
+  // soit le champ prix. Le montant de la commande (totalPrice) n'est pas modifié.
+  const paidOnline = formData.get("paidOnline") === "on";
+  const price = paidOnline ? 0 : Number(priceRaw);
 
   if (carrier !== "FORCELOG" && carrier !== "OZON") {
     return { error: "Transporteur invalide." };
@@ -35,7 +38,7 @@ export async function createParcel(
   if (!receiver || !phone || !address || !productNature) {
     return { error: "Tous les champs obligatoires doivent être remplis." };
   }
-  if (!Number.isFinite(price) || price <= 0) {
+  if (!Number.isFinite(price) || (!paidOnline && price <= 0)) {
     return { error: "Le prix doit être un nombre positif." };
   }
   // Limites de caractères du transporteur vérifiées ici, avant tout envoi.
@@ -104,7 +107,7 @@ export async function createParcel(
           address,
           comment: comment || null,
           fragile,
-          totalPrice: price,
+          ...(paidOnline ? { paidOnline: true } : { paidOnline: false, totalPrice: price }),
         },
       });
 
@@ -155,7 +158,7 @@ export async function createParcel(
           address,
           comment: comment || null,
           fragile,
-          totalPrice: price,
+          ...(paidOnline ? { paidOnline: true } : { paidOnline: false, totalPrice: price }),
         },
       });
 
