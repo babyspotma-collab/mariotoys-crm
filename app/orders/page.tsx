@@ -1,3 +1,4 @@
+import { orderSearchWhere } from "@/lib/order-search";
 import { prisma } from "@/lib/db";
 import { cancelOrder, confirmOrder, detachParcel, startLocalDelivery } from "./actions";
 import { ArrowCounterClockwise, Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
@@ -127,14 +128,7 @@ export default async function DashboardPage({
         : tab === "ok"
           ? { status: "CONFIRMEE" as const }
           : {}),
-    ...(q
-      ? {
-          OR: [
-            { customerName: { contains: q, mode: "insensitive" as const } },
-            { orderNumber: { contains: q, mode: "insensitive" as const } },
-          ],
-        }
-      : {}),
+    ...orderSearchWhere(q),
   };
 
   const [orders, listTotal, counts, noParcelCount, auto] = await Promise.all([
@@ -206,7 +200,7 @@ export default async function DashboardPage({
           hidden={{ ...periodKeep, tab }}
           defaultValue={q}
           label="Rechercher une commande"
-          placeholder="Client ou n° de commande"
+          placeholder="Nom, téléphone, article, ville…"
         />
       </div>
 
