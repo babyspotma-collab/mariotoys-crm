@@ -14,9 +14,9 @@ import StatCard from "@/components/StatCard";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { paidLabel } from "@/lib/payment-method";
 import { formatDateTimeMa, formatDh, formatInt } from "@/lib/format";
-import { DEFAULT_COURIERS, LOCAL_STATUS, cleanCourier, isLocalStatus, type LocalStatus } from "@/lib/local-delivery";
+import { DEFAULT_COURIERS, LOCAL_STATUS, NOTE_MAX_LENGTH, cleanCourier, isLocalStatus, type LocalStatus } from "@/lib/local-delivery";
 import { normalizeMoroccanPhone } from "@/lib/phone";
-import { markDelivered, markReturned, putBackWithCourier, reassignCourier, removeFromLocalDelivery } from "./actions";
+import { markDelivered, markReturned, putBackWithCourier, reassignCourier, removeFromLocalDelivery, saveLocalNote } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,7 @@ export default async function LocalDeliveriesPage({
         OR: [
           { customerName: { contains: q, mode: "insensitive" as const } },
           { orderNumber: { contains: q, mode: "insensitive" as const } },
+          { localNote: { contains: q, mode: "insensitive" as const } },
           ...phoneNeedles.map((n) => ({ phone: { contains: n } })),
         ],
       }
@@ -278,6 +279,34 @@ export default async function LocalDeliveriesPage({
                     {paidLabel(order) && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">{paidLabel(order)} — rien à encaisser</div>
                     )}
+                    {order.localNote && (
+                      <p className="mt-1.5 whitespace-pre-line break-words rounded-md border border-line-soft bg-cream px-2.5 py-1.5 text-[13px] text-ink">
+                        <span className="font-medium text-muted">Remarque : </span>
+                        {order.localNote}
+                      </p>
+                    )}
+                    <details className="mt-1.5">
+                      <summary className="w-fit cursor-pointer list-none text-xs font-medium text-body underline-offset-4 hover:underline">
+                        {order.localNote ? "Modifier la remarque" : "+ Ajouter une remarque"}
+                      </summary>
+                      <form action={saveLocalNote.bind(null, order.id)} className="mt-2 flex flex-col gap-2">
+                        <textarea
+                          name="note"
+                          defaultValue={order.localNote ?? ""}
+                          maxLength={NOTE_MAX_LENGTH}
+                          rows={3}
+                          aria-label="Remarque sur la livraison"
+                          placeholder="Ex. client absent, rappeler à 18h"
+                          className="input"
+                        />
+                        <div className="flex items-center gap-3">
+                          <button type="submit" className="btn-primary h-9 px-3.5 text-[13px]">
+                            Enregistrer
+                          </button>
+                          <span className="text-xs text-muted">Vide = efface la remarque.</span>
+                        </div>
+                      </form>
+                    </details>
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>
                 </div>
