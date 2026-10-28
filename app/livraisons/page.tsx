@@ -12,6 +12,7 @@ import SearchForm from "@/components/SearchForm";
 import Segmented from "@/components/Segmented";
 import StatCard from "@/components/StatCard";
 import { periodParams, periodRange } from "@/lib/date-range";
+import { paidLabel } from "@/lib/payment-method";
 import { formatDateTimeMa, formatDh, formatInt } from "@/lib/format";
 import { DEFAULT_COURIERS, LOCAL_STATUS, cleanCourier, isLocalStatus, type LocalStatus } from "@/lib/local-delivery";
 import { normalizeMoroccanPhone } from "@/lib/phone";
@@ -274,8 +275,8 @@ export default async function LocalDeliveriesPage({
                       {order.orderNumber} · {order.localCourier ?? "—"}
                       {order.localAssignedAt ? `, remise le ${formatDateTimeMa(order.localAssignedAt)}` : ""}
                     </div>
-                    {order.paidOnline && (
-                      <div className="mt-1 text-xs font-medium text-pill-green-fg">Payée en ligne — rien à encaisser</div>
+                    {paidLabel(order) && (
+                      <div className="mt-1 text-xs font-medium text-pill-green-fg">{paidLabel(order)} — rien à encaisser</div>
                     )}
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(order.totalPrice)}</div>

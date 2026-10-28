@@ -1,4 +1,5 @@
 import { orderSearchWhere } from "@/lib/order-search";
+import { paidLabel } from "@/lib/payment-method";
 import { prisma } from "@/lib/db";
 import { cancelOrder, confirmOrder, detachParcel, startLocalDelivery } from "./actions";
 import { ArrowCounterClockwise, Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
@@ -279,7 +280,7 @@ export default async function DashboardPage({
                       <span className="lg:hidden">{order.city} · </span>
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
                     </div>
-                    {order.paidOnline && <div className="mt-1 text-xs font-medium text-pill-green-fg">Payée en ligne par carte</div>}
+                    {paidLabel(order) && <div className="mt-1 text-xs font-medium text-pill-green-fg">{paidLabel(order)}</div>}
                     {order.autoConfirmedAt && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
                     )}

@@ -7,6 +7,7 @@ import type { ForcelogCity } from "@/lib/forcelog";
 import type { OzonCity } from "@/lib/ozon";
 import { formatDh } from "@/lib/format";
 import { limitFor, type LimitedField } from "@/lib/parcel-limits";
+import { PAID_METHODS, PAID_METHOD_LABEL, type PaidMethod } from "@/lib/payment-method";
 
 type InitialValues = {
   receiver: string;
@@ -17,7 +18,7 @@ type InitialValues = {
   comment: string;
   productNature: string;
   price: number;
-  paidOnline: boolean;
+  paidMethod: PaidMethod | null; // null = pas encore payée
   fragile: boolean;
 };
 
@@ -46,7 +47,8 @@ export default function ConfirmForm({
   const action = createParcel.bind(null, orderId);
   const initialState: ConfirmState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
-  const [paidOnline, setPaidOnline] = useState(initialValues.paidOnline);
+  const [paidMethod, setPaidMethod] = useState<PaidMethod | null>(initialValues.paidMethod);
+  const paidOnline = paidMethod !== null;
   const [carrier, setCarrier] = useState<"FORCELOG" | "OZON">("FORCELOG");
   // Champs limités en longueur selon le transporteur (voir lib/parcel-limits.ts) :
   // contrôlés pour afficher le compteur et bloquer la saisie au-delà.
@@ -263,16 +265,20 @@ export default function ConfirmForm({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
-            <input
-              type="checkbox"
-              name="paidOnline"
-              checked={paidOnline}
-              onChange={(e) => setPaidOnline(e.target.checked)}
-              className="h-4 w-4 accent-ink"
-            />
-            Payée en ligne par carte
-          </label>
+          <input type="hidden" name="paidMethod" value={paidMethod ?? ""} />
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {PAID_METHODS.map((m) => (
+              <label key={m} className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={paidMethod === m}
+                  onChange={(e) => setPaidMethod(e.target.checked ? m : null)}
+                  className="h-4 w-4 accent-ink"
+                />
+                {PAID_METHOD_LABEL[m]}
+              </label>
+            ))}
+          </div>
           {paidOnline && (
             <p id="paid-note" className="hint">
               Le colis part à 0 DH chez le transporteur (le client a déjà payé {formatDh(initialValues.price)}).

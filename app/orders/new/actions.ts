@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { cleanPaidMethod } from "@/lib/payment-method";
 import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 
 export type NewOrderState = { error: string | null };
@@ -46,6 +47,8 @@ export async function createManualOrder(
 
   const orderNumber = `M-${Date.now().toString(36).toUpperCase()}`;
 
+  const paidMethod = cleanPaidMethod(formData.get("paidMethod"));
+
   await prisma.order.create({
     data: {
       shopifyOrderId: null,
@@ -56,7 +59,8 @@ export async function createManualOrder(
       city,
       address,
       totalPrice,
-      paidOnline: formData.get("paidOnline") === "on",
+      paidOnline: paidMethod !== null,
+      paidMethod,
       items: { create: items.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price })) },
     },
   });

@@ -5,6 +5,7 @@ import { getCities as getOzonCities } from "@/lib/ozon";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { existingParcelCode } from "@/lib/existing-parcel";
 import { buildProductNature } from "@/lib/parcel-limits";
+import { cleanPaidMethod, paidLabel } from "@/lib/payment-method";
 import PageHeader from "@/components/PageHeader";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { confirmOrder } from "@/app/orders/actions";
@@ -47,7 +48,7 @@ export default async function ConfirmOrderPage({
         <span className="text-sm text-muted">Total</span>
         <span className="text-lg font-semibold tabular-nums">{formatDh(order.totalPrice)}</span>
       </div>
-      {order.paidOnline && <p className="mt-2 text-xs font-medium text-pill-green-fg">Payée en ligne par carte — rien à encaisser.</p>}
+      {paidLabel(order) && <p className="mt-2 text-xs font-medium text-pill-green-fg">{paidLabel(order)} — rien à encaisser.</p>}
     </aside>
   );
   const placedAt = <span className="tabular-nums">Passée le {formatDateTimeMa(order.createdAt)}</span>;
@@ -223,7 +224,7 @@ export default async function ConfirmOrderPage({
             comment: order.comment ?? "",
             productNature: defaultProductNature,
             price: Number(order.totalPrice),
-            paidOnline: order.paidOnline,
+            paidMethod: order.paidOnline ? cleanPaidMethod(order.paidMethod) ?? "CARTE" : null,
             fragile: order.fragile,
           }}
         />

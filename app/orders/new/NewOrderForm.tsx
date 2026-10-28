@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
 import ProductPicker from "./ProductPicker";
+import { PAID_METHODS, PAID_METHOD_LABEL, type PaidMethod } from "@/lib/payment-method";
 import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 import { formatDh } from "@/lib/format";
 import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
@@ -23,6 +24,7 @@ export default function NewOrderForm() {
   const initialState: NewOrderState = { error: null };
   const [state, formAction] = useFormState(createManualOrder, initialState);
   const [shipping, setShipping] = useState<number>(0);
+  const [paidMethod, setPaidMethod] = useState<PaidMethod | null>(null);
   const [lines, setLines] = useState<Line[]>([{ title: "", price: 0, quantity: 1 }]);
 
   function updateLine(index: number, patch: Partial<Line>) {
@@ -161,10 +163,20 @@ export default function NewOrderForm() {
           })}
         </div>
 
-        <label className="mt-1 flex w-fit cursor-pointer items-center gap-2.5 text-sm">
-          <input type="checkbox" name="paidOnline" className="h-4 w-4 accent-ink" />
-          Payée en ligne par carte
-        </label>
+        <input type="hidden" name="paidMethod" value={paidMethod ?? ""} />
+        <div className="mt-1 flex flex-wrap gap-x-6 gap-y-2">
+          {PAID_METHODS.map((m) => (
+            <label key={m} className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={paidMethod === m}
+                onChange={(e) => setPaidMethod(e.target.checked ? m : null)}
+                className="h-4 w-4 accent-ink"
+              />
+              {PAID_METHOD_LABEL[m]}
+            </label>
+          ))}
+        </div>
         <p className="hint -mt-1">Le client a déjà payé : le colis sera créé à 0 DH chez le transporteur.</p>
       </fieldset>
 

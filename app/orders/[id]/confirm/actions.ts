@@ -8,6 +8,7 @@ import { addParcel as addOzonParcel, getCities as getOzonCities } from "@/lib/oz
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { existingParcelCode } from "@/lib/existing-parcel";
 import { tooLongError } from "@/lib/parcel-limits";
+import { cleanPaidMethod } from "@/lib/payment-method";
 import { safeReturnPath } from "@/lib/return-path";
 
 export type ConfirmState = { error: string | null };
@@ -29,7 +30,8 @@ export async function createParcel(
   const fragile = formData.get("fragile") === "on";
   // Payée en ligne par carte : le colis part à 0 DH (rien à encaisser), quel que
   // soit le champ prix. Le montant de la commande (totalPrice) n'est pas modifié.
-  const paidOnline = formData.get("paidOnline") === "on";
+  const paidMethod = cleanPaidMethod(formData.get("paidMethod"));
+  const paidOnline = paidMethod !== null;
   const price = paidOnline ? 0 : Number(priceRaw);
 
   if (carrier !== "FORCELOG" && carrier !== "OZON") {
@@ -107,7 +109,7 @@ export async function createParcel(
           address,
           comment: comment || null,
           fragile,
-          ...(paidOnline ? { paidOnline: true } : { paidOnline: false, totalPrice: price }),
+          ...(paidOnline ? { paidOnline: true, paidMethod } : { paidOnline: false, paidMethod: null, totalPrice: price }),
         },
       });
 
@@ -158,7 +160,7 @@ export async function createParcel(
           address,
           comment: comment || null,
           fragile,
-          ...(paidOnline ? { paidOnline: true } : { paidOnline: false, totalPrice: price }),
+          ...(paidOnline ? { paidOnline: true, paidMethod } : { paidOnline: false, paidMethod: null, totalPrice: price }),
         },
       });
 
