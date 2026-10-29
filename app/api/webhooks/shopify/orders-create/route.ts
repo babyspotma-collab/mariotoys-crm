@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       city,
       phone,
       totalPrice: order.total_price ?? "0",
+      shippingFee: order.total_shipping_price_set?.shop_money?.amount ?? null,
       items: { create: items },
     },
   });

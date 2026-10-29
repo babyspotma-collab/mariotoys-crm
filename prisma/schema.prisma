@@ -26,6 +26,9 @@ model Order {
   // alors à 0 DH chez Forcelog/Ozon, mais totalPrice reste le vrai montant de
   // la commande (chiffre d'affaires).
   paidOnline       Boolean     @default(false)
+  // Frais de livraison facturés au client, compris dans totalPrice (0 = gratuite).
+  // Null = inconnus (commandes d'avant ce champ) ; sert à l'export Excel.
+  shippingFee      Decimal?    @db.Decimal(10, 2)
   // Comment elle a été payée : "CARTE" ou "WAFACASH_CASHPLUS" (lib/payment-method.ts).
   // Null = payée par carte (commandes d'avant ce champ) ou non payée.
   paidMethod       String?

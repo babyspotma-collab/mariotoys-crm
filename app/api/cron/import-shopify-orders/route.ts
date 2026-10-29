@@ -24,6 +24,7 @@ type Node = {
   cancelledAt: string | null;
   phone: string | null;
   totalPriceSet: { shopMoney: { amount: string } };
+  totalShippingPriceSet: { shopMoney: { amount: string } } | null;
   shippingAddress: { firstName: string | null; lastName: string | null; address1: string | null; city: string | null; phone: string | null } | null;
   lineItems: { nodes: { title: string; variantTitle: string | null; quantity: number; variant: { id: string } | null; originalUnitPriceSet: { shopMoney: { amount: string } } }[] };
 };
@@ -35,6 +36,7 @@ const QUERY = `
       nodes {
         legacyResourceId name createdAt cancelledAt phone
         totalPriceSet { shopMoney { amount } }
+        totalShippingPriceSet { shopMoney { amount } }
         shippingAddress { firstName lastName address1 city phone }
         lineItems(first: 50) { nodes { title variantTitle quantity variant { id } originalUnitPriceSet { shopMoney { amount } } } }
       }
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
           city: a?.city ?? "",
           phone: normalizeMoroccanPhone(a?.phone ?? n.phone ?? ""),
           totalPrice: n.totalPriceSet.shopMoney.amount,
+          shippingFee: n.totalShippingPriceSet?.shopMoney.amount ?? null,
           status: n.cancelledAt ? ("ANNULEE" as const) : ("NOUVELLE" as const),
           createdAt: new Date(n.createdAt),
         };

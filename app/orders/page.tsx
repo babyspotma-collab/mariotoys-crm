@@ -7,6 +7,7 @@ import AutoConfirmPanel from "@/components/AutoConfirmPanel";
 import CasaMenu from "@/components/CasaMenu";
 import ConfirmButton from "@/components/ConfirmButton";
 import EmptyState from "@/components/EmptyState";
+import ExportMonth from "@/components/ExportMonth";
 import MoreMenu from "@/components/MoreMenu";
 import PageHeader from "@/components/PageHeader";
 import PeriodFilter from "@/components/PeriodFilter";
@@ -211,7 +212,10 @@ export default async function DashboardPage({
 
       <AutoConfirmPanel toConfirm={auto.toConfirm} toReview={auto.toReview} />
 
-      <PeriodFilter action="/orders" keep={{ tab, q }} range={range} />
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <PeriodFilter action="/orders" keep={{ tab, q }} range={range} />
+        <ExportMonth defaultMonth={range.from.slice(0, 7)} />
+      </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <Segmented

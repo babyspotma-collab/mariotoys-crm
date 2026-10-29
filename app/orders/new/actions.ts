@@ -59,6 +59,7 @@ export async function createManualOrder(
       city,
       address,
       totalPrice,
+      shippingFee: shipping,
       paidOnline: paidMethod !== null,
       paidMethod,
       items: { create: items.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price })) },
