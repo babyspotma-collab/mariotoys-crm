@@ -1,6 +1,6 @@
 // Vérification rapide : npx tsx lib/orders-export.check.ts
 import assert from "node:assert";
-import { exportRow, monthPeriod, transporterName, type ExportOrder } from "./orders-export";
+import { STATE_FILL, carrierFill, exportRow, monthBanner, monthPeriod, transporterName, type ExportOrder } from "./orders-export";
 
 const oct = monthPeriod("2026-10")!;
 assert.equal(oct.from, "2026-10-01");
@@ -13,6 +13,8 @@ assert.equal(monthPeriod("octobre"), null);
 assert.equal(monthPeriod(undefined), null);
 
 const base: ExportOrder = {
+  orderNumber: "#7001",
+  localNote: null,
   createdAt: new Date("2026-10-05T10:00:00Z"),
   customerName: "Sara B.",
   city: "Rabat",
@@ -46,29 +48,46 @@ assert.equal(exportRow({ ...base, shippingFee: 0 }).fraisLivraison, 0, "livraiso
 
 // Retours : colis refusé/annulé/retourné (Forcelog et Ozon), retour d'une livraison Casa.
 const parcel = (carrier: "FORCELOG" | "OZON", statusCode: string | null, status: string) => ({ carrier, statusCode, status });
-assert.equal(exportRow(base).retourne, false);
+assert.equal(exportRow(base).state, "encours");
 assert.equal(exportRow(base).remarque, "");
 assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Retourné")] }).remarque, "Retourné");
-assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Refusé")] }).retourne, true);
-assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Livré")] }).retourne, false);
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "RETURNED", "Retourné")] }).retourne, true, "retourné chez Forcelog");
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).retourne, false);
-assert.equal(exportRow({ ...base, ozonCode: "O1", ozonStatus: "Annulé" }).retourne, true, "sans ligne Parcel : statut de la commande");
-assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "RETOUR" }).retourne, true);
-assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "LIVREE" }).retourne, false);
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Refusé")] }).state === "retour", true);
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Livré")] }).state === "retour", false);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "RETURNED", "Retourné")] }).state === "retour", true, "retourné chez Forcelog");
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).state === "retour", false);
+assert.equal(exportRow({ ...base, ozonCode: "O1", ozonStatus: "Annulé" }).state === "retour", true, "sans ligne Parcel : statut de la commande");
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "RETOUR" }).state === "retour", true);
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "LIVREE" }).state === "retour", false);
 
 // Colis sans code machine, seulement un libellé (cas réel de Forcelog et Ozon).
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Reçu par client")] }).retourne, true);
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Expédier vers client")] }).retourne, true);
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Préparation Retour")] }).retourne, true);
-assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Retourné Expédié au client")] }).retourne, true);
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Nouveau")] }).retourne, false);
-assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Reporté 2026-10-29")] }).retourne, false);
-assert.equal(exportRow({ ...base, forcelogCode: "F1", forcelogStatusCode: "RETURNED", forcelogStatus: "Retourné" }).retourne, true, "statut sur la commande");
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Reçu par client")] }).state === "retour", true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Expédier vers client")] }).state === "retour", true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Préparation Retour")] }).state === "retour", true);
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Retourné Expédié au client")] }).state === "retour", true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Nouveau")] }).state === "retour", false);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Reporté 2026-10-29")] }).state === "retour", false);
+assert.equal(exportRow({ ...base, forcelogCode: "F1", forcelogStatusCode: "RETURNED", forcelogStatus: "Retourné" }).state === "retour", true, "statut sur la commande");
 assert.equal(
-  exportRow({ ...base, forcelogCode: "F1", forcelogStatus: "Retourné", parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).retourne,
-  false,
+  exportRow({ ...base, forcelogCode: "F1", forcelogStatus: "Retourné", parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).state,
+  "livree",
   "dernier colis livré : pas un retour"
 );
+
+// Format de la feuille de suivi : statut, confirmation, prix vide pour un retour, couleurs, bandeau.
+const delivered = exportRow({ ...base, parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] });
+assert.deepEqual([delivered.statut, delivered.confirmation, delivered.prix], ["livrée", "valider", 349]);
+const back = exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Reçu par client")] });
+assert.deepEqual([back.statut, back.confirmation, back.prix, back.remarque], ["RETOUR", "annuler", null, "Retourné"]);
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "LIVREE" }).statut, "livrée");
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "A_LIVRER" }).statut, "en cours");
+assert.equal(exportRow({ ...base, localNote: "Appeler avant" }).remarque, "Appeler avant");
+assert.equal(exportRow({ ...base, orderNumber: "#7848" }).numero, "#7848");
+assert.equal(carrierFill("Forcelog"), "FFE6DDF5");
+assert.equal(carrierFill(""), null);
+assert.equal(carrierFill("Younes"), carrierFill("Younes"), "couleur stable pour un livreur inconnu");
+assert.ok(STATE_FILL.livree && STATE_FILL.retour && STATE_FILL.encours === null);
+assert.equal(monthBanner("2026-10"), "Mois d'Octobre 01/10/2026");
+assert.equal(monthBanner("2026-06"), "Mois de Juin 01/06/2026");
+assert.equal(monthBanner("2026-08"), "Mois d'Août 01/08/2026");
 
 console.log("orders-export checks OK");
