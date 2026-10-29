@@ -1,8 +1,8 @@
 import { orderSearchWhere } from "@/lib/order-search";
-import { paidLabel } from "@/lib/payment-method";
+import { paidBadge } from "@/lib/payment-method";
 import { prisma } from "@/lib/db";
 import { cancelOrder, confirmOrder, detachParcel, startLocalDelivery } from "./actions";
-import { ArrowCounterClockwise, Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, CreditCard, Phone, Plus, XCircle } from "@phosphor-icons/react/dist/ssr";
 import AutoConfirmPanel from "@/components/AutoConfirmPanel";
 import CasaMenu from "@/components/CasaMenu";
 import ConfirmButton from "@/components/ConfirmButton";
@@ -284,7 +284,14 @@ export default async function DashboardPage({
                       <span className="lg:hidden">{order.city} · </span>
                       {orderNumberLabel(order.orderNumber)}, {formatDateTimeMa(order.createdAt)}
                     </div>
-                    {paidLabel(order) && <div className="mt-1 text-xs font-medium text-pill-green-fg">{paidLabel(order)}</div>}
+                    {paidBadge(order) && (
+                      <div className="mt-1.5">
+                        <span className="inline-flex h-6 items-center gap-1.5 rounded-md bg-pill-green-bg px-2 text-xs font-semibold text-pill-green-fg">
+                          <CreditCard size={14} weight="bold" aria-hidden="true" />
+                          {paidBadge(order)}
+                        </span>
+                      </div>
+                    )}
                     {order.autoConfirmedAt && (
                       <div className="mt-1 text-xs font-medium text-pill-green-fg">Confirmée automatiquement (colis envoyé)</div>
                     )}

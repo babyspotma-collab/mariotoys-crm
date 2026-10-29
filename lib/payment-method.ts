@@ -16,6 +16,18 @@ export function cleanPaidMethod(raw: unknown): PaidMethod | null {
   return PAID_METHODS.find((m) => m === raw) ?? null;
 }
 
+// Texte court du badge de la liste des commandes.
+export const PAID_METHOD_BADGE: Record<PaidMethod, string> = {
+  CARTE: "Payée par carte",
+  WAFACASH_CASHPLUS: "Payée Wafacash / Cashplus",
+};
+
+/** Texte du badge, ou null si la commande n'est pas déjà payée. */
+export function paidBadge(order: { paidOnline: boolean; paidMethod: string | null }): string | null {
+  if (!order.paidOnline) return null;
+  return PAID_METHOD_BADGE[cleanPaidMethod(order.paidMethod) ?? "CARTE"];
+}
+
 /** Libellé à afficher, ou null si la commande n'est pas déjà payée. */
 export function paidLabel(order: { paidOnline: boolean; paidMethod: string | null }): string | null {
   if (!order.paidOnline) return null;
