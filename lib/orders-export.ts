@@ -26,6 +26,7 @@ export type ExportOrder = {
   localCourier: string | null;
   localStatus: string | null;
   forcelogStatusCode: string | null;
+  forcelogStatus: string | null;
   ozonStatus: string | null;
   // Le plus récent en premier.
   parcels: { carrier: "FORCELOG" | "OZON"; statusCode: string | null; status: string }[];
@@ -44,12 +45,26 @@ const dateMa = new Intl.DateTimeFormat("fr-FR", { timeZone: "Africa/Casablanca",
 const toNumber = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number(String(v)));
 
 /** Colis refusé / annulé / retourné chez Forcelog ou Ozon Express, ou livraison Casa marquée en retour. */
-export function isReturned(o: Pick<ExportOrder, "localDelivery" | "localStatus" | "forcelogCode" | "ozonCode" | "forcelogStatusCode" | "ozonStatus" | "parcels">): boolean {
+//
+// Beaucoup de colis n'ont pas de code machine (statusCode vide) et seulement un
+// libellé ("Retourné Reçu par client", "Retourné Expédié au client"…) : le
+// libellé est donc lu aussi, en plus des catégories des pages Colis.
+const RETURN_TEXT = /retourn|refus|annul|rembours/i;
+
+function parcelReturned(carrier: "FORCELOG" | "OZON", statusCode: string | null, status: string): boolean {
+  return parcelBucket(carrier, statusCode, status) === "returns" || RETURN_TEXT.test(status);
+}
+
+export function isReturned(
+  o: Pick<ExportOrder, "localDelivery" | "localStatus" | "forcelogCode" | "ozonCode" | "forcelogStatusCode" | "forcelogStatus" | "ozonStatus" | "parcels">
+): boolean {
   if (o.localDelivery) return o.localStatus === "RETOUR";
   const last = o.parcels[0]; // le plus récent (la requête les trie ainsi)
-  if (last) return parcelBucket(last.carrier, last.statusCode, last.status) === "returns";
-  if (o.forcelogCode) return parcelBucket("FORCELOG", o.forcelogStatusCode, "") === "returns";
-  if (o.ozonCode) return parcelBucket("OZON", null, o.ozonStatus ?? "") === "returns";
+  if (last && parcelBucket(last.carrier, last.statusCode, last.status) === "delivered") return false;
+  if (last && parcelReturned(last.carrier, last.statusCode, last.status)) return true;
+  // Statut gardé sur la commande elle-même (peut être plus à jour que la ligne colis).
+  if (o.forcelogCode && parcelReturned("FORCELOG", o.forcelogStatusCode, o.forcelogStatus ?? "")) return true;
+  if (o.ozonCode && parcelReturned("OZON", null, o.ozonStatus ?? "")) return true;
   return false;
 }
 

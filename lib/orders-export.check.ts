@@ -25,6 +25,7 @@ const base: ExportOrder = {
   localCourier: null,
   localStatus: null,
   forcelogStatusCode: null,
+  forcelogStatus: null,
   ozonStatus: null,
   parcels: [],
   items: [{ title: "Licorne", quantity: 2 }, { title: "Puzzle", quantity: 1 }],
@@ -55,5 +56,19 @@ assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "DELIVERED", "Liv
 assert.equal(exportRow({ ...base, ozonCode: "O1", ozonStatus: "Annulé" }).retourne, true, "sans ligne Parcel : statut de la commande");
 assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "RETOUR" }).retourne, true);
 assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "LIVREE" }).retourne, false);
+
+// Colis sans code machine, seulement un libellé (cas réel de Forcelog et Ozon).
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Reçu par client")] }).retourne, true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Expédier vers client")] }).retourne, true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Retourné Préparation Retour")] }).retourne, true);
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Retourné Expédié au client")] }).retourne, true);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Nouveau")] }).retourne, false);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", null, "Reporté 2026-10-29")] }).retourne, false);
+assert.equal(exportRow({ ...base, forcelogCode: "F1", forcelogStatusCode: "RETURNED", forcelogStatus: "Retourné" }).retourne, true, "statut sur la commande");
+assert.equal(
+  exportRow({ ...base, forcelogCode: "F1", forcelogStatus: "Retourné", parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).retourne,
+  false,
+  "dernier colis livré : pas un retour"
+);
 
 console.log("orders-export checks OK");

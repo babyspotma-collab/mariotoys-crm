@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       localCourier: true,
       localStatus: true,
       forcelogStatusCode: true,
+      forcelogStatus: true,
       ozonStatus: true,
       parcels: { select: { carrier: true, statusCode: true, status: true }, orderBy: { carrierCreatedAt: { sort: "desc", nulls: "last" } }, take: 1 },
       items: { select: { title: true, quantity: true } },
