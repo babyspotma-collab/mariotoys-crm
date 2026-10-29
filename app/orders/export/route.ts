@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { exportRow, monthPeriod } from "@/lib/orders-export";
@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
       ozonCode: true,
       localDelivery: true,
       localCourier: true,
-      parcels: { select: { carrier: true }, take: 1 },
+      localStatus: true,
+      forcelogStatusCode: true,
+      ozonStatus: true,
+      parcels: { select: { carrier: true, statusCode: true, status: true }, orderBy: { carrierCreatedAt: { sort: "desc", nulls: "last" } }, take: 1 },
       items: { select: { title: true, quantity: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -47,14 +50,25 @@ export async function GET(req: NextRequest) {
     { header: "Transporteur", key: "transporteur", width: 16 },
     { header: "Frais de livraison", key: "fraisLivraison", width: 18, style: { numFmt: '#,##0.00 "DH"' } },
     { header: "Prix de la commande", key: "prix", width: 20, style: { numFmt: '#,##0.00 "DH"' } },
+    { header: "Remarque", key: "remarque", width: 14 },
   ];
-  ws.addRows(rows);
+  ws.addRows(rows.map(({ retourne: _r, ...cells }) => cells));
   ws.getRow(1).font = { bold: true };
   ws.views = [{ state: "frozen", ySplit: 1 }];
   ws.eachRow((row) => {
     row.alignment = { vertical: "top", wrapText: true };
   });
 
+  // Colis retournés : ligne surlignée en rouge (la colonne Remarque dit "Retourné").
+  rows.forEach((r, i) => {
+    if (!r.retourne) return;
+    ws.getRow(i + 2).eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8C9C9" } };
+      cell.font = { color: { argb: "FF9B1C1C" } };
+    });
+  });
+
+  const returnedRows = rows.filter((r) => r.retourne);
   const total = ws.addRow({
     date: "Total",
     articles: `${rows.length} commande${rows.length > 1 ? "s" : ""}`,
@@ -62,6 +76,12 @@ export async function GET(req: NextRequest) {
     prix: rows.reduce((s, r) => s + r.prix, 0),
   });
   total.font = { bold: true };
+  const ret = ws.addRow({
+    date: "Dont retournés",
+    articles: `${returnedRows.length} commande${returnedRows.length > 1 ? "s" : ""}`,
+    prix: returnedRows.reduce((s, r) => s + r.prix, 0),
+  });
+  ret.font = { bold: true, color: { argb: "FF9B1C1C" } };
 
   const buffer = await wb.xlsx.writeBuffer();
   return new NextResponse(buffer as ArrayBuffer, {
@@ -72,3 +92,4 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+

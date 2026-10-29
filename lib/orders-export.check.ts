@@ -23,13 +23,16 @@ const base: ExportOrder = {
   ozonCode: null,
   localDelivery: false,
   localCourier: null,
+  localStatus: null,
+  forcelogStatusCode: null,
+  ozonStatus: null,
   parcels: [],
   items: [{ title: "Licorne", quantity: 2 }, { title: "Puzzle", quantity: 1 }],
 };
 assert.equal(transporterName(base), "", "aucun colis : transporteur vide");
 assert.equal(transporterName({ ...base, forcelogCode: "F1" }), "Forcelog");
 assert.equal(transporterName({ ...base, ozonCode: "O1" }), "Ozon Express");
-assert.equal(transporterName({ ...base, parcels: [{ carrier: "OZON" }] }), "Ozon Express");
+assert.equal(transporterName({ ...base, parcels: [{ carrier: "OZON", statusCode: null, status: "Livré" }] }), "Ozon Express");
 assert.equal(transporterName({ ...base, localDelivery: true, localCourier: "Amine" }), "Amine");
 
 const row = exportRow(base);
@@ -39,5 +42,18 @@ assert.equal(row.fraisLivraison, 40);
 assert.equal(row.prix, 349);
 assert.equal(exportRow({ ...base, shippingFee: null }).fraisLivraison, null, "frais inconnus : cellule vide");
 assert.equal(exportRow({ ...base, shippingFee: 0 }).fraisLivraison, 0, "livraison gratuite : 0");
+
+// Retours : colis refusé/annulé/retourné (Forcelog et Ozon), retour d'une livraison Casa.
+const parcel = (carrier: "FORCELOG" | "OZON", statusCode: string | null, status: string) => ({ carrier, statusCode, status });
+assert.equal(exportRow(base).retourne, false);
+assert.equal(exportRow(base).remarque, "");
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Retourné")] }).remarque, "Retourné");
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Refusé")] }).retourne, true);
+assert.equal(exportRow({ ...base, parcels: [parcel("OZON", null, "Livré")] }).retourne, false);
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "RETURNED", "Retourné")] }).retourne, true, "retourné chez Forcelog");
+assert.equal(exportRow({ ...base, parcels: [parcel("FORCELOG", "DELIVERED", "Livré")] }).retourne, false);
+assert.equal(exportRow({ ...base, ozonCode: "O1", ozonStatus: "Annulé" }).retourne, true, "sans ligne Parcel : statut de la commande");
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "RETOUR" }).retourne, true);
+assert.equal(exportRow({ ...base, localDelivery: true, localCourier: "Amine", localStatus: "LIVREE" }).retourne, false);
 
 console.log("orders-export checks OK");
