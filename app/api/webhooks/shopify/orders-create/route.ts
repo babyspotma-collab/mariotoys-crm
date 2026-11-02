@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyShopifyWebhook } from "@/lib/shopify-verify";
 import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { isPaidByCard } from "@/lib/shopify-payment";
 
 // Shopify webhook orders/create — reçoit CHAQUE nouvelle commande, sans
 // filtre (contrairement à une éventuelle automatisation qui ne traiterait
@@ -40,6 +41,8 @@ export async function POST(req: NextRequest) {
     shopifyVariantId: li.variant_id ? `gid://shopify/ProductVariant/${li.variant_id}` : null,
   }));
 
+  const paidByCard = isPaidByCard(order.financial_status, order.payment_gateway_names);
+
   await prisma.order.upsert({
     where: { shopifyOrderId: String(order.id) },
     update: {}, // une commande existante n'est jamais réécrite par le webhook
@@ -52,6 +55,8 @@ export async function POST(req: NextRequest) {
       phone,
       totalPrice: order.total_price ?? "0",
       shippingFee: order.total_shipping_price_set?.shop_money?.amount ?? null,
+      // Payée par carte sur Shopify (Payzone…) : rien à encaisser à la livraison.
+      ...(paidByCard ? { paidOnline: true, paidMethod: "CARTE" } : {}),
       items: { create: items },
     },
   });

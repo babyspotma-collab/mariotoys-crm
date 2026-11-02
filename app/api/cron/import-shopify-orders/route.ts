@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { gql } from "@/lib/shopify-admin";
+import { isPaidByCard } from "@/lib/shopify-payment";
 
 // Réimporte les commandes Shopify absentes du CRM (base repartie de zéro
 // après la migration vers Neon du 07/10/2026 : l'ancienne base n'a pas pu
@@ -25,6 +26,8 @@ type Node = {
   phone: string | null;
   totalPriceSet: { shopMoney: { amount: string } };
   totalShippingPriceSet: { shopMoney: { amount: string } } | null;
+  displayFinancialStatus: string | null;
+  paymentGatewayNames: string[];
   shippingAddress: { firstName: string | null; lastName: string | null; address1: string | null; city: string | null; phone: string | null } | null;
   lineItems: { nodes: { title: string; variantTitle: string | null; quantity: number; variant: { id: string } | null; originalUnitPriceSet: { shopMoney: { amount: string } } }[] };
 };
@@ -37,6 +40,7 @@ const QUERY = `
         legacyResourceId name createdAt cancelledAt phone
         totalPriceSet { shopMoney { amount } }
         totalShippingPriceSet { shopMoney { amount } }
+        displayFinancialStatus paymentGatewayNames
         shippingAddress { firstName lastName address1 city phone }
         lineItems(first: 50) { nodes { title variantTitle quantity variant { id } originalUnitPriceSet { shopMoney { amount } } } }
       }
@@ -91,6 +95,7 @@ export async function POST(req: NextRequest) {
           phone: normalizeMoroccanPhone(a?.phone ?? n.phone ?? ""),
           totalPrice: n.totalPriceSet.shopMoney.amount,
           shippingFee: n.totalShippingPriceSet?.shopMoney.amount ?? null,
+          ...(isPaidByCard(n.displayFinancialStatus, n.paymentGatewayNames) ? { paidOnline: true, paidMethod: "CARTE" } : {}),
           status: n.cancelledAt ? ("ANNULEE" as const) : ("NOUVELLE" as const),
           createdAt: new Date(n.createdAt),
         };
