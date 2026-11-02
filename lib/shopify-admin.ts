@@ -18,12 +18,12 @@ async function getAccessToken(): Promise<string> {
     throw new Error("SHOPIFY_STORE, SHOPIFY_CLIENT_ID ou SHOPIFY_CLIENT_SECRET manquant");
   }
 
-  const res = await fetch(`https://${STORE}/admin/oauth/access_token`, {
+  const res = await fetch(`https://${STORE.trim()}/admin/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      client_id: CLIENT_ID.trim(),
+      client_secret: CLIENT_SECRET.trim(),
       grant_type: "client_credentials",
     }),
   });
@@ -31,6 +31,7 @@ async function getAccessToken(): Promise<string> {
   const data = await res.json();
   if (!data.access_token) throw new Error(`Pas de token Shopify: ${JSON.stringify(data)}`);
 
+  console.info("Shopify : jeton obtenu", { scope: data.scope, expiresIn: data.expires_in });
   // Pas de expires_in documenté de façon fiable pour ce flow — on garde
   // le token en cache 50 minutes par prudence plutôt que de le refaire à
   // chaque appel.
@@ -38,13 +39,23 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+async function callGraphql(query: string, variables?: Record<string, unknown>): Promise<Response> {
   const token = await getAccessToken();
-  const res = await fetch(`https://${STORE}/admin/api/${API_VERSION}/graphql.json`, {
+  return fetch(`https://${STORE?.trim()}/admin/api/${API_VERSION}/graphql.json`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
     body: JSON.stringify({ query, variables }),
   });
+}
+
+export async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  let res = await callGraphql(query, variables);
+  if (res.status === 401) {
+    // Jeton refusé (révoqué, expiré avant les 50 min prévues) : on en redemande un neuf une fois.
+    console.error("Shopify 401 : jeton refusé, nouvelle demande de jeton", { store: STORE?.trim(), apiVersion: API_VERSION });
+    cachedToken = null;
+    res = await callGraphql(query, variables);
+  }
   if (!res.ok) throw new Error(`Shopify GraphQL HTTP ${res.status}: ${await res.text()}`);
   const json = await res.json();
   if (json.errors) throw new Error(`Shopify GraphQL errors: ${JSON.stringify(json.errors)}`);
