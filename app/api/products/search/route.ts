@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
     const q = (req.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 80);
     if (q.length < 2) return NextResponse.json({ products: [] });
     return NextResponse.json({ products: await searchProducts(q, 10) });
-  } catch {
+  } catch (err) {
+    console.error("products/search :", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Catalogue Shopify indisponible" }, { status: 502 });
   }
 }

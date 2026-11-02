@@ -142,8 +142,17 @@ export type ProductSuggestion = ShopifyProductSummary & { status: string };
 
 /** Propositions pour la saisie `query` : meilleures correspondances d'abord, avec leur image. */
 export async function searchProducts(query: string, limit = 10): Promise<ProductSuggestion[]> {
-  const { index } = await getCatalogue();
-  const found = matchProducts(index, query, limit);
+  let found: CatalogueEntry[];
+  try {
+    const { index } = await getCatalogue();
+    found = matchProducts(index, query, limit);
+  } catch (err) {
+    // Catalogue complet impossible à charger (limite de débit Shopify, démarrage à
+    // froid trop long…) : on retombe sur la recherche native de Shopify, moins
+    // souple (début de mot, accents) mais qui répond toujours.
+    console.error("Catalogue Shopify indisponible, recherche native :", err instanceof Error ? err.message : err);
+    return (await listProducts(query, limit)).map((p) => ({ ...p, status: "ACTIVE" }));
+  }
   if (found.length === 0) return [];
   const data = await gql<{ nodes: ({ id: string; featuredImage: { url: string } | null } | null)[] }>(
     `query ($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id featuredImage { url } } } }`,
