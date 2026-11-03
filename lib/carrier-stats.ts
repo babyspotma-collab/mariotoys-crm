@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { categoryById } from "@/lib/parcel-categories";
 import { ozonCategoryById } from "@/lib/ozon-categories";
+import { parcelInRange } from "@/lib/parcel-date";
 
 // Tableau comparatif par transporteur (page Statistiques). "Retours" =
 // catégorie "cancelled" (refusé/annulé/retourné, voir lib/parcel-categories.ts
@@ -31,7 +32,7 @@ async function rowFor(
   cancelledWhere: Record<string, unknown>,
   range: Range
 ): Promise<CarrierStatRow> {
-  const dateFilter = { carrierCreatedAt: { gte: range.start, lt: range.end } };
+  const dateFilter = parcelInRange(range);
 
   const [sent, delivered, returns, delayRows, invoiceAgg] = await Promise.all([
     prisma.parcel.count({ where: { carrier, ...dateFilter } }),

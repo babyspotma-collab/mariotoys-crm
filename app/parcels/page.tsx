@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+﻿import { prisma } from "@/lib/db";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import PeriodFilter from "@/components/PeriodFilter";
@@ -25,6 +25,7 @@ import {
 import { formatDh } from "@/lib/format";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { createOzonDeliveryNote, relaunch } from "./actions";
+import { parcelInRange } from "@/lib/parcel-date";
 
 const NO_ANSWER_CODES = categoryById("noAnswer").codes;
 
@@ -59,7 +60,7 @@ export default async function ParcelsPage({
   const view = searchParams.view === "notes" || searchParams.view === "pickups" ? searchParams.view : "parcels";
   const carrierName = carrier === "forcelog" ? "Forcelog" : "Ozon Express";
 
-  // En-tête commun : transporteur + onglets Colis / Bons de livraison / Ramassages.
+  // En-tÃªte commun : transporteur + onglets Colis / Bons de livraison / Ramassages.
   const header = (subtitle: string) => (
     <>
       <PageHeader
@@ -120,7 +121,7 @@ export default async function ParcelsPage({
 
   const where: Record<string, unknown> = {
     carrier: carrier.toUpperCase(),
-    carrierCreatedAt: { gte: range.start, lt: range.end },
+    AND: [parcelInRange(range)], // AND : la recherche ci-dessous utilise dÃ©jÃ  OR
     ...parcelWhereFor(carrier, filter),
     ...(q
       ? {
@@ -137,12 +138,12 @@ export default async function ParcelsPage({
     prisma.parcel.findMany({
       where,
       include: { order: true },
-      orderBy: { carrierCreatedAt: "desc" },
+      orderBy: { carrierCreatedAt: { sort: "desc", nulls: "last" } },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
     prisma.parcel.count({ where }),
-    // Colis Ozon pouvant entrer dans un bon de livraison (cases à cocher).
+    // Colis Ozon pouvant entrer dans un bon de livraison (cases Ã  cocher).
     carrier === "ozon" ? eligibleOzonCodes() : Promise.resolve(new Set<string>()),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
@@ -150,8 +151,8 @@ export default async function ParcelsPage({
   const allTabs: { id: ColisFilter; label: string; count: number }[] = [
     { id: "all", label: "Tous", count: buckets.all },
     { id: "ongoing", label: "En cours", count: buckets.ongoing },
-    { id: "delivered", label: "Livrés", count: buckets.delivered },
-    { id: "todo", label: "À traiter", count: buckets.todo },
+    { id: "delivered", label: "LivrÃ©s", count: buckets.delivered },
+    { id: "todo", label: "Ã€ traiter", count: buckets.todo },
   ];
   const tabs = allTabs.filter((t) => t.id === "all" || t.count > 0);
 
@@ -163,15 +164,15 @@ export default async function ParcelsPage({
 
   return (
     <>
-      {header(`${range.label} · ${buckets.all} colis, ${buckets.delivered} livrés, ${buckets.todo} à traiter`)}
+      {header(`${range.label} Â· ${buckets.all} colis, ${buckets.delivered} livrÃ©s, ${buckets.todo} Ã  traiter`)}
 
       {eligible.size > 0 && (
         <p className="rounded-[10px] bg-pill-blue-bg px-3.5 py-3 text-sm text-pill-blue-fg">
-          {eligible.size} colis Ozon pas encore dans un bon de livraison : cochez-les pour créer le bon.
+          {eligible.size} colis Ozon pas encore dans un bon de livraison : cochez-les pour crÃ©er le bon.
         </p>
       )}
       <form id="bl-form" action={createOzonDeliveryNote} className="hidden" />
-      <SelectionBar formId="bl-form" buttonLabel="Créer un bon de livraison" />
+      <SelectionBar formId="bl-form" buttonLabel="CrÃ©er un bon de livraison" />
 
       <PeriodFilter action="/parcels" keep={{ carrier, filter, q }} range={range} />
 
@@ -185,19 +186,19 @@ export default async function ParcelsPage({
           hidden={{ carrier, filter, ...periodKeep }}
           defaultValue={q}
           label="Rechercher un colis"
-          placeholder="Nom, ville, n° de suivi"
+          placeholder="Nom, ville, nÂ° de suivi"
         />
       </div>
 
       {visible.length === 0 ? (
         q ? (
-          <EmptyState title={`Aucun résultat pour « ${q} »`}>
+          <EmptyState title={`Aucun rÃ©sultat pour Â« ${q} Â»`}>
             <a href={`/parcels?${new URLSearchParams({ carrier, filter, ...periodKeep })}`} className="font-medium text-ink underline underline-offset-4">
               Effacer la recherche
             </a>
           </EmptyState>
         ) : (
-          <EmptyState title="Aucun colis sur cette période dans cette catégorie" />
+          <EmptyState title="Aucun colis sur cette pÃ©riode dans cette catÃ©gorie" />
         )
       ) : (
         <ul className="card divide-y divide-line-soft">
@@ -224,13 +225,13 @@ export default async function ParcelsPage({
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    {/* Lien étiré : toute la ligne est cliquable, sans imbriquer le bouton Relancer dans le lien */}
+                    {/* Lien Ã©tirÃ© : toute la ligne est cliquable, sans imbriquer le bouton Relancer dans le lien */}
                     <a href={detailHref} className="block truncate font-semibold no-underline after:absolute after:inset-0 md:font-medium">
                       {parcel.receiver || "Destinataire inconnu"}
                     </a>
                     <div className="mt-0.5 truncate text-[13px] text-muted">
-                      <span className="md:hidden">{parcel.cityName} · </span>
-                      {parcel.order ? `Commande ${parcel.order.orderNumber}` : "Sans commande liée"}
+                      <span className="md:hidden">{parcel.cityName} Â· </span>
+                      {parcel.order ? `Commande ${parcel.order.orderNumber}` : "Sans commande liÃ©e"}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums md:hidden">{formatDh(parcel.price)}</div>
@@ -259,7 +260,7 @@ export default async function ParcelsPage({
 
       <Pagination page={page} totalPages={totalPages} hrefFor={(p) => qsBase({ page: String(p) })} />
 
-      <p className="text-center text-xs text-muted">Mis à jour automatiquement depuis {carrierName}</p>
+      <p className="text-center text-xs text-muted">Mis Ã  jour automatiquement depuis {carrierName}</p>
     </>
   );
 }

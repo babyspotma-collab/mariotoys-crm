@@ -6,6 +6,7 @@ import { monthRange, monthLabel } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
 import { getCarrierStats } from "@/lib/carrier-stats";
 import { getRevenue } from "@/lib/revenue";
+import { parcelInRange } from "@/lib/parcel-date";
 import { PARCEL_CATEGORIES } from "@/lib/parcel-categories";
 import { OZON_CATEGORIES } from "@/lib/ozon-categories";
 
@@ -31,7 +32,7 @@ const STATUS_COLORS: Record<StatusBucket, string> = {
 };
 
 async function statusBreakdown(carrier: CarrierFilter, range: { start: Date; end: Date }) {
-  const dateFilter = { carrierCreatedAt: { gte: range.start, lt: range.end } };
+  const dateFilter = parcelInRange(range);
   const totals: Record<StatusBucket, number> = {
     delivered: 0,
     ongoing: 0,

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { PARCEL_CATEGORIES, ALL_CATEGORIZED_CODES, type ParcelCategoryId } from "./parcel-categories";
+import { parcelInRange } from "@/lib/parcel-date";
 
 export type ParcelCategoryCounts = Record<ParcelCategoryId | "all" | "uncategorized", number>;
 
@@ -7,7 +8,7 @@ export type ParcelCategoryCounts = Record<ParcelCategoryId | "all" | "uncategori
 export async function getParcelCategoryCounts(range?: { start: Date; end: Date }): Promise<ParcelCategoryCounts> {
   const rows = await prisma.parcel.groupBy({
     by: ["statusCode"],
-    where: { carrier: "FORCELOG", ...(range ? { carrierCreatedAt: { gte: range.start, lt: range.end } } : {}) },
+    where: { carrier: "FORCELOG", ...(range ? parcelInRange(range) : {}) },
     _count: true,
   });
 

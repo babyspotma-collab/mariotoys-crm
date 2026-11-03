@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { OZON_CATEGORIES, ALL_OZON_CATEGORIZED_STATUSES, type OzonCategoryId } from "./ozon-categories";
+import { parcelInRange } from "@/lib/parcel-date";
 
 export type OzonCategoryCounts = Record<OzonCategoryId | "all" | "uncategorized", number>;
 
@@ -7,7 +8,7 @@ export type OzonCategoryCounts = Record<OzonCategoryId | "all" | "uncategorized"
 export async function getOzonCategoryCounts(range?: { start: Date; end: Date }): Promise<OzonCategoryCounts> {
   const rows = await prisma.parcel.groupBy({
     by: ["status"],
-    where: { carrier: "OZON", ...(range ? { carrierCreatedAt: { gte: range.start, lt: range.end } } : {}) },
+    where: { carrier: "OZON", ...(range ? parcelInRange(range) : {}) },
     _count: true,
   });
 

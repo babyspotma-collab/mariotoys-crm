@@ -13,6 +13,7 @@
 import { prisma } from "@/lib/db";
 import { categoryById } from "@/lib/parcel-categories";
 import { ozonCategoryById } from "@/lib/ozon-categories";
+import { parcelInRange } from "@/lib/parcel-date";
 
 type Range = { start: Date; end: Date };
 type Money = unknown; // Prisma Decimal | number | string | null
@@ -136,11 +137,20 @@ export function parcelBucket(carrier: "FORCELOG" | "OZON", statusCode: string | 
     if (statusCode && forcelogCodes.delivered.has(statusCode)) return "delivered";
     if (statusCode && forcelogCodes.returns.has(statusCode)) return "returns";
     if (statusCode && forcelogCodes.ongoing.has(statusCode)) return "ongoing";
-    return "other";
+    return textBucket(status);
   }
   if (ozonStatuses.delivered.has(status)) return "delivered";
   if (ozonStatuses.returns.has(status)) return "returns";
   if (ozonStatuses.ongoing.has(status)) return "ongoing";
+  return textBucket(status);
+}
+
+// Beaucoup de colis n'ont pas de code machine, seulement un libellé français
+// ("Livré", "Retourné Reçu par client"…) : on le lit pour ne pas les ranger en "autre".
+const RETURN_TEXT = /retourn|refus|annul|rembours/i;
+function textBucket(status: string): ParcelBucket {
+  if (/^livr[ée]e?$/i.test(status.trim())) return "delivered";
+  if (RETURN_TEXT.test(status)) return "returns";
   return "other";
 }
 
@@ -241,7 +251,7 @@ export type HomeStats = {
 
 export async function getHomeStats(range: Range): Promise<HomeStats> {
   const created = { createdAt: { gte: range.start, lt: range.end } };
-  const parcelDate = { carrierCreatedAt: { gte: range.start, lt: range.end } };
+  const parcelDate = parcelInRange(range);
 
   const [orderGroups, cityGroups, parcelGroups, invoiceGroups, casaPending, casaPeriod] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], where: created, _count: true, _sum: { totalPrice: true } }),
