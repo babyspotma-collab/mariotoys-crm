@@ -49,6 +49,7 @@ export default function ConfirmForm({
   const [state, formAction] = useFormState(action, initialState);
   const [paidMethod, setPaidMethod] = useState<PaidMethod | null>(initialValues.paidMethod);
   const paidOnline = paidMethod !== null;
+  const [price, setPrice] = useState(String(initialValues.price));
   const [carrier, setCarrier] = useState<"FORCELOG" | "OZON">("FORCELOG");
   // Champs limités en longueur selon le transporteur (voir lib/parcel-limits.ts) :
   // contrôlés pour afficher le compteur et bloquer la saisie au-delà.
@@ -257,9 +258,19 @@ export default function ConfirmForm({
                 step="0.01"
                 min="0"
                 required
-                defaultValue={initialValues.price}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
                 className="input tabular-nums"
               />
+            )}
+            {!paidOnline && (
+              <button
+                type="button"
+                onClick={() => setPrice(String((Number(price) || 0) + 20))}
+                className="mt-2 rounded-md border border-line-soft px-2.5 py-1 text-xs font-medium hover:bg-black/5"
+              >
+                +20 DH
+              </button>
             )}
           </div>
         </div>
