@@ -75,8 +75,16 @@ function parseYmd(s?: string): { y: number; m: number; d: number } | null {
 
 const frDate = (s: string) => s.split("-").reverse().join("/");
 
-export function periodRange(params: { period?: string; from?: string; to?: string }, now = new Date()): PeriodRange {
+export function periodRange(params: { period?: string; from?: string; to?: string; month?: string }, now = new Date()): PeriodRange {
   const t = maToday(now);
+
+  // ?month=2026-10 : un mois complet (sélecteur de mois), rendu comme une période personnalisée.
+  const mm = params.month?.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if (mm) {
+    const y = Number(mm[1]);
+    const m = Number(mm[2]) - 1; // mois à partir de 0, comme dans parseYmd
+    return { period: "custom", start: maMidnight(y, m, 1), end: maMidnight(y, m + 1, 1), from: ymd(y, m, 1), to: ymd(y, m + 1, 0), label: monthLabel(`${mm[1]}-${mm[2]}`) };
+  }
 
   if (params.period === "today") {
     return { period: "today", start: maMidnight(t.y, t.m, t.d), end: maMidnight(t.y, t.m, t.d + 1), from: ymd(t.y, t.m, t.d), to: ymd(t.y, t.m, t.d), label: "Aujourd'hui" };

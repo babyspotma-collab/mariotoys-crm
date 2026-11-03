@@ -41,6 +41,18 @@ export default function PeriodFilter({
         className="w-full flex-wrap md:w-fit md:flex-nowrap [&>a]:basis-[45%] md:[&>a]:basis-auto"
         items={PRESETS.map((p) => ({ href: href(p.id), label: p.label, active: range.period === p.id }))}
       />
+      <form action={action} className="flex items-end gap-2">
+        {Object.entries(kept).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted md:flex-none">
+          Mois complet
+          <input type="month" name="month" defaultValue={range.from.slice(0, 7)} required className="input" />
+        </label>
+        <button type="submit" className="btn-primary">
+          OK
+        </button>
+      </form>
       {range.period === "custom" && (
         <form action={action} className="flex items-end gap-2">
           {Object.entries({ ...kept, period: "custom" }).map(([name, value]) => (
