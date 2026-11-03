@@ -107,12 +107,12 @@ export default async function StatsPage({
   const sales = [
     { label: "Commandes", value: formatInt(totalOrders), sub: `${totalOrders - confirmed} encore à confirmer` },
     {
-      label: "CA réel (livré)",
-      value: formatDh(revenue.delivered.amount),
-      sub: `${revenue.delivered.count} livrées sur ${confirmed} confirmées (${formatDh(revenue.confirmedAmount)})`,
+      label: "CA réel",
+      value: formatDh(revenue.sales.amount),
+      sub: `${revenue.sales.count} parties sur ${confirmed} confirmées (${formatDh(revenue.confirmedAmount)})`,
     },
     { label: "Taux de confirmation", value: `${confirmationRate} %`, sub: "Confirmées / reçues" },
-    { label: "Panier moyen", value: revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket), sub: "Sur les commandes livrées" },
+    { label: "Panier moyen", value: revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket), sub: "Sur les commandes parties" },
   ];
 
   const visibleCarrierRows = carrier === "all" ? carrierRows : carrierRows.filter((r) => r.id === carrier);

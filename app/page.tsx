@@ -62,11 +62,11 @@ export default async function HomePage({
           <StatCard label="Annulées" value={formatInt(orders.annulee)} sub={orders.total > 0 ? `${Math.round((orders.annulee / orders.total) * 100)} % des commandes` : "—"} />
           <StatCard
             label="Chiffre d'affaires réel"
-            value={formatDh(revenue.delivered.amount)}
-            sub={`${formatInt(revenue.delivered.count)} commandes livrées`}
+            value={formatDh(revenue.sales.amount)}
+            sub={`${formatInt(revenue.sales.count)} commandes parties (livrées + en cours)`}
           />
-          <StatCard label="Panier moyen" value={revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket)} sub="sur les livrées" />
-          <StatCard label="En cours de livraison" value={formatDh(revenue.ongoing.amount)} sub={`${formatInt(revenue.ongoing.count)} commandes · pas encore encaissées`} />
+          <StatCard label="Panier moyen" value={revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket)} sub="sur le chiffre d'affaires" />
+          <StatCard label="Dont livrées" value={formatDh(revenue.delivered.amount)} sub={`${formatInt(revenue.delivered.count)} commandes · ${formatDh(revenue.ongoing.amount)} encore en cours`} />
           <StatCard label="Confirmées, pas expédiées" value={formatDh(revenue.notShipped.amount)} sub={`${formatInt(revenue.notShipped.count)} commandes · colis non créé ou pas parti`} />
           <StatCard label="Retours" value={formatDh(revenue.returned.amount)} sub={`${formatInt(revenue.returned.count)} commandes · exclues du chiffre`} />
           <StatCard label="CA confirmé (ancien calcul)" value={formatDh(revenue.confirmedAmount)} sub="toutes les confirmées, livrées ou non" />

@@ -13,7 +13,7 @@ export type RevenueState = "livree" | "en_cours" | "a_expedier" | "retour";
 
 export type RevenueOrder = Pick<
   ExportOrder,
-  "totalPrice" | "localDelivery" | "localStatus" | "forcelogCode" | "ozonCode" | "forcelogStatusCode" | "forcelogStatus" | "ozonStatus" | "parcels"
+  "totalPrice" | "localDelivery" | "localCourier" | "localStatus" | "forcelogCode" | "ozonCode" | "forcelogStatusCode" | "forcelogStatus" | "ozonStatus" | "parcels"
 >;
 
 // Colis créé chez le transporteur mais pas encore pris en charge ("Nouveau", en attente de ramassage…).
@@ -22,7 +22,12 @@ const NOT_PICKED_UP = /nouveau|attente|ramass|pr[ée]par|cr[ée]/i;
 const toNumber = (v: unknown): number => (v === null || v === undefined || v === "" ? 0 : Number(String(v)));
 
 export function revenueState(o: RevenueOrder): RevenueState {
-  if (o.localDelivery) return o.localStatus === "LIVREE" ? "livree" : o.localStatus === "RETOUR" ? "retour" : "en_cours";
+  // Casablanca : pris en charge par un livreur (n'importe lequel) = vraie vente ; sans livreur = pas parti.
+  if (o.localDelivery) {
+    if (o.localStatus === "LIVREE") return "livree";
+    if (o.localStatus === "RETOUR") return "retour";
+    return o.localCourier ? "en_cours" : "a_expedier";
+  }
 
   const last = o.parcels[0]; // le plus récent
   if (last && parcelBucket(last.carrier, last.statusCode, last.status) === "delivered") return "livree";
@@ -48,26 +53,33 @@ export type RevenueSummary = {
   ongoing: { count: number; amount: number };
   notShipped: { count: number; amount: number };
   returned: { count: number; amount: number };
+  // Chiffre d'affaires : commandes réellement parties (livrées + en cours). Sans les non expédiées ni les retours.
+  sales: { count: number; amount: number };
   confirmedCount: number;
   confirmedAmount: number;
-  avgBasket: number | null; // sur les commandes livrées
+  avgBasket: number | null; // sur le chiffre d'affaires
 };
 
 export function summarizeRevenue(orders: RevenueOrder[]): RevenueSummary {
   const zero = () => ({ count: 0, amount: 0 });
   const s: RevenueSummary = {
-    delivered: zero(), ongoing: zero(), notShipped: zero(), returned: zero(), confirmedCount: 0, confirmedAmount: 0, avgBasket: null,
+    delivered: zero(), ongoing: zero(), notShipped: zero(), returned: zero(), sales: zero(), confirmedCount: 0, confirmedAmount: 0, avgBasket: null,
   };
   const slot = { livree: s.delivered, en_cours: s.ongoing, a_expedier: s.notShipped, retour: s.returned };
   for (const o of orders) {
     const amount = toNumber(o.totalPrice);
-    const b = slot[revenueState(o)];
+    const state = revenueState(o);
+    const b = slot[state];
     b.count += 1;
     b.amount += amount;
+    if (state === "livree" || state === "en_cours") {
+      s.sales.count += 1;
+      s.sales.amount += amount;
+    }
     s.confirmedCount += 1;
     s.confirmedAmount += amount;
   }
-  s.avgBasket = s.delivered.count > 0 ? Math.round(s.delivered.amount / s.delivered.count) : null;
+  s.avgBasket = s.sales.count > 0 ? Math.round(s.sales.amount / s.sales.count) : null;
   return s;
 }
 
@@ -78,6 +90,7 @@ export async function getRevenue(range: { start: Date; end: Date }): Promise<Rev
     select: {
       totalPrice: true,
       localDelivery: true,
+      localCourier: true,
       localStatus: true,
       forcelogCode: true,
       ozonCode: true,
