@@ -20,6 +20,7 @@ async function getAccessToken(): Promise<string> {
 
   const res = await fetch(`https://${STORE.trim()}/admin/oauth/access_token`, {
     method: "POST",
+    cache: "no-store", // Next.js met en cache les fetch identiques : on resservirait un vieux jeton périmé
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       client_id: CLIENT_ID.trim(),
@@ -43,6 +44,7 @@ async function callGraphql(query: string, variables?: Record<string, unknown>): 
   const token = await getAccessToken();
   return fetch(`https://${STORE?.trim()}/admin/api/${API_VERSION}/graphql.json`, {
     method: "POST",
+    cache: "no-store",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
     body: JSON.stringify({ query, variables }),
   });
