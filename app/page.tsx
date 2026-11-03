@@ -7,6 +7,7 @@ import StatCard from "@/components/StatCard";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
 import { getHomeStats, type CarrierSummary } from "@/lib/home-stats";
+import { getRevenue } from "@/lib/revenue";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function HomePage({
 
   const range = periodRange(searchParams);
   const keep = periodParams(range);
-  const stats = await getHomeStats(range);
+  const [stats, revenue] = await Promise.all([getHomeStats(range), getRevenue(range)]);
   const { orders, shopifyCities, forcelog, ozon, casa } = stats;
 
   // Liens vers les pages détaillées, en gardant la période choisie.
@@ -59,8 +60,16 @@ export default async function HomePage({
           />
           <StatCard label="À confirmer" value={formatInt(orders.nouvelle)} sub="en attente" href={to("/orders", { tab: "todo" })} />
           <StatCard label="Annulées" value={formatInt(orders.annulee)} sub={orders.total > 0 ? `${Math.round((orders.annulee / orders.total) * 100)} % des commandes` : "—"} />
-          <StatCard label="Chiffre d'affaires confirmé" value={formatDh(orders.confirmedAmount)} sub="commandes confirmées" />
-          <StatCard label="Panier moyen" value={orders.avgBasket === null ? "—" : formatDh(orders.avgBasket)} sub="sur les confirmées" />
+          <StatCard
+            label="Chiffre d'affaires réel"
+            value={formatDh(revenue.delivered.amount)}
+            sub={`${formatInt(revenue.delivered.count)} commandes livrées`}
+          />
+          <StatCard label="Panier moyen" value={revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket)} sub="sur les livrées" />
+          <StatCard label="En cours de livraison" value={formatDh(revenue.ongoing.amount)} sub={`${formatInt(revenue.ongoing.count)} commandes · pas encore encaissées`} />
+          <StatCard label="Confirmées, pas expédiées" value={formatDh(revenue.notShipped.amount)} sub={`${formatInt(revenue.notShipped.count)} commandes · colis non créé ou pas parti`} />
+          <StatCard label="Retours" value={formatDh(revenue.returned.amount)} sub={`${formatInt(revenue.returned.count)} commandes · exclues du chiffre`} />
+          <StatCard label="CA confirmé (ancien calcul)" value={formatDh(revenue.confirmedAmount)} sub="toutes les confirmées, livrées ou non" />
         </div>
       </section>
 

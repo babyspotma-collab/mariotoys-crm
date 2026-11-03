@@ -5,6 +5,7 @@ import Segmented from "@/components/Segmented";
 import { monthRange, monthLabel } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
 import { getCarrierStats } from "@/lib/carrier-stats";
+import { getRevenue } from "@/lib/revenue";
 import { PARCEL_CATEGORIES } from "@/lib/parcel-categories";
 import { OZON_CATEGORIES } from "@/lib/ozon-categories";
 
@@ -92,9 +93,9 @@ export default async function StatsPage({
   const carrier: CarrierFilter =
     searchParams.carrier === "forcelog" || searchParams.carrier === "ozon" ? searchParams.carrier : "all";
 
-  const [byStatus, confirmedRevenue, topCities, carrierRows, statusTotals] = await Promise.all([
+  const [byStatus, revenue, topCities, carrierRows, statusTotals] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], where, _count: true }),
-    prisma.order.aggregate({ where: { ...where, status: "CONFIRMEE" }, _sum: { totalPrice: true } }),
+    getRevenue(range),
     prisma.order.groupBy({ by: ["city"], where, _count: true, orderBy: { _count: { city: "desc" } }, take: 5 }),
     getCarrierStats(range),
     statusBreakdown(carrier, range),
@@ -103,14 +104,15 @@ export default async function StatsPage({
   const totalOrders = byStatus.reduce((sum, s) => sum + s._count, 0);
   const confirmed = byStatus.find((s) => s.status === "CONFIRMEE")?._count ?? 0;
   const confirmationRate = totalOrders > 0 ? Math.round((confirmed / totalOrders) * 100) : 0;
-  const confirmedTotal = Number(confirmedRevenue._sum.totalPrice ?? 0);
-  const avgBasket = confirmed > 0 ? Math.round(confirmedTotal / confirmed) : 0;
-
   const sales = [
     { label: "Commandes", value: formatInt(totalOrders), sub: `${totalOrders - confirmed} encore à confirmer` },
-    { label: "CA confirmé", value: formatDh(confirmedTotal), sub: `${confirmed} commandes confirmées` },
+    {
+      label: "CA réel (livré)",
+      value: formatDh(revenue.delivered.amount),
+      sub: `${revenue.delivered.count} livrées sur ${confirmed} confirmées (${formatDh(revenue.confirmedAmount)})`,
+    },
     { label: "Taux de confirmation", value: `${confirmationRate} %`, sub: "Confirmées / reçues" },
-    { label: "Panier moyen", value: formatDh(avgBasket), sub: "Sur les commandes confirmées" },
+    { label: "Panier moyen", value: revenue.avgBasket === null ? "—" : formatDh(revenue.avgBasket), sub: "Sur les commandes livrées" },
   ];
 
   const visibleCarrierRows = carrier === "all" ? carrierRows : carrierRows.filter((r) => r.id === carrier);
