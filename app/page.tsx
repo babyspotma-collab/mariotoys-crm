@@ -7,7 +7,7 @@ import StatCard from "@/components/StatCard";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
 import { getHomeStats, type CarrierSummary } from "@/lib/home-stats";
-import { getRevenue } from "@/lib/revenue";
+import { getAwaitingShipment, getRevenue } from "@/lib/revenue";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ export default async function HomePage({
 
   const range = periodRange(searchParams);
   const keep = periodParams(range);
-  const [stats, revenue] = await Promise.all([getHomeStats(range), getRevenue(range)]);
+  const [stats, revenue, awaiting] = await Promise.all([getHomeStats(range), getRevenue(range), getAwaitingShipment()]);
   const { orders, shopifyCities, forcelog, ozon, casa } = stats;
 
   // Liens vers les pages détaillées, en gardant la période choisie.
@@ -68,6 +68,16 @@ export default async function HomePage({
           <StatCard label="Dont livrées" value={formatDh(revenue.delivered.amount)} sub={`${formatInt(revenue.delivered.count)} commandes livrées`} />
           <StatCard label="En cours" value={formatDh(revenue.ongoing.amount)} sub={`${formatInt(revenue.ongoing.count)} commandes en cours de livraison`} />
           <StatCard label="Retours" value={formatDh(revenue.returned.amount)} sub={`${formatInt(revenue.returned.count)} commandes · exclues du chiffre`} />
+          <StatCard
+            label="À expédier"
+            value={formatInt(awaiting.count)}
+            sub={
+              awaiting.count === 0
+                ? "aucune commande en attente de colis"
+                : `${formatDh(awaiting.amount)} · la plus ancienne : ${awaiting.oldestDays} j · toutes périodes`
+            }
+            href="/orders?tab=noparcel"
+          />
         </div>
       </section>
 

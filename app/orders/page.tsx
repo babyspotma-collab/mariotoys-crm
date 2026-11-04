@@ -24,6 +24,7 @@ import { cancelConfirmMessage } from "@/lib/order-cancel";
 import { detachConfirmMessage } from "@/lib/parcel-detach";
 import { confirmHref } from "@/lib/return-path";
 import { readAlbaseetSale, readStockInfo } from "@/lib/stock-albaseet";
+import { NO_PARCEL, waitLabel, waitTone, waitingDays } from "@/lib/no-parcel";
 
 // Une ligne sous les articles : vendu dans ALBASEET+, ou où se trouve le stock
 // (dépôts comptés pour la vente en ligne d'abord). Détail sur la fiche commande.
@@ -58,7 +59,6 @@ const TABS: Tab[] = ["todo", "noparcel", "ok", "all"];
 // Une commande remise à un livreur de l'entreprise (Livraison Casa, page
 // /livraisons) n'a pas de colis transporteur et n'en attend pas : elle ne
 // compte pas dans "Confirmées sans colis".
-const NO_PARCEL = { forcelogCode: null, ozonCode: null, parcels: { none: {} }, localDelivery: false };
 
 const STATUS_PILL: Record<string, { tone: PillTone; label: string }> = {
   NOUVELLE: { tone: "gray", label: "Nouvelle" },
@@ -143,8 +143,11 @@ export default async function DashboardPage({
   const q = searchParams.q?.trim();
 
   const page = Math.max(1, Number(searchParams.page) || 1);
+  // "Confirmées sans colis" ignore la période : une commande confirmée en fin de mois
+  // et expédiée plus tard ne doit pas disparaître au changement de mois. La plus
+  // ancienne en premier (la plus urgente).
   const listWhere = {
-    ...dateFilter,
+    ...(tab === "noparcel" ? {} : dateFilter),
     ...(tab === "todo"
       ? { status: "NOUVELLE" as const }
       : tab === "noparcel"
@@ -159,13 +162,13 @@ export default async function DashboardPage({
     prisma.order.findMany({
       where: listWhere,
       include: { items: true, parcels: { select: { id: true, code: true, carrier: true, status: true }, take: 1 } },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: tab === "noparcel" ? "asc" : "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
     prisma.order.count({ where: listWhere }),
     prisma.order.groupBy({ by: ["status"], where: dateFilter, _count: true }),
-    prisma.order.count({ where: { ...dateFilter, status: "CONFIRMEE", ...NO_PARCEL } }),
+    prisma.order.count({ where: { status: "CONFIRMEE", ...NO_PARCEL } }),
     findAutoConfirmations(),
   ]);
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
@@ -231,6 +234,10 @@ export default async function DashboardPage({
         />
       </div>
 
+      {tab === "noparcel" && (
+        <p className="hint">Toutes périodes confondues, la plus ancienne en premier. L'ancienneté se compte depuis la date de la commande.</p>
+      )}
+
       {orders.length === 0 ? (
         q ? (
           <EmptyState title={`Aucun résultat pour « ${q} »`}>
@@ -290,6 +297,11 @@ export default async function DashboardPage({
                           <CreditCard size={14} weight="bold" aria-hidden="true" />
                           {paidBadge(order)}
                         </span>
+                      </div>
+                    )}
+                    {order.status === "CONFIRMEE" && !hasParcel && !order.localDelivery && (
+                      <div className="mt-1.5">
+                        <Pill tone={waitTone(waitingDays(order.createdAt))}>{waitLabel(waitingDays(order.createdAt))}</Pill>
                       </div>
                     )}
                     {order.autoConfirmedAt && (

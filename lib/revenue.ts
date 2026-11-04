@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/db";
 import { parcelBucket } from "@/lib/home-stats";
 import { isReturned, type ExportOrder } from "@/lib/orders-export";
+import { NO_PARCEL, waitingDays } from "@/lib/no-parcel";
 
 export type RevenueState = "livree" | "en_cours" | "a_expedier" | "retour";
 
@@ -81,6 +82,16 @@ export function summarizeRevenue(orders: RevenueOrder[]): RevenueSummary {
   }
   s.avgBasket = s.sales.count > 0 ? Math.round(s.sales.amount / s.sales.count) : null;
   return s;
+}
+
+/** Commandes confirmées encore sans colis, toutes périodes (carte "À expédier" de l'Accueil). Casa exclue. */
+export async function getAwaitingShipment(): Promise<{ count: number; amount: number; oldestDays: number | null }> {
+  const where = { status: "CONFIRMEE" as const, ...NO_PARCEL };
+  const [agg, oldest] = await Promise.all([
+    prisma.order.aggregate({ where, _count: true, _sum: { totalPrice: true } }),
+    prisma.order.findFirst({ where, orderBy: { createdAt: "asc" }, select: { createdAt: true } }),
+  ]);
+  return { count: agg._count, amount: toNumber(agg._sum.totalPrice), oldestDays: oldest ? waitingDays(oldest.createdAt) : null };
 }
 
 /** Commandes confirmées créées dans la période, classées par état de livraison. */
