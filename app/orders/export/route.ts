@@ -3,13 +3,15 @@ import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { STATE_FILL, carrierFill, exportRow, monthBanner, monthPeriod } from "@/lib/orders-export";
 import { monthLabel } from "@/lib/date-range";
+import { revenueState } from "@/lib/revenue";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BANNER_FILL = "FFFFF4B8"; // jaune pastel
 const HEADER_FILL = "FFE6E6EA"; // gris pastel
-const LINE = { style: "thin" as const, color: { argb: "FFD9D9DE" } };
+const NOT_SHIPPED_FILL = "FFFFF1C9"; // jaune clair : confirmée mais pas encore partie
+const LINE ={ style: "thin" as const, color: { argb: "FFD9D9DE" } };
 
 const fill = (argb: string): ExcelJS.Fill => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
 
@@ -49,7 +51,13 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { createdAt: "asc" },
   });
-  const rows = orders.map(exportRow);
+  // Même règle que le chiffre d'affaires du CRM : une commande confirmée mais pas
+  // partie (sans colis, ou colis jamais pris en charge) n'entre pas dans le total.
+  const rows = orders.map((o) => {
+    const row = exportRow(o);
+    const notShipped = revenueState(o) === "a_expedier";
+    return { ...row, notShipped, statut: notShipped ? "à expédier" : row.statut };
+  });
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(monthLabel(month).slice(0, 31));
@@ -112,7 +120,7 @@ export async function GET(req: NextRequest) {
       r.remarque,
     ];
     lastDate = r.date;
-    const stateFill = STATE_FILL[r.state];
+    const stateFill = r.notShipped ? NOT_SHIPPED_FILL : STATE_FILL[r.state];
     for (let c = 1; c <= last; c++) {
       const cell = row.getCell(c);
       cell.alignment = { vertical: "top", wrapText: true, horizontal: c === 2 || c >= 7 && c <= 8 ? "center" : undefined };
@@ -124,10 +132,11 @@ export async function GET(req: NextRequest) {
     if (r.state === "retour") row.getCell(8).font = { bold: true, color: { argb: "FFB4552D" } };
   });
 
-  // Pied : total des commandes non retournées (un retour n'a rien encaissé).
+  // Pied : total des commandes parties, hors retours (rien encaissé) et hors commandes pas encore expédiées.
   const total = ws.getRow(rows.length + 3);
-  const kept = rows.filter((r) => r.state !== "retour");
-  const returnedCount = rows.length - kept.length;
+  const kept = rows.filter((r) => r.state !== "retour" && !r.notShipped);
+  const returnedCount = rows.filter((r) => r.state === "retour").length;
+  const pending = rows.filter((r) => r.notShipped);
   total.values = [
     "Total",
     "",
@@ -147,6 +156,19 @@ export async function GET(req: NextRequest) {
     cell.font = { bold: true };
     cell.fill = fill(HEADER_FILL);
     cell.border = { top: LINE, bottom: LINE, left: LINE, right: LINE };
+  }
+
+  if (pending.length > 0) {
+    const note = ws.getRow(rows.length + 4);
+    note.getCell(1).value = "Pas encore expédiées";
+    note.getCell(3).value = `${pending.length} commande${pending.length > 1 ? "s" : ""} confirmée${pending.length > 1 ? "s" : ""}, non comptées dans le total`;
+    note.getCell(9).value = pending.reduce((s, r) => s + (r.prix ?? 0), 0);
+    for (let c = 1; c <= last; c++) {
+      const cell = note.getCell(c);
+      cell.font = { italic: true };
+      cell.fill = fill(NOT_SHIPPED_FILL);
+      cell.border = { top: LINE, bottom: LINE, left: LINE, right: LINE };
+    }
   }
 
   const buffer = await wb.xlsx.writeBuffer();

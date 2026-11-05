@@ -82,12 +82,12 @@ export default function ConfirmForm({
   // Présélectionne la ville si son nom correspond à la ville Shopify
   // d'origine ; sinon on laisse le choix explicite à l'utilisateur plutôt
   // que de deviner (c'est tout le but de cet écran).
-  const matchedForcelogCity = forcelogCities.find(
-    (c) => c.name.toLowerCase() === initialValues.city.toLowerCase()
-  );
-  const matchedOzonCity = ozonCities.find(
-    (c) => c.name.toLowerCase() === initialValues.city.toLowerCase()
-  );
+  // Comparaison sans accents, casse, espaces ni ponctuation en trop.
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const wanted = norm(initialValues.city);
+  const matchedForcelogCity = forcelogCities.find((c) => norm(c.name) === wanted);
+  const matchedOzonCity = ozonCities.find((c) => norm(c.name) === wanted);
 
   const cityWarning = (
     <p className="hint text-pill-amber-fg">
@@ -164,6 +164,7 @@ export default function ConfirmForm({
                 Ville
               </label>
               <select
+                key="forcelogCity"
                 id="forcelogCity"
                 name="forcelogCity"
                 required
@@ -187,6 +188,7 @@ export default function ConfirmForm({
                 Ville
               </label>
               <select
+                key="ozonCity"
                 id="ozonCity"
                 name="ozonCity"
                 required

@@ -273,7 +273,7 @@ export async function getCities(): Promise<ForcelogCity[]> {
   );
 
   return Object.values(raw.Cities ?? {})
-    .map((c) => ({ code: String(c.CODE ?? ""), name: String(c.NAME ?? "") }))
+    .map((c) => ({ code: String(c.CODE ?? ""), name: String(c.NAME ?? "").trim() }))
     .filter((c) => c.code && c.name)
     .sort((a, b) => a.name.localeCompare(b.name));
 }

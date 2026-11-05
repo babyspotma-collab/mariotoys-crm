@@ -198,7 +198,7 @@ export async function getCities(): Promise<OzonCity[]> {
   if (!res.ok) throw new Error(`Ozon /cities — ${res.status}: ${JSON.stringify(json)}`);
 
   return Object.values(json.CITIES ?? {})
-    .map((c: any) => ({ id: String(c.ID ?? ""), ref: String(c.REF ?? ""), name: String(c.NAME ?? "") }))
+    .map((c: any) => ({ id: String(c.ID ?? ""), ref: String(c.REF ?? ""), name: String(c.NAME ?? "").trim() }))
     .filter((c) => c.id && c.name)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
