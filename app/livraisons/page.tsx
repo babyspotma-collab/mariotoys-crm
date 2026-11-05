@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
-import { Check, Phone, Trash } from "@phosphor-icons/react/dist/ssr";
-import ConfirmButton from "@/components/ConfirmButton";
+import { Check, Phone } from "@phosphor-icons/react/dist/ssr";
 import CourierPicker from "@/components/CourierPicker";
 import EmptyState from "@/components/EmptyState";
 import MoreMenu from "@/components/MoreMenu";
@@ -16,7 +15,7 @@ import { paidLabel } from "@/lib/payment-method";
 import { formatDateTimeMa, formatDh, formatInt } from "@/lib/format";
 import { DEFAULT_COURIERS, LOCAL_STATUS, NOTE_MAX_LENGTH, cleanCourier, isLocalStatus, type LocalStatus } from "@/lib/local-delivery";
 import { normalizeMoroccanPhone } from "@/lib/phone";
-import { markDelivered, markReturned, putBackWithCourier, reassignCourier, removeFromLocalDelivery, saveLocalNote } from "./actions";
+import { markDelivered, markReturned, putBackWithCourier, reassignCourier, saveLocalNote } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -358,16 +357,6 @@ export default async function LocalDeliveriesPage({
                       <p className="px-2.5 pb-1 text-xs font-medium text-muted">Changer de livreur</p>
                       <CourierPicker action={reassignCourier.bind(null, order.id)} current={order.localCourier} />
                     </div>
-
-                    <form action={removeFromLocalDelivery.bind(null, order.id)} className="mt-0.5 border-t border-line-soft pt-1.5">
-                      <ConfirmButton
-                        message={`Retirer la commande ${order.orderNumber} de ${order.customerName} de Livraisons Casa ? Elle redeviendra « Confirmée sans colis ».`}
-                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-accent hover:bg-pill-red-bg"
-                      >
-                        <Trash size={16} aria-hidden="true" />
-                        Retirer de Livraisons Casa
-                      </ConfirmButton>
-                    </form>
                   </MoreMenu>
                 </div>
               </li>
