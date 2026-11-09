@@ -53,6 +53,8 @@ export async function createManualOrder(
     data: {
       shopifyOrderId: null,
       source: "MANUEL",
+      // Saisie à la main = déjà validée avec le client : directement confirmée.
+      status: "CONFIRMEE",
       orderNumber,
       customerName,
       phone,
@@ -66,7 +68,7 @@ export async function createManualOrder(
     },
   });
 
-  // Rejoint la liste "Nouvelles" du dashboard — suit le même workflow
-  // Confirmer que les commandes Shopify, sans étape spéciale.
-  redirect("/orders");
+  // Commande confirmée d'office : on arrive sur l'onglet des confirmées, d'où
+  // on crée le colis (ou on la remet à un livreur Casa).
+  redirect("/orders?tab=ok");
 }
