@@ -315,7 +315,7 @@ export default async function LocalDeliveriesPage({
 
                 <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-1">
                   <span className="hidden text-sm font-semibold tabular-nums md:block">{formatDh(order.totalPrice)}</span>
-                  {status && <Pill tone={LOCAL_STATUS[status].tone}>{LOCAL_STATUS[status].label}{status === "A_LIVRER" && order.localCourier ? ` · ${order.localCourier}` : ""}</Pill>}
+                  {status && <Pill tone={LOCAL_STATUS[status].tone}>{status === "A_LIVRER" && order.localCourier ? `Chez ${order.localCourier}` : LOCAL_STATUS[status].label}</Pill>}
                 </div>
 
                 <div className="flex items-center gap-2 md:justify-end md:gap-1">
