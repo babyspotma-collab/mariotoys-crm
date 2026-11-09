@@ -1,6 +1,6 @@
 // Vérification rapide : npx tsx lib/local-delivery.check.ts
 import assert from "node:assert";
-import { COURIER_MAX_LENGTH, DEFAULT_COURIERS, NOTE_MAX_LENGTH, cleanNote, LOCAL_STATUS, cleanCourier, isLocalStatus } from "./local-delivery";
+import { matchCourier, COURIER_MAX_LENGTH, DEFAULT_COURIERS, NOTE_MAX_LENGTH, cleanNote, LOCAL_STATUS, cleanCourier, isLocalStatus } from "./local-delivery";
 
 // Livreurs par défaut : écriture officielle, quelle que soit la saisie
 assert.deepEqual([...DEFAULT_COURIERS], ["Amine", "Nizar", "Retrait Dépot", "Retrait Magasin"]);
@@ -39,3 +39,11 @@ assert.equal(LOCAL_STATUS.A_LIVRER.label, "Chez le livreur");
 assert.ok(isLocalStatus("LIVREE") && !isLocalStatus("CONFIRMEE") && !isLocalStatus(null));
 
 console.log("local-delivery checks OK");
+
+// Rapprochement des noms de livreur : casse, accents, espaces, lettres doublees
+assert.equal(matchCourier("Youness", ["Amine", "Younes"]), "Younes");
+assert.equal(matchCourier("YOUNES", ["Younes"]), "Younes");
+assert.equal(matchCourier("retrait depot", ["Retrait D\u00e9pot"]), "Retrait D\u00e9pot");
+assert.equal(matchCourier("Hamza", ["Amine", "Younes"]), "Hamza", "nom nouveau : garde tel quel");
+assert.equal(matchCourier("Amina", ["Amine"]), "Amina", "pas de rapprochement approximatif");
+console.log("matchCourier checks OK");

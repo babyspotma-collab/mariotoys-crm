@@ -41,6 +41,25 @@ export function cleanCourier(raw: unknown): string {
   return known ?? text;
 }
 
+// Clé de comparaison de deux noms de livreur : sans accents, casse, espaces ni
+// ponctuation, et lettres doublées réduites ("Youness" = "younes" = "YOUNES").
+function courierKey(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .replace(/(.)\1+/g, "$1");
+}
+
+// Si le nom saisi désigne un livreur déjà connu (par défaut ou déjà utilisé),
+// renvoie l'écriture existante ; sinon le nom tel quel.
+export function matchCourier(name: string, existing: readonly string[]): string {
+  const key = courierKey(name);
+  if (!key) return name;
+  return existing.find((c) => courierKey(c) === key) ?? name;
+}
+
 export const NOTE_MAX_LENGTH = 300;
 
 // Nettoie une remarque de livraison : retours à la ligne conservés (3 de suite

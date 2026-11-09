@@ -8,7 +8,22 @@
 // (sauf la remise initiale, qui exige justement qu'elle ne le soit pas).
 
 import { prisma } from "@/lib/db";
-import { cleanCourier, cleanNote, type LocalStatus } from "@/lib/local-delivery";
+import { DEFAULT_COURIERS, cleanCourier, cleanNote, matchCourier, type LocalStatus } from "@/lib/local-delivery";
+
+// Nom nettoyé, puis rapproché d'un livreur déjà utilisé (le plus fréquent d'abord) :
+// "Youness", "younes" ou "YOUNES" retombent sur le même livreur. "" si invalide.
+async function resolveCourier(rawCourier: unknown): Promise<string> {
+  const courier = cleanCourier(rawCourier);
+  if (!courier) return "";
+  const used = await prisma.order.groupBy({
+    by: ["localCourier"],
+    where: { localDelivery: true, localCourier: { not: null } },
+    _count: true,
+    orderBy: { _count: { localCourier: "desc" } },
+  });
+  const names = [...DEFAULT_COURIERS, ...used.map((g) => g.localCourier).filter((c): c is string => !!c)];
+  return matchCourier(courier, names);
+}
 
 // Aucun colis transporteur d'aucune sorte : ni code Forcelog/Ozon, ni ligne
 // Parcel liée. Même définition que "Confirmées sans colis" (app/page.tsx).
@@ -20,7 +35,7 @@ export type LocalResult = { ok: boolean; reason?: string };
 // appel Forcelog/Ozon. Ne s'applique qu'à une commande NOUVELLE ou CONFIRMEE
 // sans aucun colis et pas déjà en livraison Casa.
 export async function startLocalDelivery(orderId: string, rawCourier: unknown): Promise<LocalResult> {
-  const courier = cleanCourier(rawCourier);
+  const courier = await resolveCourier(rawCourier);
   if (!courier) return { ok: false, reason: "Nom de livreur vide ou invalide." };
 
   const now = new Date();
@@ -66,7 +81,7 @@ export async function setLocalStatus(orderId: string, from: LocalStatus[], to: L
 // c'est une nouvelle remise physique : la date de remise est mise à jour. Pour
 // une commande déjà livrée ou en retour, seul le nom change (historique).
 export async function changeCourier(orderId: string, rawCourier: unknown): Promise<LocalResult> {
-  const courier = cleanCourier(rawCourier);
+  const courier = await resolveCourier(rawCourier);
   if (!courier) return { ok: false, reason: "Nom de livreur vide ou invalide." };
 
   const pending = await prisma.order.updateMany({
