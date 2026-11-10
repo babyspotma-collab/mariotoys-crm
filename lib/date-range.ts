@@ -31,7 +31,7 @@ export function monthLabel(month: string): string {
 
 const TZ = "Africa/Casablanca";
 
-export type Period = "today" | "7d" | "month" | "custom";
+export type Period = "today" | "7d" | "30d" | "month" | "custom";
 export type PeriodRange = {
   period: Period;
   start: Date;
@@ -91,6 +91,9 @@ export function periodRange(params: { period?: string; from?: string; to?: strin
   }
   if (params.period === "7d") {
     return { period: "7d", start: maMidnight(t.y, t.m, t.d - 6), end: maMidnight(t.y, t.m, t.d + 1), from: ymd(t.y, t.m, t.d - 6), to: ymd(t.y, t.m, t.d), label: "7 derniers jours" };
+  }
+  if (params.period === "30d") {
+    return { period: "30d", start: maMidnight(t.y, t.m, t.d - 29), end: maMidnight(t.y, t.m, t.d + 1), from: ymd(t.y, t.m, t.d - 29), to: ymd(t.y, t.m, t.d), label: "30 derniers jours" };
   }
   if (params.period === "custom") {
     let a = parseYmd(params.from) ?? { y: t.y, m: t.m, d: 1 };

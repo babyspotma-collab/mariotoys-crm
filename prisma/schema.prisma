@@ -413,3 +413,151 @@ model WorkerStatus {
   issue        String?
   issueMessage String?
 }
+
+// ─── Rentabilité (voir app/rentabilite et lib/profit) ──────────────────────
+// Tables créées en SQL (prisma/sql/2026-11-10-rentabilite.sql, jamais db push).
+
+// Article du logiciel de stock ALBASEET+, envoyé par l'appli locale via
+// POST /api/stock-sync (mise à jour par code). costType est choisi À LA MAIN
+// sur /rentabilite/classement et n'est jamais écrasé par la synchro :
+//   LOCAL      -> coût = prixAchat
+//   IMPORTE    -> coût = prixGros (prixAchat + alerte si prixGros manque)
+//   NON_CLASSE -> coût = prixAchat + alerte « à classer »
+model AlbaseetArticle {
+  code            String    @id
+  barcode         String?
+  designation     String
+  prixAchat       Decimal?  @db.Decimal(12, 2)
+  prixGros        Decimal?  @db.Decimal(12, 2)
+  prixVente       Decimal?  @db.Decimal(12, 2)
+  fournisseur     String?
+  famille         String?
+  stock           Decimal?  @db.Decimal(14, 3)
+  costType        CostType  @default(NON_CLASSE)
+  costTypeSetAt   DateTime?
+  sourceUpdatedAt DateTime? // updated_at envoyé par ALBASEET+
+  sentAt          DateTime? // sent_at du dernier lot reçu
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([barcode])
+  @@index([fournisseur])
+  @@index([famille])
+  @@index([costType])
+}
+
+enum CostType {
+  LOCAL
+  IMPORTE
+  NON_CLASSE
+}
+
+// Une ligne à chaque changement de prixAchat OU de prixGros (valeurs après le
+// changement). Le coût d'une vente est celui en vigueur à la date de la commande.
+model AlbaseetPriceHistory {
+  id          String   @id @default(cuid())
+  code        String
+  prixAchat   Decimal? @db.Decimal(12, 2)
+  prixGros    Decimal? @db.Decimal(12, 2)
+  effectiveAt DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([code, effectiveAt])
+}
+
+// Copie du catalogue Shopify (une ligne par variante), rafraîchie chaque jour
+// par /api/cron/sync-shopify-catalog (opération groupée Shopify).
+model ShopifyVariant {
+  id            String   @id // gid://shopify/ProductVariant/...
+  productId     String
+  productTitle  String
+  variantTitle  String? // null pour "Default Title"
+  sku           String?
+  barcode       String?
+  price         Decimal  @db.Decimal(12, 2)
+  imageUrl      String?
+  productStatus String // ACTIVE | DRAFT | ARCHIVED
+  collectionIds String[] @default([])
+  syncedAt      DateTime
+
+  @@index([productId])
+  @@index([barcode])
+  @@index([sku])
+}
+
+model ShopifyCollection {
+  id       String   @id // gid://shopify/Collection/...
+  title    String
+  syncedAt DateTime
+}
+
+// Variante Shopify -> article ALBASEET+. method : BARCODE | SKU | NAME (à
+// vérifier) | MANUAL. Un lien MANUAL n'est jamais modifié par l'association
+// automatique ; albaseetCode null + MANUAL = « aucun article » choisi à la main.
+model ArticleLink {
+  variantId    String   @id
+  albaseetCode String?
+  method       String
+  score        Float? // ressemblance des noms (method NAME)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([albaseetCode])
+}
+
+// Campagnes Meta Ads des comptes réglés sur /rentabilite/reglages, et leur
+// dépense par jour (devise du compte), via /api/cron/sync-meta.
+model MetaCampaign {
+  id        String   @id
+  accountId String
+  name      String
+  status    String?
+  currency  String   @default("USD")
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([accountId])
+}
+
+model MetaSpendDaily {
+  campaignId String
+  date       DateTime @db.Date
+  accountId  String
+  spend      Decimal  @db.Decimal(12, 2)
+  currency   String
+  syncedAt   DateTime @default(now())
+
+  @@id([campaignId, date])
+  @@index([date])
+  @@index([accountId, date])
+}
+
+// Campagne -> produit ou collection Shopify (targetType PRODUCT | COLLECTION).
+model CampaignLink {
+  id          String   @id @default(cuid())
+  campaignId  String
+  targetType  String
+  targetId    String
+  targetTitle String
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, targetType, targetId])
+}
+
+// Réglages de la page Rentabilité (clé -> JSON), voir lib/profit/settings.ts.
+model ProfitSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// Tarif de livraison par ville et par transporteur. cityKey = nom normalisé
+// (lib/profit/text.ts) ; cityKey "*" = tarif par défaut (villes inconnues).
+model ShippingRate {
+  id      String  @id @default(cuid())
+  carrier Carrier
+  city    String
+  cityKey String
+  fee     Decimal @db.Decimal(10, 2)
+
+  @@unique([carrier, cityKey])
+}

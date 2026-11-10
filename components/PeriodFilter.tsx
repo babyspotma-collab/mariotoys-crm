@@ -1,25 +1,30 @@
 import Segmented from "@/components/Segmented";
 import type { Period, PeriodRange } from "@/lib/date-range";
 
-const PRESETS: { id: Period; label: string }[] = [
-  { id: "today", label: "Aujourd'hui" },
-  { id: "7d", label: "7 derniers jours" },
-  { id: "month", label: "Mois en cours" },
-  { id: "custom", label: "Personnalisée" },
-];
+const LABELS: Record<Period, string> = {
+  today: "Aujourd'hui",
+  "7d": "7 derniers jours",
+  "30d": "30 derniers jours",
+  month: "Mois en cours",
+  custom: "Personnalisée",
+};
+const DEFAULT_PRESETS: Period[] = ["today", "7d", "month", "custom"];
 
 // Sélecteur de période (état dans l'URL : period, from, to). "keep" = les
 // autres paramètres de la page à conserver ; la page est toujours remise
-// à 1 (jamais transmise).
+// à 1 (jamais transmise). "presets" : boutons proposés (par défaut sans 30 j).
 export default function PeriodFilter({
   action,
   keep,
   range,
+  presets = DEFAULT_PRESETS,
 }: {
   action: string;
   keep: Record<string, string | undefined>;
   range: PeriodRange;
+  presets?: Period[];
 }) {
+  const PRESETS = presets.map((id) => ({ id, label: LABELS[id] }));
   const kept = Object.fromEntries(Object.entries(keep).filter((e): e is [string, string] => !!e[1]));
   const href = (period: Period) => {
     const params = new URLSearchParams(kept);
@@ -35,7 +40,7 @@ export default function PeriodFilter({
   };
 
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center">
+    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
       <Segmented
         label="Période"
         className="w-full flex-wrap md:w-fit md:flex-nowrap [&>a]:basis-[45%] md:[&>a]:basis-auto"

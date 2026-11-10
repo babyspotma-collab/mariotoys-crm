@@ -8,7 +8,22 @@ import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 
 export type NewOrderState = { error: string | null };
 
-type LineItem = { title: string; price: number; quantity: number };
+type LineItem = { title: string; price: number; quantity: number; productId?: string };
+
+// Variante Shopify d'un produit choisi dans le catalogue, quand il n'en a qu'une
+// (copie du catalogue de la page Rentabilité) : sert à retrouver son prix
+// d'achat. Plusieurs variantes ou produit inconnu : null (rapprochement par le titre).
+async function singleVariantIds(items: LineItem[]): Promise<Map<string, string>> {
+  const productIds = [...new Set(items.map((i) => i.productId).filter((id): id is string => typeof id === "string" && id.startsWith("gid://shopify/Product/")))];
+  if (!productIds.length) return new Map();
+  const variants = await prisma.shopifyVariant.findMany({ where: { productId: { in: productIds } }, select: { id: true, productId: true } });
+  const out = new Map<string, string>();
+  for (const id of productIds) {
+    const list = variants.filter((v) => v.productId === id);
+    if (list.length === 1) out.set(id, list[0].id);
+  }
+  return out;
+}
 
 export async function createManualOrder(
   _prevState: NewOrderState,
@@ -48,6 +63,7 @@ export async function createManualOrder(
   const orderNumber = `M-${Date.now().toString(36).toUpperCase()}`;
 
   const paidMethod = cleanPaidMethod(formData.get("paidMethod"));
+  const variantOf = await singleVariantIds(items).catch(() => new Map<string, string>());
 
   await prisma.order.create({
     data: {
@@ -64,7 +80,14 @@ export async function createManualOrder(
       shippingFee: shipping,
       paidOnline: paidMethod !== null,
       paidMethod,
-      items: { create: items.map((i) => ({ title: i.title, quantity: i.quantity, price: i.price })) },
+      items: {
+        create: items.map((i) => ({
+          title: i.title,
+          quantity: i.quantity,
+          price: i.price,
+          shopifyVariantId: (i.productId && variantOf.get(i.productId)) || null,
+        })),
+      },
     },
   });
 

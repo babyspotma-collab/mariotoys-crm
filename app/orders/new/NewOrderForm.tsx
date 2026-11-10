@@ -9,7 +9,8 @@ import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 import { formatDh } from "@/lib/format";
 import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 
-type Line = { title: string; price: number; quantity: number };
+// productId : produit choisi dans le catalogue (sert à retrouver sa variante, voir actions.ts).
+type Line = { title: string; price: number; quantity: number; productId?: string };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -97,8 +98,8 @@ export default function NewOrderForm() {
             >
               <ProductPicker
                 value={line.title}
-                onChange={(title) => updateLine(i, { title })}
-                onPick={(p) => updateLine(i, { title: p.title, price: p.price })}
+                onChange={(title) => updateLine(i, { title, productId: undefined })}
+                onPick={(p) => updateLine(i, { title: p.title, price: p.price, productId: p.id })}
               />
               <input
                 type="number"
