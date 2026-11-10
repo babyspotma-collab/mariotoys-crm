@@ -26,6 +26,7 @@ type Filter = (typeof FILTERS)[number]["id"];
 
 const METHOD: Record<string, { label: string; tone: "green" | "blue" | "amber" | "gray" }> = {
   BARCODE: { label: "Code-barres", tone: "green" },
+  DESIGNATION: { label: "SKU = désignation", tone: "green" },
   SKU: { label: "SKU", tone: "green" },
   NAME: { label: "Nom · à vérifier", tone: "amber" },
   MANUAL: { label: "Manuel", tone: "blue" },

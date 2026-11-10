@@ -62,4 +62,31 @@ assert.equal(autoMatch(variants, articles, named).find((r) => r.variantId === "v
 const same = new Map<string, LinkState>([["v1", { albaseetCode: "A1", method: "BARCODE", score: null }]]);
 assert.ok(!autoMatch(variants, articles, same).some((r) => r.variantId === "v1"));
 
+// SKU Shopify = désignation ALBASEET+ (casse, espaces, espaces autour de * et - ignorés)
+{
+  const arts = [
+    { code: "16526", barcode: null, designation: "VOITURE METAL TL 25100*12C" },
+    { code: "16527", barcode: null, designation: "BABYWALKER 07-45*4C" },
+    { code: "16528", barcode: null, designation: "MAISON PILSAN 6093" },
+    { code: "16529", barcode: null, designation: "maison pilsan 6093" },
+  ];
+  const vars = [
+    { id: "r", productTitle: "Voiture", variantTitle: "Rouge", sku: "voiture  metal tl 25100 * 12c", barcode: null },
+    { id: "b", productTitle: "Voiture", variantTitle: "Bleu", sku: "VOITURE METAL TL 25100 *12C", barcode: null },
+    { id: "w", productTitle: "Trotteur", variantTitle: null, sku: "BABYWALKER 07 - 45 *4C", barcode: null },
+    { id: "m", productTitle: "Maison", variantTitle: null, sku: "MAISON PILSAN 6093", barcode: null },
+  ];
+  const r = new Map(autoMatch(vars, arts, new Map()).map((x) => [x.variantId, x]));
+  assert.equal(r.get("r")?.albaseetCode, "16526");
+  assert.equal(r.get("r")?.method, "DESIGNATION");
+  assert.equal(r.get("b")?.albaseetCode, "16526", "variantes au même SKU = même article");
+  assert.equal(r.get("w")?.albaseetCode, "16527");
+  assert.notEqual(r.get("m")?.method, "DESIGNATION", "désignation en double = ambiguë");
+  // Un SKU sans lettre n'est pas comparé au code interne
+  assert.ok(!autoMatch([{ id: "n", productTitle: "x", variantTitle: null, sku: "16528", barcode: null }], arts, new Map()).length);
+  // Un lien par le nom est remplacé ; un lien code-barres ne l'est pas
+  assert.equal(autoMatch(vars, arts, new Map([["r", { albaseetCode: "X", method: "NAME", score: 0.9 }]])).find((x) => x.variantId === "r")?.method, "DESIGNATION");
+  assert.ok(!autoMatch(vars, arts, new Map([["r", { albaseetCode: "X", method: "BARCODE", score: null }]])).some((x) => x.variantId === "r"));
+}
+
 console.log("cost + matching checks OK");
