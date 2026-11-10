@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { articleFilter, COST_TYPES } from "@/lib/profit/article-filter";
 import { cityKey, DEFAULT_CITY_KEY } from "@/lib/profit/city-rate";
 import { resolveCost } from "@/lib/profit/cost";
+import { OVERHEAD_TARGET, SITE_TARGET } from "@/lib/profit/compute";
 import { syncMetaSpend } from "@/lib/profit/meta";
 import { saveSetting, type CasaRates, type MetaAccount } from "@/lib/profit/settings";
 import { syncCatalog } from "@/lib/profit/shopify-catalog";
@@ -208,11 +209,28 @@ export async function searchTargets(q: string): Promise<TargetHit[]> {
 export async function addCampaignLink(campaignId: string, target: Pick<TargetHit, "type" | "id" | "title">): Promise<void> {
   if (!(await prisma.metaCampaign.findUnique({ where: { id: campaignId }, select: { id: true } }))) return;
   if (target.type !== "PRODUCT" && target.type !== "COLLECTION") return;
-  await prisma.campaignLink.upsert({
-    where: { campaignId_targetType_targetId: { campaignId, targetType: target.type, targetId: clean(target.id, 100) } },
-    create: { campaignId, targetType: target.type, targetId: clean(target.id, 100), targetTitle: clean(target.title, 200) },
-    update: {},
-  });
+  // Un seul type d'association : un produit ou une collection remplace « tout le site » / « frais généraux ».
+  await prisma.$transaction([
+    prisma.campaignLink.deleteMany({ where: { campaignId, targetType: { in: [SITE_TARGET, OVERHEAD_TARGET] } } }),
+    prisma.campaignLink.upsert({
+      where: { campaignId_targetType_targetId: { campaignId, targetType: target.type, targetId: clean(target.id, 100) } },
+      create: { campaignId, targetType: target.type, targetId: clean(target.id, 100), targetTitle: clean(target.title, 200) },
+      update: {},
+    }),
+  ]);
+  refresh();
+}
+
+/** « Tout le site » ou « Frais généraux » : remplace toutes les autres associations de la campagne. */
+export async function setCampaignScope(campaignId: string, scope: "SITE" | "OVERHEAD"): Promise<void> {
+  if (scope !== SITE_TARGET && scope !== OVERHEAD_TARGET) return;
+  if (!(await prisma.metaCampaign.findUnique({ where: { id: campaignId }, select: { id: true } }))) return;
+  await prisma.$transaction([
+    prisma.campaignLink.deleteMany({ where: { campaignId } }),
+    prisma.campaignLink.create({
+      data: { campaignId, targetType: scope, targetId: "*", targetTitle: scope === SITE_TARGET ? "Tout le site" : "Frais généraux (notoriété, magasin)" },
+    }),
+  ]);
   refresh();
 }
 

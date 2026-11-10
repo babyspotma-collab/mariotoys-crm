@@ -12,6 +12,10 @@
 //   abîmés » du coût d'achat des produits retournés.
 // - Pub Meta : dépense de la période convertie en MAD, répartie entre les
 //   produits associés à la campagne selon leur CA ; sinon « pub non attribuée ».
+//   Campagne « tout le site » (SITE) : répartie sur tous les produits vendus, sa
+//   marge = celle de toutes les ventes. « Frais généraux » (OVERHEAD) : attribuée à
+//   aucun produit, déduite du bénéfice global (ligne « Pub frais généraux »).
+//   Un seul type d'association par campagne ; en cas de mélange, OVERHEAD > SITE > produits.
 // - Les coûts d'une commande (CA, livraison, retour) sont répartis entre ses
 //   articles au prorata de leur montant.
 
@@ -78,8 +82,14 @@ export type ProductRow = {
   marginPct: number | null;
 };
 
+/** Type d'association d'une campagne : produits/collections, tout le site, frais généraux ou rien. */
+export type CampaignScope = "PRODUCTS" | "SITE" | "OVERHEAD" | "NONE";
+export const SITE_TARGET = "SITE";
+export const OVERHEAD_TARGET = "OVERHEAD";
+
 export type CampaignRow = {
   id: string;
+  scope: CampaignScope;
   name: string;
   accountId: string;
   currency: string;
@@ -116,6 +126,7 @@ export type ProfitReport = {
   products: ProductRow[];
   campaigns: CampaignRow[];
   unattributedAds: number;
+  overheadAds: number; // campagnes « frais généraux »
   alerts: {
     lossSales: LossSale[];
     missingCost: MissingCost[];
@@ -300,22 +311,43 @@ export function computeProfit(input: ProfitInput): ProfitReport {
 
   const campaigns: CampaignRow[] = [];
   let unattributedAds = 0;
+  let overheadAds = 0;
   for (const s of input.spend) {
     if (s.amount <= 0) continue;
     const spendMad = s.amount * (s.currency === "MAD" ? 1 : settings.usdToMad);
     kpi.ads += spendMad;
     const targets = targetsByCampaign.get(s.campaignId) ?? [];
-    const productIds = new Set<string>();
-    for (const t of targets) {
-      if (t.targetType === "COLLECTION") for (const id of productsByCollection.get(t.targetId) ?? []) productIds.add(id);
-      else productIds.add(t.targetId);
+    const scope: CampaignScope = targets.some((t) => t.targetType === OVERHEAD_TARGET)
+      ? "OVERHEAD"
+      : targets.some((t) => t.targetType === SITE_TARGET)
+        ? "SITE"
+        : targets.length
+          ? "PRODUCTS"
+          : "NONE";
+    if (scope === "OVERHEAD") {
+      overheadAds += spendMad;
+      campaigns.push({
+        id: s.campaignId, scope, name: s.name, accountId: s.accountId, currency: s.currency, spend: s.amount, spendMad,
+        linkedCount: targets.length, attributed: false, unattributedReason: "frais généraux", margin: 0, net: -spendMad, roas: null,
+      });
+      continue;
     }
-    const selling = [...productIds].map((id) => products.get(id)).filter((p): p is Acc => !!p && p.ca > 0);
+    let selling: Acc[];
+    if (scope === "SITE") selling = [...products.values()].filter((p) => p.ca > 0);
+    else {
+      const productIds = new Set<string>();
+      for (const t of targets) {
+        if (t.targetType === "COLLECTION") for (const id of productsByCollection.get(t.targetId) ?? []) productIds.add(id);
+        else productIds.add(t.targetId);
+      }
+      selling = [...productIds].map((id) => products.get(id)).filter((p): p is Acc => !!p && p.ca > 0);
+    }
     const row: CampaignRow = {
-      id: s.campaignId, name: s.name, accountId: s.accountId, currency: s.currency, spend: s.amount, spendMad,
+      id: s.campaignId, scope, name: s.name, accountId: s.accountId, currency: s.currency, spend: s.amount, spendMad,
       linkedCount: targets.length, attributed: selling.length > 0, unattributedReason: null, margin: 0, net: 0, roas: null,
     };
     if (!targets.length) row.unattributedReason = "campagne non associée";
+    else if (scope === "SITE" && !selling.length) row.unattributedReason = "aucune vente sur la période";
     else if (!selling.length) row.unattributedReason = "aucune vente des produits associés";
     if (!row.attributed) unattributedAds += spendMad;
     else {
@@ -343,7 +375,11 @@ export function computeProfit(input: ProfitInput): ProfitReport {
       if (c) c.margin += (p.contribution * part) / p.ads;
     }
   }
+  // « Tout le site » : marge de toutes les ventes de la période (avant pub).
+  const siteMargin = rows.reduce((sum, p) => sum + p.contribution, 0);
   for (const c of campaigns) {
+    if (c.scope === "OVERHEAD") continue;
+    if (c.scope === "SITE" && c.attributed) c.margin = siteMargin;
     c.net = c.margin - c.spendMad;
     c.roas = c.attributed && c.spendMad > 0 ? c.margin / c.spendMad : null;
   }
@@ -359,6 +395,7 @@ export function computeProfit(input: ProfitInput): ProfitReport {
       .sort((a, b) => b.ca - a.ca || b.returnLoss - a.returnLoss),
     campaigns: campaigns.sort((a, b) => b.spendMad - a.spendMad),
     unattributedAds,
+    overheadAds,
     alerts: {
       lossSales: lossSales.sort((a, b) => b.unitCost - b.paid - (a.unitCost - a.paid)),
       missingCost: [...missingCost.values()].sort((a, b) => b.ca - a.ca),

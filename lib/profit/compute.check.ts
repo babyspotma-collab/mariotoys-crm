@@ -131,4 +131,49 @@ assert.deepEqual(splitItemTitle("Chat (variante : Rose)"), { base: "Chat", varia
   assert.deepEqual(r.alerts.unlinkedOrders.map((u) => [u.orderNumber, Math.round(u.amount)]), [["M-B", 600], ["M-C", 100]], "montant décroissant");
   assert.equal(r.alerts.missingCost.find((m) => m.title === "Truc inconnu")?.reason, "produit Shopify introuvable");
 }
+
+// Campagnes « tout le site » et « frais généraux »
+{
+  const run = (links: { campaignId: string; targetType: string; targetId: string; targetTitle: string }[]) =>
+    computeProfit({
+      orders: [
+        order({ totalPrice: 2999, localDelivery: true, localCourier: "amine", localStatus: "LIVREE",
+          items: [{ title: "Moto BMW GS 1200", quantity: 1, price: 2999, shopifyVariantId: "vMoto" }] }),
+        order({ totalPrice: 300, localDelivery: true, localCourier: "amine", localStatus: "LIVREE",
+          items: [{ title: "Chat Interactif (variante : Rose)", quantity: 1, price: 300, shopifyVariantId: "vChatR" }] }),
+      ],
+      variants, links: new Map([["vMoto", "MOTO"], ["vChatR", "CHAT"]]), articles, history: new Map(),
+      rates: { FORCELOG: [], OZON: [] },
+      settings: { returnFees: { FORCELOG: 0, OZON: null }, casa: { defaultFee: 20, couriers: [{ name: "Amine", fee: 0 }] }, damagedReturnPct: 0, usdToMad: 10 },
+      spend: [
+        { campaignId: "cSite", name: "Site", accountId: "a", currency: "USD", amount: 33 },
+        { campaignId: "cOver", name: "Magasin", accountId: "a", currency: "USD", amount: 10 },
+      ],
+      campaignLinks: links,
+    });
+  const r = run([
+    { campaignId: "cSite", targetType: "SITE", targetId: "*", targetTitle: "Tout le site" },
+    { campaignId: "cOver", targetType: "OVERHEAD", targetId: "*", targetTitle: "Frais généraux" },
+  ]);
+  const site = r.campaigns.find((c) => c.id === "cSite")!;
+  const over = r.campaigns.find((c) => c.id === "cOver")!;
+  // Marge de toutes les ventes : (2999 - 3499) + (300 - 120) = -320
+  assert.equal(site.scope, "SITE");
+  close(site.margin, -320, "marge tout le site");
+  close(site.roas!, -320 / 330, "ROAS tout le site");
+  close(r.products.find((p) => p.key === "pMoto")!.ads, (330 * 2999) / 3299, "pub répartie au prorata du CA");
+  assert.equal(over.scope, "OVERHEAD");
+  assert.equal(over.roas, null);
+  close(r.overheadAds, 100, "frais généraux");
+  close(r.unattributedAds, 0, "frais généraux séparés de la pub non attribuée");
+  close(r.kpi.ads, 430);
+  close(r.kpi.net, 3299 - 3619 - 430, "frais généraux déduits du bénéfice");
+  assert.ok(!r.alerts.unlinkedCampaigns.some((c) => c.id === "cOver"), "pas d'alerte « sans produit »");
+  // Mélange (ne devrait pas arriver) : frais généraux l'emportent
+  const mixed = run([
+    { campaignId: "cSite", targetType: "SITE", targetId: "*", targetTitle: "Tout le site" },
+    { campaignId: "cSite", targetType: "OVERHEAD", targetId: "*", targetTitle: "Frais généraux" },
+  ]);
+  assert.equal(mixed.campaigns.find((c) => c.id === "cSite")!.scope, "OVERHEAD");
+}
 console.log("compute checks OK");

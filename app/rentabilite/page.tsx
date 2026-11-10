@@ -50,7 +50,13 @@ export default async function ProfitPage({ searchParams }: { searchParams: Recor
         <StatCard
           label="Pub Meta"
           value={formatDh(kpi.ads)}
-          sub={`taux ${settings.usdToMad.toLocaleString("fr-FR")} · ${report.unattributedAds > 0 ? `${formatDh(report.unattributedAds)} non attribuée` : "toute attribuée"}`}
+          sub={[
+            `taux ${settings.usdToMad.toLocaleString("fr-FR")}`,
+            report.unattributedAds > 0 ? `${formatDh(report.unattributedAds)} non attribuée` : "toute attribuée",
+            report.overheadAds > 0 ? `${formatDh(report.overheadAds)} frais généraux` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         />
         <StatCard label="Livraison" value={formatDh(kpi.delivery)} sub="transporteurs et livreurs Casa" />
         <StatCard label="Pertes sur retours" value={formatDh(kpi.returnLoss)} sub={`${formatInt(kpi.returnCount)} retours · ${settings.damagedReturnPct} % abîmés`} />
@@ -176,7 +182,7 @@ export default async function ProfitPage({ searchParams }: { searchParams: Recor
         {report.products.length === 0 ? (
           <EmptyState title="Aucune vente">Aucune commande livrée ou en cours sur cette période.</EmptyState>
         ) : (
-          <ProductTable rows={products} unattributed={report.unattributedAds} />
+          <ProductTable rows={products} unattributed={report.unattributedAds} overhead={report.overheadAds} />
         )}
         {!showAll && report.products.length > products.length && (
           <a href={allHref} className="btn-secondary w-fit">
@@ -230,7 +236,7 @@ function AlertRow({ title, count, tone, href, children }: { title: string; count
   );
 }
 
-function ProductTable({ rows, unattributed }: { rows: ProductRow[]; unattributed: number }) {
+function ProductTable({ rows, unattributed, overhead }: { rows: ProductRow[]; unattributed: number; overhead: number }) {
   return (
     <div className="card overflow-hidden">
       {/* Mobile : une carte par produit */}
@@ -252,6 +258,12 @@ function ProductTable({ rows, unattributed }: { rows: ProductRow[]; unattributed
           <li className="flex justify-between gap-3 p-4 text-sm">
             <span className="text-muted">Pub non attribuée</span>
             <Signed value={-unattributed} className="font-semibold" />
+          </li>
+        )}
+        {overhead > 0 && (
+          <li className="flex justify-between gap-3 p-4 text-sm">
+            <span className="text-muted">Pub frais généraux (notoriété, magasin)</span>
+            <Signed value={-overhead} className="font-semibold" />
           </li>
         )}
       </ul>
@@ -302,6 +314,14 @@ function ProductTable({ rows, unattributed }: { rows: ProductRow[]; unattributed
                 <td />
               </tr>
             )}
+            {overhead > 0 && (
+              <tr>
+                <td className="px-4 py-2.5 text-muted" colSpan={6}>Pub frais généraux (notoriété, magasin)</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{formatDh(overhead)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold"><Signed value={-overhead} /></td>
+                <td />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -311,7 +331,20 @@ function ProductTable({ rows, unattributed }: { rows: ProductRow[]; unattributed
 
 function RoasPill({ c }: { c: CampaignRow }) {
   if (c.roas === null) return <span className="text-xs text-muted">{c.unattributedReason}</span>;
-  return <Pill tone={c.roas >= 1 ? "green" : "red"}>{c.roas.toFixed(2).replace(".", ",")}</Pill>;
+  const pill = <Pill tone={c.roas >= 1 ? "green" : "red"}>{c.roas.toFixed(2).replace(".", ",")}</Pill>;
+  if (c.scope !== "SITE") return pill;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {pill}
+      <span className="text-xs text-muted">tout le site</span>
+    </span>
+  );
+}
+
+function scopeLabel(c: CampaignRow): React.ReactNode {
+  if (c.scope === "SITE") return "Tout le site";
+  if (c.scope === "OVERHEAD") return "Frais généraux";
+  return c.linkedCount || <span className="text-pill-amber-fg">aucune</span>;
 }
 
 function CampaignTable({ rows }: { rows: CampaignRow[] }) {
@@ -326,7 +359,8 @@ function CampaignTable({ rows }: { rows: CampaignRow[] }) {
               <RoasPill c={c} />
             </div>
             <div className="text-xs text-muted tabular-nums">
-              {formatDh(c.spendMad)} ({spendLabel(c)}) · marge {formatDh(c.margin)} · net <Signed value={c.net} />
+              {formatDh(c.spendMad)} ({spendLabel(c)})
+              {c.scope === "OVERHEAD" ? " · frais généraux" : <> · marge{c.scope === "SITE" ? " (tout le site)" : ""} {formatDh(c.margin)} · net <Signed value={c.net} /></>}
             </div>
           </li>
         ))}
@@ -351,8 +385,8 @@ function CampaignTable({ rows }: { rows: CampaignRow[] }) {
                   {formatDh(c.spendMad)}
                   <div className="text-xs text-muted">{spendLabel(c)}</div>
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{c.linkedCount || <span className="text-pill-amber-fg">aucune</span>}</td>
-                <td className="px-3 py-2.5 text-right"><Signed value={c.margin} /></td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{scopeLabel(c)}</td>
+                <td className="px-3 py-2.5 text-right">{c.scope === "OVERHEAD" ? <span className="text-muted">—</span> : <Signed value={c.margin} />}</td>
                 <td className="px-3 py-2.5 text-right font-semibold"><Signed value={c.net} /></td>
                 <td className="px-4 py-2.5 text-right"><RoasPill c={c} /></td>
               </tr>

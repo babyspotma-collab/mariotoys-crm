@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Plus, X } from "@phosphor-icons/react/dist/ssr";
-import { addCampaignLink, removeCampaignLink, searchTargets, type TargetHit } from "../actions";
+import { addCampaignLink, removeCampaignLink, searchTargets, setCampaignScope, type TargetHit } from "../actions";
 
 export type LinkChip = { id: string; type: string; title: string };
 export type Suggestion = { type: "PRODUCT" | "COLLECTION"; id: string; title: string };
 
-// Produits / collections associés à une campagne Meta : retirer, accepter une
-// suggestion (nom ressemblant) ou chercher dans le catalogue Shopify.
+// Association d'une campagne Meta, un seul type à la fois : produits / collections
+// (retirer, accepter une suggestion, chercher dans le catalogue Shopify), « Tout le
+// site » ou « Frais généraux ». Choisir un type remplace les autres associations.
 export default function CampaignTargets({ campaignId, links, suggestions }: { campaignId: string; links: LinkChip[]; suggestions: Suggestion[] }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<TargetHit[]>([]);
@@ -31,11 +32,27 @@ export default function CampaignTargets({ campaignId, links, suggestions }: { ca
       setOpen(false);
     });
 
+  const scope = links.some((l) => l.type === "OVERHEAD") ? "OVERHEAD" : links.some((l) => l.type === "SITE") ? "SITE" : null;
+  const chipTone = (type: string) =>
+    type === "SITE" ? "bg-pill-green-bg text-pill-green-fg" : type === "OVERHEAD" ? "bg-cream-dark text-body" : "bg-pill-blue-bg text-pill-blue-fg";
+  const scopeButton = (value: "SITE" | "OVERHEAD", label: string, title: string) =>
+    scope === value ? null : (
+      <button
+        type="button"
+        disabled={pending}
+        title={title}
+        onClick={() => start(() => setCampaignScope(campaignId, value))}
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-xs font-medium text-ink hover:bg-cream"
+      >
+        {label}
+      </button>
+    );
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
         {links.map((l) => (
-          <span key={l.id} className="inline-flex h-7 max-w-full items-center gap-1 rounded-md bg-pill-blue-bg pl-2 pr-1 text-xs font-medium text-pill-blue-fg">
+          <span key={l.id} className={`inline-flex h-7 max-w-full items-center gap-1 rounded-md pl-2 pr-1 text-xs font-medium ${chipTone(l.type)}`}>
             <span className="truncate">{l.type === "COLLECTION" ? `Collection : ${l.title}` : l.title}</span>
             <button
               type="button"
@@ -65,7 +82,12 @@ export default function CampaignTargets({ campaignId, links, suggestions }: { ca
           <Plus size={12} aria-hidden="true" />
           Associer
         </button>
+        {scopeButton("SITE", "Tout le site", "Dépense répartie sur tous les produits vendus, au prorata de leur CA")}
+        {scopeButton("OVERHEAD", "Frais généraux", "Notoriété, magasin : dépense déduite du bénéfice global, attribuée à aucun produit")}
       </div>
+      {open && scope && (
+        <p className="text-xs text-muted">Associer un produit ou une collection remplacera « {scope === "SITE" ? "Tout le site" : "Frais généraux"} ».</p>
+      )}
       {open && (
         <div className="flex flex-col gap-1.5">
           <input

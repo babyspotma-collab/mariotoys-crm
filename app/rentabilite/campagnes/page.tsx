@@ -64,8 +64,9 @@ export default async function CampagnesPage({ searchParams }: { searchParams: Re
       />
       <SyncLine status={status} />
       <p className="text-xs text-muted">
-        La dépense d&apos;une campagne est répartie entre ses produits associés selon leur chiffre d&apos;affaires. Les suggestions (cadre pointillé) viennent du nom de
-        la campagne : un clic pour les accepter.{unlinkedWithSpend > 0 ? ` ${unlinkedWithSpend} campagne(s) avec dépense ne sont associées à rien.` : ""}
+        La dépense d&apos;une campagne est répartie entre ses produits associés selon leur chiffre d&apos;affaires. « Tout le site » la répartit sur tous les produits
+        vendus ; « Frais généraux » (notoriété, magasin) la déduit du bénéfice global sans l&apos;attribuer à un produit. Un seul type d&apos;association par campagne. Les
+        suggestions (cadre pointillé) viennent du nom de la campagne : un clic pour les accepter.{unlinkedWithSpend > 0 ? ` ${unlinkedWithSpend} campagne(s) avec dépense ne sont associées à rien.` : ""}
       </p>
 
       {rows.length === 0 ? (
