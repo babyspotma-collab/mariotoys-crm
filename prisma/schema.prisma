@@ -112,6 +112,10 @@ model OrderItem {
   stockInfo        Json? // { relie, articles: [{ nom, code, depots: [{ depot, quantite, enLigne }] }] }
   albaseetSale     Json? // { facture, depot, date, vendeur } dès que l'article est vendu dans ALBASEET+, sinon null
   stockCheckedAt   DateTime? // dernier passage du programme local
+
+  // Rentabilité (prisma/sql/2026-11-10-orderitem-catalogue.sql) :
+  originalTitle String? // titre saisi à l'origine, gardé quand la ligne est reliée au catalogue ou découpée
+  albaseetCode  String? // article ALBASEET+ choisi directement (produit absent de Shopify) : son coût d'achat s'applique
 }
 
 enum OrderStatus {

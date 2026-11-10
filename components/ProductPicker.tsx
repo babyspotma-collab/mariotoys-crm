@@ -4,9 +4,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ProductSuggestion } from "@/lib/shopify-admin";
 import { formatDh } from "@/lib/format";
 
-// Champ "Nom de l'article" : le texte reste libre, et dès 2 lettres des
-// propositions du catalogue Shopify apparaissent (8 au maximum). Choisir une
-// proposition reprend son nom exact et son prix.
+// Recherche d'un produit du catalogue Shopify : dès 2 lettres, des propositions
+// apparaissent. Le produit doit être choisi dans la liste (voir CatalogLinePicker,
+// qui demande ensuite la variante) : le texte tapé seul n'est jamais enregistré.
 export default function ProductPicker({
   value,
   onChange,
@@ -95,7 +95,7 @@ export default function ProductPicker({
   const showPanel = open && value.trim().length >= 2 && (loading || error || results.length > 0 || typed.current);
 
   return (
-    <div ref={boxRef} className="relative col-span-3 md:col-span-1">
+    <div ref={boxRef} className="relative">
       <input
         value={value}
         onChange={(e) => {
@@ -111,8 +111,8 @@ export default function ProductPicker({
         aria-autocomplete="list"
         required
         autoComplete="off"
-        aria-label="Nom de l'article"
-        placeholder="Nom de l'article"
+        aria-label="Produit du catalogue"
+        placeholder="Rechercher un produit du catalogue"
         className="input w-full"
       />
       {showPanel && (
@@ -152,7 +152,7 @@ export default function ProductPicker({
           ))}
           {results.length === 0 && (
             <li className="px-3 py-2 text-sm text-muted">
-              {loading ? "Recherche…" : error ? "Catalogue Shopify indisponible — tu peux saisir le nom à la main." : "Aucun produit trouvé — le nom saisi sera utilisé tel quel."}
+              {loading ? "Recherche…" : error ? "Catalogue Shopify indisponible — réessaie dans un instant." : "Aucun produit trouvé."}
             </li>
           )}
         </ul>

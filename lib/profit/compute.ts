@@ -27,7 +27,8 @@ export type ProfitOrder = Omit<RevenueOrder, "parcels"> & {
   orderNumber: string;
   createdAt: Date;
   parcels: Parcel[]; // le plus récent en premier
-  items: { title: string; quantity: number; price: unknown; shopifyVariantId: string | null }[];
+  // albaseetCode : article ALBASEET+ choisi directement (produit absent de Shopify)
+  items: { title: string; quantity: number; price: unknown; shopifyVariantId: string | null; albaseetCode?: string | null }[];
 };
 
 export type VariantInfo = {
@@ -94,6 +95,8 @@ export type CampaignRow = {
 
 export type LossSale = { title: string; orderNumber: string; paid: number; unitCost: number; costLabel: string; quantity: number };
 export type MissingCost = { key: string; title: string; quantity: number; ca: number; reason: string };
+/** Commande dont au moins une ligne ne correspond à aucun produit du catalogue (à corriger sur la fiche commande). */
+export type UnlinkedOrder = { orderId: string; orderNumber: string; createdAt: Date; amount: number; titles: string[] };
 export type ArticleAlert = { code: string; designation: string; quantity: number };
 
 export type ProfitReport = {
@@ -116,6 +119,7 @@ export type ProfitReport = {
   alerts: {
     lossSales: LossSale[];
     missingCost: MissingCost[];
+    unlinkedOrders: UnlinkedOrder[]; // montant décroissant
     toClassify: ArticleAlert[];
     grosMissing: ArticleAlert[];
     unprofitableCampaigns: CampaignRow[];
@@ -191,6 +195,7 @@ export function computeProfit(input: ProfitInput): ProfitReport {
   const kpi = { ca: 0, cogs: 0, grossMargin: 0, ads: 0, delivery: 0, returnLoss: 0, net: 0, marginPct: null as number | null, salesCount: 0, returnCount: 0, missingCostCa: 0 };
   const lossSales: LossSale[] = [];
   const missingCost = new Map<string, MissingCost>();
+  const unlinkedOrders: UnlinkedOrder[] = [];
   const toClassify = new Map<string, ArticleAlert>();
   const grosMissing = new Map<string, ArticleAlert>();
   const missingRates = { FORCELOG: 0, OZON: 0 };
@@ -201,6 +206,13 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     const sold = state === "livree" || state === "en_cours";
     const returned = state === "retour";
     const lines = o.items.map((it) => {
+      const direct = it.albaseetCode ? input.articles.get(it.albaseetCode) : undefined;
+      if (direct) {
+        // Article ALBASEET+ choisi directement : pas de variante Shopify.
+        const cost = resolveCost(direct.costType, pricesAt(input.history.get(direct.code), direct, o.createdAt));
+        const unit = num(it.price);
+        return { it, v: undefined, variantId: null, title: direct.designation, key: `a:${direct.code}`, article: direct as CostArticle | undefined, cost: cost as CostResult | null, unit, value: unit * it.quantity };
+      }
       const variantId = resolveVariant(it);
       const v = variantId ? variantById.get(variantId) : undefined;
       const title = v ? v.productTitle : splitItemTitle(it.title).base;
@@ -228,6 +240,12 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     if (sold) kpi.salesCount++;
     else kpi.returnCount++;
 
+    const orphans = lines.filter((l) => !l.v && !l.article);
+    if (orphans.length) {
+      const amount = orphans.reduce((s, l) => s + orderCa * (total > 0 ? l.value / total : 1 / lines.length), 0);
+      unlinkedOrders.push({ orderId: o.id, orderNumber: o.orderNumber, createdAt: o.createdAt, amount, titles: orphans.map((l) => l.it.title) });
+    }
+
     lines.forEach((l) => {
       const share = total > 0 ? l.value / total : 1 / lines.length;
       const p = product(l.key, l.title, l.v);
@@ -245,7 +263,7 @@ export function computeProfit(input: ProfitInput): ProfitReport {
         } else {
           p.missingCostQty += qty;
           kpi.missingCostCa += ca;
-          const reason = !l.v && !l.variantId ? "produit Shopify introuvable" : !l.article ? "non associé à un article ALBASEET+" : "article sans prix d'achat";
+          const reason = !l.v && !l.article ? "produit Shopify introuvable" : !l.article ? "non associé à un article ALBASEET+" : "article sans prix d'achat";
           const m = missingCost.get(l.key) ?? { key: l.key, title: l.title, quantity: 0, ca: 0, reason };
           m.quantity += qty;
           m.ca += ca;
@@ -344,6 +362,7 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     alerts: {
       lossSales: lossSales.sort((a, b) => b.unitCost - b.paid - (a.unitCost - a.paid)),
       missingCost: [...missingCost.values()].sort((a, b) => b.ca - a.ca),
+      unlinkedOrders: unlinkedOrders.sort((a, b) => b.amount - a.amount),
       toClassify: [...toClassify.values()].sort((a, b) => b.quantity - a.quantity),
       grosMissing: [...grosMissing.values()].sort((a, b) => b.quantity - a.quantity),
       unprofitableCampaigns: campaigns.filter((c) => c.roas !== null && c.roas < 1),

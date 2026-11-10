@@ -53,7 +53,7 @@ export async function loadProfitReport(range: { start: Date; end: Date }): Promi
         localDelivery: true, localCourier: true, localStatus: true,
         forcelogCode: true, ozonCode: true, forcelogStatusCode: true, forcelogStatus: true, ozonStatus: true,
         parcels: { select: { carrier: true, statusCode: true, status: true, cityName: true }, orderBy: { carrierCreatedAt: { sort: "desc", nulls: "last" } }, take: 1 },
-        items: { select: { title: true, quantity: true, price: true, shopifyVariantId: true } },
+        items: { select: { title: true, quantity: true, price: true, shopifyVariantId: true, albaseetCode: true } },
       },
     }),
     loadCatalog(),

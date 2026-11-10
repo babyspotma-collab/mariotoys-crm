@@ -5,25 +5,11 @@ import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { cleanPaidMethod } from "@/lib/payment-method";
 import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
+import { resolveCatalogLines } from "@/lib/order-lines";
 
 export type NewOrderState = { error: string | null };
 
-type LineItem = { title: string; price: number; quantity: number; productId?: string };
-
-// Variante Shopify d'un produit choisi dans le catalogue, quand il n'en a qu'une
-// (copie du catalogue de la page Rentabilité) : sert à retrouver son prix
-// d'achat. Plusieurs variantes ou produit inconnu : null (rapprochement par le titre).
-async function singleVariantIds(items: LineItem[]): Promise<Map<string, string>> {
-  const productIds = [...new Set(items.map((i) => i.productId).filter((id): id is string => typeof id === "string" && id.startsWith("gid://shopify/Product/")))];
-  if (!productIds.length) return new Map();
-  const variants = await prisma.shopifyVariant.findMany({ where: { productId: { in: productIds } }, select: { id: true, productId: true } });
-  const out = new Map<string, string>();
-  for (const id of productIds) {
-    const list = variants.filter((v) => v.productId === id);
-    if (list.length === 1) out.set(id, list[0].id);
-  }
-  return out;
-}
+// Une ligne = une variante Shopify ou un article ALBASEET+ (lib/order-lines.ts) : aucun titre libre.
 
 export async function createManualOrder(
   _prevState: NewOrderState,
@@ -39,17 +25,15 @@ export async function createManualOrder(
     return { error: "Tous les champs client sont obligatoires." };
   }
 
-  let items: LineItem[];
+  let raw: unknown;
   try {
-    items = JSON.parse(itemsRaw);
+    raw = JSON.parse(itemsRaw);
   } catch {
     return { error: "Articles invalides." };
   }
-
-  items = items.filter((i) => i.title && i.quantity > 0 && i.price >= 0);
-  if (items.length === 0) {
-    return { error: "Ajoutez au moins un article." };
-  }
+  const resolved = await resolveCatalogLines(raw);
+  if ("error" in resolved) return { error: resolved.error };
+  const items = resolved.lines;
 
   // Frais de livraison choisis dans le formulaire : gratuit, 20 ou 40 DH.
   // Comme pour une commande Shopify, ils sont inclus dans le total à encaisser.
@@ -63,7 +47,6 @@ export async function createManualOrder(
   const orderNumber = `M-${Date.now().toString(36).toUpperCase()}`;
 
   const paidMethod = cleanPaidMethod(formData.get("paidMethod"));
-  const variantOf = await singleVariantIds(items).catch(() => new Map<string, string>());
 
   await prisma.order.create({
     data: {
@@ -81,12 +64,7 @@ export async function createManualOrder(
       paidOnline: paidMethod !== null,
       paidMethod,
       items: {
-        create: items.map((i) => ({
-          title: i.title,
-          quantity: i.quantity,
-          price: i.price,
-          shopifyVariantId: (i.productId && variantOf.get(i.productId)) || null,
-        })),
+        create: items,
       },
     },
   });

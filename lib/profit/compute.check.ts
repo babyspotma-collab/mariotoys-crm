@@ -108,4 +108,27 @@ assert.equal(report.alerts.grosMissing.length, 0, "la moto n'est pas vendue (ret
 assert.deepEqual(shopifyBelowCost(variants, links, articles).map((b) => b.variantId), ["vMoto"]);
 
 assert.deepEqual(splitItemTitle("Chat (variante : Rose)"), { base: "Chat", variant: "Rose" });
+
+// Ligne reliée directement à un article ALBASEET+ (produit absent de Shopify) et commande introuvable dans le catalogue
+{
+  const r = computeProfit({
+    orders: [
+      order({ id: "oA", orderNumber: "M-A", totalPrice: 500, localDelivery: true, localCourier: "amine", localStatus: "LIVREE",
+        items: [{ title: "MOTO GS", quantity: 1, price: 500, shopifyVariantId: null, albaseetCode: "MOTO" }] }),
+      order({ id: "oB", orderNumber: "M-B", totalPrice: 900, localDelivery: true, localCourier: "amine", localStatus: "LIVREE",
+        items: [{ title: "Quad x1, Vespa x1", quantity: 1, price: 600, shopifyVariantId: null }, { title: "Moto BMW GS 1200", quantity: 1, price: 300, shopifyVariantId: "vMoto" }] }),
+      order({ id: "oC", orderNumber: "M-C", totalPrice: 100, localDelivery: true, localCourier: "amine", localStatus: "LIVREE",
+        items: [{ title: "Truc inconnu", quantity: 1, price: 100, shopifyVariantId: null }] }),
+    ],
+    variants, links, articles, history: new Map(),
+    rates: { FORCELOG: [], OZON: [] },
+    settings: { returnFees: { FORCELOG: 0, OZON: null }, casa: { defaultFee: 20, couriers: [{ name: "Amine", fee: 0 }] }, damagedReturnPct: 0, usdToMad: 10.2 },
+    spend: [], campaignLinks: [],
+  });
+  close(r.kpi.cogs, 3499 * 2, "coût de l'article ALBASEET+ direct + moto");
+  const a = r.products.find((p) => p.key === "a:MOTO")!;
+  assert.equal(a.title, "MOTO GS");
+  assert.deepEqual(r.alerts.unlinkedOrders.map((u) => [u.orderNumber, Math.round(u.amount)]), [["M-B", 600], ["M-C", 100]], "montant décroissant");
+  assert.equal(r.alerts.missingCost.find((m) => m.title === "Truc inconnu")?.reason, "produit Shopify introuvable");
+}
 console.log("compute checks OK");

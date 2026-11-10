@@ -201,3 +201,42 @@ export async function listProducts(searchTerm = "", limit = 50): Promise<Shopify
     image: n.images.edges[0]?.node.url ?? null,
   }));
 }
+
+// ── Variantes (lignes de commande reliées au catalogue) ──
+
+export type CatalogVariant = { id: string; title: string | null; price: number };
+
+const variantLabel = (t: string | null | undefined): string | null => (t && t !== "Default Title" ? t : null);
+
+/** Titre d'une ligne de commande, au même format que les commandes Shopify (webhook orders-create). */
+export function catalogItemTitle(productTitle: string, variantTitle: string | null): string {
+  return variantTitle ? `${productTitle} (variante : ${variantTitle})` : productTitle;
+}
+
+/** Variantes d'un produit, dans l'ordre de Shopify. */
+export async function getProductVariants(productId: string): Promise<{ productTitle: string; variants: CatalogVariant[] } | null> {
+  const data = await gql<{ product: { title: string; variants: { nodes: { id: string; title: string; price: string }[] } } | null }>(
+    `query ($id: ID!) { product(id: $id) { title variants(first: 100) { nodes { id title price } } } }`,
+    { id: productId }
+  );
+  if (!data.product) return null;
+  return {
+    productTitle: data.product.title,
+    variants: data.product.variants.nodes.map((v) => ({ id: v.id, title: variantLabel(v.title), price: Math.round(parseFloat(v.price) * 100) / 100 })),
+  };
+}
+
+/** Vérifie des variantes auprès de Shopify et renvoie leur titre de ligne de commande. Variante inconnue : absente du résultat. */
+export async function resolveCatalogVariants(ids: string[]): Promise<Map<string, { title: string; price: number }>> {
+  const unique = [...new Set(ids)].filter((id) => id.startsWith("gid://shopify/ProductVariant/"));
+  if (!unique.length) return new Map();
+  const data = await gql<{ nodes: ({ id: string; title: string; price: string; product: { title: string } } | null)[] }>(
+    `query ($ids: [ID!]!) { nodes(ids: $ids) { ... on ProductVariant { id title price product { title } } } }`,
+    { ids: unique }
+  );
+  const out = new Map<string, { title: string; price: number }>();
+  for (const n of data.nodes) {
+    if (n?.id && n.product) out.set(n.id, { title: catalogItemTitle(n.product.title, variantLabel(n.title)), price: parseFloat(n.price) });
+  }
+  return out;
+}

@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createManualOrder, type NewOrderState } from "./actions";
-import ProductPicker from "./ProductPicker";
+import CatalogLinePicker, { type CatalogPick } from "@/components/CatalogLinePicker";
 import { PAID_METHODS, PAID_METHOD_LABEL, type PaidMethod } from "@/lib/payment-method";
 import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 import { formatDh } from "@/lib/format";
 import { Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 
-// productId : produit choisi dans le catalogue (sert à retrouver sa variante, voir actions.ts).
-type Line = { title: string; price: number; quantity: number; productId?: string };
+// Une ligne = une variante du catalogue Shopify (obligatoire). `key` : identifiant
+// stable de la ligne, pour garder la bonne recherche quand on en retire une.
+type Line = { key: number; pick: CatalogPick | null; price: number; quantity: number };
+let nextKey = 1;
+const emptyLine = (): Line => ({ key: nextKey++, pick: null, price: 0, quantity: 1 });
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -26,14 +29,15 @@ export default function NewOrderForm() {
   const [state, formAction] = useFormState(createManualOrder, initialState);
   const [shipping, setShipping] = useState<number>(0);
   const [paidMethod, setPaidMethod] = useState<PaidMethod | null>(null);
-  const [lines, setLines] = useState<Line[]>([{ title: "", price: 0, quantity: 1 }]);
+  const [lines, setLines] = useState<Line[]>(() => [emptyLine()]);
+  const [lineError, setLineError] = useState<string | null>(null);
 
   function updateLine(index: number, patch: Partial<Line>) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { title: "", price: 0, quantity: 1 }]);
+    setLines((prev) => [...prev, emptyLine()]);
   }
 
   function removeLine(index: number) {
@@ -44,8 +48,21 @@ export default function NewOrderForm() {
   const total = subtotal + shipping;
 
   return (
-    <form action={formAction} className="card flex flex-col">
-      <input type="hidden" name="items" value={JSON.stringify(lines)} />
+    <form
+      action={formAction}
+      onSubmit={(e) => {
+        if (lines.some((l) => !l.pick)) {
+          e.preventDefault();
+          setLineError("Choisis pour chaque ligne un produit du catalogue avec sa variante, ou un article ALBASEET+ (une ligne par produit).");
+        } else setLineError(null);
+      }}
+      className="card flex flex-col"
+    >
+      <input
+        type="hidden"
+        name="items"
+        value={JSON.stringify(lines.map((l) => ({ variantId: l.pick?.variantId ?? null, albaseetCode: l.pick?.albaseetCode ?? null, price: l.price, quantity: l.quantity })))}
+      />
 
       <fieldset className="flex flex-col gap-4 p-4 md:p-6">
         <legend className="sr-only">Client</legend>
@@ -93,14 +110,17 @@ export default function NewOrderForm() {
         <div className="flex flex-col gap-4 md:gap-2">
           {lines.map((line, i) => (
             <div
-              key={i}
+              key={line.key}
               className="grid grid-cols-[80px_minmax(0,1fr)_44px] gap-2 md:grid-cols-[minmax(0,1fr)_80px_120px_40px]"
             >
-              <ProductPicker
-                value={line.title}
-                onChange={(title) => updateLine(i, { title, productId: undefined })}
-                onPick={(p) => updateLine(i, { title: p.title, price: p.price, productId: p.id })}
-              />
+              <div className="col-span-3 md:col-span-1">
+                <CatalogLinePicker
+                  onChange={(pick) => {
+                    updateLine(i, pick ? { pick, price: pick.price } : { pick: null });
+                    setLineError(null);
+                  }}
+                />
+              </div>
               <input
                 type="number"
                 min={1}
@@ -136,8 +156,9 @@ export default function NewOrderForm() {
 
         <button type="button" onClick={addLine} className="btn-ghost w-fit px-3">
           <Plus size={16} weight="bold" aria-hidden="true" />
-          Ajouter un article
+          Ajouter un produit
         </button>
+        <p className="hint -mt-1">Une ligne par produit, choisi dans le catalogue avec sa variante (ou un article ALBASEET+ s&apos;il n&apos;est pas sur Shopify).</p>
       </fieldset>
 
       <fieldset className="flex flex-col gap-3 border-t border-line-soft p-4 md:p-6">
@@ -182,7 +203,7 @@ export default function NewOrderForm() {
       </fieldset>
 
       <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+56px)] flex flex-col gap-3 rounded-b-[14px] border-t border-line bg-white/95 p-4 backdrop-blur md:static md:bottom-auto md:px-6">
-        {state.error && <p className="alert-error">{state.error}</p>}
+        {(lineError ?? state.error) && <p className="alert-error">{lineError ?? state.error}</p>}
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-col">
             <span className="text-xs text-muted">

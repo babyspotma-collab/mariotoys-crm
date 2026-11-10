@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import PageHeader from "@/components/PageHeader";
 import StockAlbaseet from "@/components/StockAlbaseet";
+import RelinkItem from "./RelinkItem";
 import { formatDateTimeMa, formatDh } from "@/lib/format";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { safeReturnPath } from "@/lib/return-path";
@@ -16,6 +17,13 @@ export default async function OrderPage({ params, searchParams }: { params: { id
   const order = await prisma.order.findUnique({ where: { id: params.id }, include: { items: true } });
   if (!order) notFound();
 
+  // Lignes sans produit du catalogue (ni variante connue, ni article ALBASEET+) : bouton « Relier au catalogue ».
+  const variantIds = order.items.map((i) => i.shopifyVariantId).filter((id): id is string => !!id);
+  const known = new Set(
+    variantIds.length ? (await prisma.shopifyVariant.findMany({ where: { id: { in: variantIds } }, select: { id: true } })).map((v) => v.id) : []
+  );
+  const relinkable = (i: (typeof order.items)[number]) => !i.albaseetCode && (!i.shopifyVariantId || !known.has(i.shopifyVariantId));
+
   const phone = normalizeMoroccanPhone(order.phone);
   const vendus = order.items.filter((i) => readAlbaseetSale(i.albaseetSale)).length;
   const etat =
@@ -27,7 +35,7 @@ export default async function OrderPage({ params, searchParams }: { params: { id
 
   return (
     <>
-      <PageHeader back={{ href: returnTo, label: "Commandes" }} title={`Commande ${order.orderNumber}`} subtitle={etat} />
+      <PageHeader back={{ href: returnTo, label: returnTo.startsWith("/rentabilite") ? "Rentabilité" : "Commandes" }} title={`Commande ${order.orderNumber}`} subtitle={etat} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="card divide-y divide-line-soft">
           {order.items.map((item) => (
@@ -38,7 +46,17 @@ export default async function OrderPage({ params, searchParams }: { params: { id
                 </span>
                 <span className="shrink-0 tabular-nums text-body">{formatDh(Number(item.price) * item.quantity)}</span>
               </div>
+              {item.originalTitle && item.originalTitle !== item.title && (
+                <span className="-mt-1 text-xs text-muted">Saisi à l&apos;origine : {item.originalTitle}</span>
+              )}
+              {item.albaseetCode && <span className="-mt-1 text-xs text-muted">Article ALBASEET+ · code {item.albaseetCode}</span>}
               <StockAlbaseet item={item} />
+              {relinkable(item) && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted">Pas reliée au catalogue : coût d&apos;achat inconnu sur la page Rentabilité.</span>
+                  <RelinkItem itemId={item.id} quantity={item.quantity} price={Number(item.price)} />
+                </div>
+              )}
             </div>
           ))}
         </section>

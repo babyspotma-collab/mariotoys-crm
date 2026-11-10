@@ -24,10 +24,11 @@ export default async function ProfitPage({ searchParams }: { searchParams: Recor
   const showAll = searchParams.all === "1";
   const products = showAll ? report.products : report.products.slice(0, 40);
   const allHref = `/rentabilite?${new URLSearchParams({ ...keep, all: "1" })}`;
+  const selfHref = `/rentabilite?${new URLSearchParams(keep)}`;
 
   const stockAge = status.stock ? (Date.now() - Date.parse(status.stock.at)) / 3600_000 : null;
   const alertCount =
-    alerts.lossSales.length + belowCost.length + alerts.missingCost.length + alerts.toClassify.length + alerts.grosMissing.length +
+    alerts.lossSales.length + belowCost.length + alerts.missingCost.length + alerts.unlinkedOrders.length + alerts.toClassify.length + alerts.grosMissing.length +
     alerts.unprofitableCampaigns.length + alerts.unlinkedCampaigns.length + alerts.missingRates.length;
 
   return (
@@ -113,6 +114,27 @@ export default async function ProfitPage({ searchParams }: { searchParams: Recor
                   </li>
                 ))}
               </ul>
+            </AlertRow>
+          )}
+          {alerts.unlinkedOrders.length > 0 && (
+            <AlertRow title="Commandes avec un produit introuvable dans le catalogue" count={alerts.unlinkedOrders.length} tone="amber">
+              <p className="text-xs text-muted">Les plus grosses d&apos;abord. Ouvre la commande puis « Relier au catalogue ».</p>
+              <ul className="flex flex-col gap-1">
+                {alerts.unlinkedOrders.slice(0, 60).map((u) => (
+                  <li key={u.orderId}>
+                    <a
+                      href={`/orders/${u.orderId}?from=${encodeURIComponent(selfHref)}`}
+                      className="flex flex-wrap justify-between gap-x-3 rounded-md px-1 py-0.5 hover:bg-cream"
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium text-ink">{u.orderNumber}</span> <span className="text-muted">· {u.titles.join(" · ")}</span>
+                      </span>
+                      <span className="tabular-nums">{formatDh(u.amount)} →</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              {alerts.unlinkedOrders.length > 60 && <p className="text-xs text-muted">… et {alerts.unlinkedOrders.length - 60} autres plus petites.</p>}
             </AlertRow>
           )}
           {alerts.toClassify.length > 0 && (
