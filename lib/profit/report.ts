@@ -30,6 +30,30 @@ export async function loadCatalog(): Promise<CatalogData> {
   };
 }
 
+/**
+ * Historique des prix (une ligne par changement de prix) des articles reliés à
+ * Shopify et des articles ALBASEET+ choisis directement sur les lignes de commande.
+ */
+export async function loadHistory(catalog: CatalogData, orders: { items: { albaseetCode?: string | null }[] }[]): Promise<Map<string, PricePoint[]>> {
+  const codes = new Set([...catalog.links.values()].filter((c): c is string => !!c));
+  for (const o of orders) for (const it of o.items) if (it.albaseetCode) codes.add(it.albaseetCode);
+  const rows = codes.size
+    ? await prisma.albaseetPriceHistory.findMany({
+        where: { code: { in: [...codes] } },
+        select: { code: true, effectiveAt: true, prixAchat: true, prixGros: true },
+        orderBy: { effectiveAt: "asc" },
+      })
+    : [];
+  const history = new Map<string, PricePoint[]>();
+  for (const h of rows) {
+    const list = history.get(h.code);
+    const point = { effectiveAt: h.effectiveAt, prixAchat: n(h.prixAchat), prixGros: n(h.prixGros) };
+    if (list) list.push(point);
+    else history.set(h.code, [point]);
+  }
+  return history;
+}
+
 export async function loadRates(): Promise<Record<"FORCELOG" | "OZON", RateRow[]>> {
   const rows = await prisma.shippingRate.findMany();
   const pick = (c: "FORCELOG" | "OZON") => rows.filter((r) => r.carrier === c).map((r) => ({ city: r.city, cityKey: r.cityKey, fee: Number(r.fee) }));
@@ -81,19 +105,8 @@ export async function loadProfitReport(range: { start: Date; end: Date }): Promi
     amount: Number(s._sum.spend ?? 0),
   }));
 
-  // Historique des prix des articles reliés à Shopify (une ligne par changement de prix).
-  const linkedCodes = [...new Set([...catalog.links.values()].filter((c): c is string => !!c))];
-  const historyRows = linkedCodes.length
-    ? await prisma.albaseetPriceHistory.findMany({
-        where: { code: { in: linkedCodes } },
-        select: { code: true, effectiveAt: true, prixAchat: true, prixGros: true },
-        orderBy: { effectiveAt: "asc" },
-      })
-    : [];
-  const history = new Map<string, PricePoint[]>();
-  for (const h of historyRows) {
-    history.set(h.code, [...(history.get(h.code) ?? []), { effectiveAt: h.effectiveAt, prixAchat: n(h.prixAchat), prixGros: n(h.prixGros) }]);
-  }
+  // Historique des prix des articles reliés à Shopify et des articles choisis directement sur une ligne.
+  const history = await loadHistory(catalog, orders);
 
   const report = computeProfit({ orders, ...catalog, history, rates, settings, spend, campaignLinks });
   return {

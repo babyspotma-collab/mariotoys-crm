@@ -21,7 +21,7 @@
 
 import { revenueState, type RevenueOrder } from "@/lib/revenue";
 import { findRate, type RateRow } from "./city-rate";
-import { pricesAt, resolveCost, type CostArticle, type CostFlag, type CostResult, type PricePoint } from "./cost";
+import { pricesAt, resolveCost, type CostArticle, type CostFlag, type CostResult, type PricePoint, type Prices } from "./cost";
 import type { ProfitSettings } from "./settings";
 import { textKey } from "./text";
 
@@ -150,8 +150,25 @@ export function splitItemTitle(title: string): { base: string; variant: string |
   return m ? { base: m[1], variant: m[2] } : { base: title, variant: null };
 }
 
-export function computeProfit(input: ProfitInput): ProfitReport {
-  const { settings } = input;
+/** Ligne de commande résolue : produit, article ALBASEET+, prix en vigueur à la date de la commande et coût retenu. */
+export type ProfitLine = {
+  it: ProfitOrder["items"][number];
+  v: VariantInfo | undefined;
+  variantId: string | null;
+  title: string;
+  key: string;
+  article: CostArticle | undefined;
+  prices: Prices | null; // prix d'achat / de gros à la date de la commande
+  cost: CostResult | null;
+  unit: number; // prix unitaire payé
+  value: number; // prix × quantité
+};
+
+/**
+ * Résolution des lignes d'une commande, partagée par la page Rentabilité et
+ * l'export Excel des commandes (mêmes chiffres des deux côtés).
+ */
+export function lineResolver(input: Pick<ProfitInput, "variants" | "links" | "articles" | "history">) {
   const variantById = new Map(input.variants.map((v) => [v.id, v]));
   const byTitle = new Map<string, VariantInfo[]>();
   for (const v of input.variants) {
@@ -160,9 +177,6 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     if (list) list.push(v);
     else byTitle.set(k, [v]);
   }
-  const casaFees = settings.casa.couriers.map((c) => ({ key: textKey(c.name), fee: c.fee }));
-  const casaFee = (name: string | null) => casaFees.find((c) => c.key === textKey(name ?? ""))?.fee ?? settings.casa.defaultFee;
-
   // Variante d'un article de commande : celle enregistrée, sinon retrouvée par le titre.
   const resolveVariant = (it: ProfitOrder["items"][number]): string | null => {
     if (it.shopifyVariantId && (variantById.has(it.shopifyVariantId) || input.links.has(it.shopifyVariantId))) return it.shopifyVariantId;
@@ -176,6 +190,32 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     if (list.length === 1) return list[0].id;
     return (list.find((v) => input.links.get(v.id)) ?? list[0]).id;
   };
+
+  return (o: Pick<ProfitOrder, "items" | "createdAt">): ProfitLine[] =>
+    o.items.map((it) => {
+      const unit = num(it.price);
+      const direct = it.albaseetCode ? input.articles.get(it.albaseetCode) : undefined;
+      if (direct) {
+        // Article ALBASEET+ choisi directement : pas de variante Shopify.
+        const prices = pricesAt(input.history.get(direct.code), direct, o.createdAt);
+        return { it, v: undefined, variantId: null, title: direct.designation, key: `a:${direct.code}`, article: direct, prices, cost: resolveCost(direct.costType, prices), unit, value: unit * it.quantity };
+      }
+      const variantId = resolveVariant(it);
+      const v = variantId ? variantById.get(variantId) : undefined;
+      const title = v ? v.productTitle : splitItemTitle(it.title).base;
+      const code = variantId ? input.links.get(variantId) ?? null : null;
+      const article = code ? input.articles.get(code) : undefined;
+      const prices = article ? pricesAt(input.history.get(article.code), article, o.createdAt) : null;
+      const cost = article && prices ? resolveCost(article.costType, prices) : null;
+      return { it, v, variantId, title, key: v ? v.productId : `t:${textKey(title)}`, article, prices, cost, unit, value: unit * it.quantity };
+    });
+}
+
+export function computeProfit(input: ProfitInput): ProfitReport {
+  const { settings } = input;
+  const resolveLines = lineResolver(input);
+  const casaFees = settings.casa.couriers.map((c) => ({ key: textKey(c.name), fee: c.fee }));
+  const casaFee = (name: string | null) => casaFees.find((c) => c.key === textKey(name ?? ""))?.fee ?? settings.casa.defaultFee;
 
   const deliveryOf = (o: ProfitOrder): { carrier: "FORCELOG" | "OZON" | "CASA" | null; fee: number | null } => {
     if (o.localDelivery) return { carrier: "CASA", fee: casaFee(o.localCourier) };
@@ -216,23 +256,7 @@ export function computeProfit(input: ProfitInput): ProfitReport {
     const state = revenueState(o);
     const sold = state === "livree" || state === "en_cours";
     const returned = state === "retour";
-    const lines = o.items.map((it) => {
-      const direct = it.albaseetCode ? input.articles.get(it.albaseetCode) : undefined;
-      if (direct) {
-        // Article ALBASEET+ choisi directement : pas de variante Shopify.
-        const cost = resolveCost(direct.costType, pricesAt(input.history.get(direct.code), direct, o.createdAt));
-        const unit = num(it.price);
-        return { it, v: undefined, variantId: null, title: direct.designation, key: `a:${direct.code}`, article: direct as CostArticle | undefined, cost: cost as CostResult | null, unit, value: unit * it.quantity };
-      }
-      const variantId = resolveVariant(it);
-      const v = variantId ? variantById.get(variantId) : undefined;
-      const title = v ? v.productTitle : splitItemTitle(it.title).base;
-      const code = variantId ? input.links.get(variantId) ?? null : null;
-      const article = code ? input.articles.get(code) : undefined;
-      const cost: CostResult | null = article ? resolveCost(article.costType, pricesAt(input.history.get(article.code), article, o.createdAt)) : null;
-      const unit = num(it.price);
-      return { it, v, variantId, title, key: v ? v.productId : `t:${textKey(title)}`, article, cost, unit, value: unit * it.quantity };
-    });
+    const lines = resolveLines(o);
 
     // Vendu sous le prix d'achat : prix réellement payé, pour toute commande confirmée.
     for (const l of lines) {
