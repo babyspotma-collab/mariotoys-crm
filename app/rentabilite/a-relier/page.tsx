@@ -46,7 +46,6 @@ export default async function ToLinkPage({ searchParams }: { searchParams: Recor
           <ul className="flex flex-col gap-3">
             {groups.map((g) => {
               const kind = KIND[g.kind];
-              const otherHref = g.kind === "VARIANT" ? `/rentabilite/articles?${new URLSearchParams({ f: "all", q: g.title.slice(0, 60) })}` : orderHref(g.orders[0].id);
               return (
                 <li key={g.key} className="card flex flex-col gap-3 p-4 md:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -79,15 +78,13 @@ export default async function ToLinkPage({ searchParams }: { searchParams: Recor
                       L&apos;article ALBASEET+ (code {g.articleCode}) n&apos;a ni prix d&apos;achat ni prix de gros : ajoute son prix dans ALBASEET+, il sera repris à la prochaine
                       synchro.
                     </p>
-                  ) : g.suggestions.length === 0 ? (
-                    <p className="text-sm text-muted">
-                      Aucun article ressemblant.{" "}
-                      <a href={otherHref} className="font-medium text-body underline">
-                        {g.kind === "VARIANT" ? "Choisir l'article à la main" : "Relier depuis la commande"}
-                      </a>
-                    </p>
                   ) : (
-                    <SuggestionPicker suggestions={g.suggestions} variantId={g.kind === "VARIANT" ? g.variantId : null} itemIds={g.itemIds} otherHref={otherHref} />
+                    <SuggestionPicker
+                      suggestions={g.suggestions}
+                      variantId={g.kind === "VARIANT" ? g.variantId : null}
+                      itemIds={g.itemIds}
+                      defaultQuery={g.title.split(/\s+/).find((w) => w.length >= 3) ?? ""}
+                    />
                   )}
                 </li>
               );

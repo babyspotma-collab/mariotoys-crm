@@ -37,7 +37,7 @@ export default function RelinkItem({ itemId, quantity, price }: { itemId: string
           setError(null);
           setOpen(true);
         }}
-        className="btn-ghost w-fit px-3 text-sm"
+        className="btn-secondary w-fit px-3 text-sm"
       >
         Relier au catalogue
       </button>
