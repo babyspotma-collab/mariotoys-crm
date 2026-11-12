@@ -7,7 +7,7 @@ import Segmented from "@/components/Segmented";
 import { prisma } from "@/lib/db";
 import { formatDh, formatInt } from "@/lib/format";
 import { splitItemTitle } from "@/lib/profit/compute";
-import { resolveCost } from "@/lib/profit/cost";
+import { costTypeOf, resolveCost } from "@/lib/profit/cost";
 import { plain, textKey } from "@/lib/profit/text";
 import ArticleLinkEditor from "../_components/ArticleLinkEditor";
 import { CostSource, CostTypePill, ProfitNav } from "../_components/ui";
@@ -44,14 +44,14 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Rec
   const [variants, links, articles, soldItems] = await Promise.all([
     prisma.shopifyVariant.findMany({ orderBy: [{ productTitle: "asc" }, { variantTitle: "asc" }] }),
     prisma.articleLink.findMany(),
-    prisma.albaseetArticle.findMany({ select: { code: true, designation: true, barcode: true, costType: true, prixAchat: true, prixGros: true } }),
+    prisma.albaseetArticle.findMany({ select: { code: true, designation: true, barcode: true, fournisseur: true, costType: true, prixAchat: true, prixGros: true } }),
     prisma.orderItem.findMany({
       where: { order: { status: "CONFIRMEE", createdAt: { gte: since } } },
       select: { title: true, quantity: true, shopifyVariantId: true },
     }),
   ]);
   const linkBy = new Map(links.map((l) => [l.variantId, l]));
-  const articleBy = new Map(articles.map((a) => [a.code, a]));
+  const articleBy = new Map(articles.map((a) => [a.code, { ...a, costType: costTypeOf(a) }]));
 
   // Quantités vendues sur 90 jours par variante (variante enregistrée, sinon retrouvée par le titre).
   const byTitle = new Map<string, string[]>();

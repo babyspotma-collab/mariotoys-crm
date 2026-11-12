@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { lineResolver } from "./profit/compute";
 import type { CostArticle, PricePoint } from "./profit/cost";
-import { profitCells, profitTotals } from "./orders-export-profit";
+import { profitCells } from "./orders-export-profit";
 
 const articles = new Map<string, CostArticle>([
   ["A1", { code: "A1", designation: "QUAD 12V", costType: "IMPORTE", prixAchat: 900, prixGros: 800 }],
@@ -51,11 +51,5 @@ const ret = profitCells(4500, lines, true);
 assert.equal(ret[0].ca, null);
 assert.equal(ret[0].marge, null);
 assert.equal(ret[0].coutTotal, 1200);
-
-// Totaux : seulement les lignes comptées ; ligne sans coût = 0.
-const t = profitTotals([...cells.map((c) => ({ counted: true, cells: c })), ...ret.map((c) => ({ counted: false, cells: c }))]);
-assert.equal(t.ca, 4500);
-assert.equal(t.cout, 1600);
-assert.equal(t.marge, 2900);
 
 console.log("orders-export-profit checks OK");

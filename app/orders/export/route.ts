@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { STATE_FILL, carrierFill, exportRow, monthBanner, monthPeriod } from "@/lib/orders-export";
 import { monthLabel } from "@/lib/date-range";
 import { revenueState } from "@/lib/revenue";
-import { profitCells, profitTotals, type ProfitCells } from "@/lib/orders-export-profit";
+import { profitCells, type ProfitCells } from "@/lib/orders-export-profit";
 import { lineResolver } from "@/lib/profit/compute";
 import { loadCatalog, loadHistory } from "@/lib/profit/report";
 
@@ -23,8 +23,8 @@ const fill = (argb: string): ExcelJS.Fill => ({ type: "pattern", pattern: "solid
 // (date de création de la commande, heure du Maroc), en fichier Excel, dans la
 // présentation de la feuille de suivi : bandeau du mois, une ligne par
 // produit (colonnes de la commande répétées), lignes vertes = livrées, pêche =
-// retours, orange = produit relié à aucun article ALBASEET+. Colonnes ALBASEET+
-// à la fin : prix à la date de la commande et coût retenu, comme la page Rentabilité.
+// retours, orange = produit relié à aucun article ALBASEET+. À la fin : prix
+// d'achat et de gros ALBASEET+ en vigueur à la date de la commande.
 // Protégé par la session comme le reste du CRM (middleware).
 export async function GET(req: NextRequest) {
   const month = req.nextUrl.searchParams.get("month");
@@ -65,16 +65,14 @@ export async function GET(req: NextRequest) {
     return { ...row, notShipped, statut: notShipped ? "à expédier" : row.statut };
   });
 
-  // Colonnes ALBASEET+ : même résolution des lignes et mêmes prix datés que la page Rentabilité.
+  // Prix ALBASEET+ : même résolution des lignes et mêmes prix datés que la page Rentabilité.
   const catalog = await loadCatalog();
   const resolve = lineResolver({ ...catalog, history: await loadHistory(catalog, orders) });
   const EMPTY: ProfitCells = { designation: "", prixAchat: null, prixGros: null, type: null, coutUnitaire: null, coutTotal: null, ca: null, marge: null, unlinked: false };
   const lineRows = rows.flatMap((r, i) => {
     const o = orders[i];
-    const state = revenueState(o);
-    const counted = state === "livree" || state === "en_cours"; // comme la page Rentabilité
-    const cells = o.items.length ? profitCells(Number(String(o.totalPrice)), resolve(o), state === "retour") : [EMPTY];
-    return cells.map((c) => ({ order: r, counted, cells: c }));
+    const cells = o.items.length ? profitCells(Number(String(o.totalPrice)), resolve(o), false) : [EMPTY];
+    return cells.map((c) => ({ order: r, cells: c }));
   });
 
   const wb = new ExcelJS.Workbook();
@@ -92,14 +90,8 @@ export async function GET(req: NextRequest) {
     { header: "Prix de la livraison", key: "fraisLivraison", width: 14, style: { numFmt: '#,##0.00' } },
     { header: "Prix Gros", key: "prixGros", width: 12, style: { numFmt: '#,##0.00' } },
     { header: "Remarque", key: "remarque", width: 28 },
-    { header: "Désignation ALBASEET+", key: "designation", width: 34 },
     { header: "Prix d'achat unitaire", key: "prixAchat", width: 13, style: { numFmt: '#,##0.00' } },
     { header: "Prix de gros unitaire", key: "prixGrosUnit", width: 13, style: { numFmt: '#,##0.00' } },
-    { header: "Type d'article", key: "type", width: 16 },
-    { header: "Coût retenu unitaire", key: "coutUnitaire", width: 13, style: { numFmt: '#,##0.00' } },
-    { header: "Coût total de la ligne", key: "coutTotal", width: 13, style: { numFmt: '#,##0.00' } },
-    { header: "Prix payé de la ligne", key: "caLigne", width: 13, style: { numFmt: '#,##0.00' } },
-    { header: "Marge de la ligne", key: "marge", width: 13, style: { numFmt: '#,##0.00' } },
   ];
   const last = COLS.length;
 
@@ -144,14 +136,8 @@ export async function GET(req: NextRequest) {
       r.fraisLivraison,
       null,
       r.remarque,
-      p.designation,
       p.prixAchat,
       p.prixGros,
-      p.type,
-      p.coutUnitaire,
-      p.coutTotal,
-      p.ca,
-      p.marge,
     ];
     lastDate = r.date;
     const stateFill = p.unlinked ? UNLINKED_FILL : r.notShipped ? NOT_SHIPPED_FILL : STATE_FILL[r.state];
@@ -203,22 +189,6 @@ export async function GET(req: NextRequest) {
       cell.fill = fill(NOT_SHIPPED_FILL);
       cell.border = { top: LINE, bottom: LINE, left: LINE, right: LINE };
     }
-  }
-
-  // Totaux ALBASEET+, calculés comme la page Rentabilité : commandes livrées ou en
-  // cours (hors retours et commandes pas encore expédiées) ; ligne sans coût = 0.
-  const t = profitTotals(lineRows);
-  const sums = ws.getRow(lineRows.length + (pending.length > 0 ? 5 : 4));
-  sums.getCell(1).value = "Totaux";
-  sums.getCell(3).value = "Livrées et en cours, comme la page Rentabilité : CA, coût total, marge";
-  sums.getCell(last - 2).value = t.cout;
-  sums.getCell(last - 1).value = t.ca;
-  sums.getCell(last).value = t.marge;
-  for (let c = 1; c <= last; c++) {
-    const cell = sums.getCell(c);
-    cell.font = { bold: true };
-    cell.fill = fill(HEADER_FILL);
-    cell.border = { top: LINE, bottom: LINE, left: LINE, right: LINE };
   }
 
   const buffer = await wb.xlsx.writeBuffer();

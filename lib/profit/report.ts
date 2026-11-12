@@ -4,7 +4,7 @@
 import { prisma } from "@/lib/db";
 import type { RateRow } from "./city-rate";
 import { computeProfit, shopifyBelowCost, type BelowCost, type CampaignSpend, type ProfitReport, type VariantInfo } from "./compute";
-import type { CostArticle, PricePoint } from "./cost";
+import { costTypeOf, type CostArticle, type PricePoint } from "./cost";
 import { getSettings, getSyncStatus, type ProfitSettings, type SyncName, type SyncStatus } from "./settings";
 
 const n = (v: unknown): number | null => (v === null || v === undefined ? null : Number(String(v)));
@@ -21,12 +21,14 @@ export async function loadCatalog(): Promise<CatalogData> {
   const [variants, links, articles] = await Promise.all([
     prisma.shopifyVariant.findMany(),
     prisma.articleLink.findMany({ select: { variantId: true, albaseetCode: true } }),
-    prisma.albaseetArticle.findMany({ select: { code: true, designation: true, costType: true, prixAchat: true, prixGros: true } }),
+    prisma.albaseetArticle.findMany({ select: { code: true, designation: true, fournisseur: true, costType: true, prixAchat: true, prixGros: true } }),
   ]);
   return {
     variants: variants.map((v) => ({ ...v, price: Number(v.price) })),
     links: new Map(links.map((l) => [l.variantId, l.albaseetCode])),
-    articles: new Map(articles.map((a) => [a.code, { ...a, prixAchat: n(a.prixAchat), prixGros: n(a.prixGros) }])),
+    articles: new Map(
+      articles.map((a) => [a.code, { code: a.code, designation: a.designation, costType: costTypeOf(a), prixAchat: n(a.prixAchat), prixGros: n(a.prixGros) }])
+    ),
   };
 }
 

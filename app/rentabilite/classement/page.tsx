@@ -4,8 +4,8 @@ import Pagination from "@/components/Pagination";
 import Segmented from "@/components/Segmented";
 import { prisma } from "@/lib/db";
 import { formatInt } from "@/lib/format";
-import { articleFilter, NONE } from "@/lib/profit/article-filter";
-import { resolveCost } from "@/lib/profit/cost";
+import { articleFilter, COST_TYPES, NONE } from "@/lib/profit/article-filter";
+import { costTypeOf, hasSupplier, resolveCost } from "@/lib/profit/cost";
 import ClassifyTable, { type ClassifyRow } from "../_components/ClassifyTable";
 import { ProfitNav } from "../_components/ui";
 
@@ -20,8 +20,9 @@ const TYPES = [
 ];
 
 // Classement des articles ALBASEET+ : acheté localement (coût = prix d'achat),
-// importé (coût = prix de gros) ou non classé (prix d'achat + alerte). Choix
-// manuel, par lot ; jamais écrasé par la synchro.
+// importé (coût = prix de gros) ou non classé (prix d'achat + alerte). Le type
+// vient du fournisseur (HUIRIN = importé, autre = local) ; le choix manuel, par
+// lot, ne s'applique qu'aux articles sans fournisseur.
 export default async function ClassementPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const filter = {
     q: (searchParams.q ?? "").trim().slice(0, 80),
@@ -35,20 +36,21 @@ export default async function ClassementPage({ searchParams }: { searchParams: R
 
   const [total, articles, byType, fournisseurs, familles] = await Promise.all([
     prisma.albaseetArticle.count({ where }),
-    prisma.albaseetArticle.findMany({ where, orderBy: [{ costType: "desc" }, { designation: "asc" }], skip: (page - 1) * PER_PAGE, take: PER_PAGE }),
-    prisma.albaseetArticle.groupBy({ by: ["costType"], where: articleFilter({ ...filter, type: "" }), _count: true }),
+    prisma.albaseetArticle.findMany({ where, orderBy: [{ designation: "asc" }], skip: (page - 1) * PER_PAGE, take: PER_PAGE }),
+    Promise.all(COST_TYPES.map(async (t) => [t, await prisma.albaseetArticle.count({ where: articleFilter({ ...filter, type: t }) })] as const)),
     prisma.albaseetArticle.groupBy({ by: ["fournisseur"], _count: true, orderBy: { fournisseur: "asc" } }),
     prisma.albaseetArticle.groupBy({ by: ["famille"], _count: true, orderBy: { famille: "asc" } }),
   ]);
-  const typeCount = (id: string) => (id ? byType.find((t) => t.costType === id)?._count ?? 0 : byType.reduce((s, t) => s + t._count, 0));
+  const typeCount = (id: string) => (id ? byType.find(([t]) => t === id)?.[1] ?? 0 : byType.reduce((s, [, n]) => s + n, 0));
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const url = (p: Record<string, string>) => `/rentabilite/classement?${new URLSearchParams({ ...kept, ...p })}`;
 
   const rows: ClassifyRow[] = articles.map((a) => {
     const prixAchat = a.prixAchat === null ? null : Number(a.prixAchat);
     const prixGros = a.prixGros === null ? null : Number(a.prixGros);
-    const c = resolveCost(a.costType, { prixAchat, prixGros });
-    return { code: a.code, designation: a.designation, fournisseur: a.fournisseur, famille: a.famille, prixAchat, prixGros, costType: a.costType, costLabel: c.label, unitCost: c.unitCost, flagged: !!c.flag };
+    const costType = costTypeOf(a);
+    const c = resolveCost(costType, { prixAchat, prixGros });
+    return { code: a.code, designation: a.designation, fournisseur: a.fournisseur, famille: a.famille, prixAchat, prixGros, costType, auto: hasSupplier(a.fournisseur), costLabel: c.label, unitCost: c.unitCost, flagged: !!c.flag };
   });
 
   return (
@@ -93,7 +95,8 @@ export default async function ClassementPage({ searchParams }: { searchParams: R
         </button>
       </form>
       <p className="text-xs text-muted">
-        {formatInt(total)} article(s). Coût retenu : prix d&apos;achat si acheté localement, prix de gros si importé (prix d&apos;achat s&apos;il manque), prix d&apos;achat si non classé.
+        {formatInt(total)} article(s). Le type vient du fournisseur de la facture d&apos;achat : HUIRIN = importé (coût = prix de gros, prix d&apos;achat s&apos;il manque), tout autre
+        fournisseur = acheté localement (coût = prix d&apos;achat). Le classement à la main ne sert que pour les articles sans fournisseur (non classé = prix d&apos;achat).
       </p>
 
       {rows.length === 0 ? (

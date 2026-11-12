@@ -1,5 +1,7 @@
-// Coût d'achat retenu pour un article ALBASEET+, selon son type (choisi à la main
-// sur /rentabilite/classement) et les prix en vigueur à une date donnée.
+// Coût d'achat retenu pour un article ALBASEET+, selon son type et les prix en
+// vigueur à une date donnée. Le type vient du fournisseur de la facture d'achat
+// (costTypeOf) ; le choix manuel de /rentabilite/classement ne sert que pour les
+// articles sans fournisseur.
 // Module pur, testé par cost.check.ts.
 //
 //   LOCAL (acheté localement) -> prix d'achat
@@ -34,6 +36,24 @@ export const FLAG_LABEL: Record<CostFlag, string> = {
   GROS_MANQUANT: "prix de gros manquant",
   SANS_PRIX: "sans prix d'achat",
 };
+
+/** Fournisseur des produits importés par Mario Toys (facture d'achat « HUIRIN · GENERAL »). */
+export const IMPORT_SUPPLIER = "HUIRIN";
+
+export function hasSupplier(fournisseur: string | null | undefined): boolean {
+  return !!fournisseur && fournisseur.trim() !== "";
+}
+
+/**
+ * Type retenu pour le calcul de la marge :
+ *   fournisseur HUIRIN   -> IMPORTE (prix de gros)
+ *   autre fournisseur    -> LOCAL (prix d'achat)
+ *   pas de fournisseur   -> choix manuel (NON_CLASSE par défaut : prix d'achat)
+ */
+export function costTypeOf(a: { fournisseur?: string | null; costType: CostTypeName }): CostTypeName {
+  if (!hasSupplier(a.fournisseur)) return a.costType;
+  return a.fournisseur!.trim().toUpperCase().startsWith(IMPORT_SUPPLIER) ? "IMPORTE" : "LOCAL";
+}
 
 const price = (v: number | null | undefined): number | null => (v === null || v === undefined || !Number.isFinite(v) || v <= 0 ? null : v);
 

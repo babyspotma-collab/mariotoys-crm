@@ -8,6 +8,7 @@ import type { SyncName, SyncStatus } from "@/lib/profit/settings";
 
 const TABS = [
   { href: "/rentabilite", label: "Vue d'ensemble" },
+  { href: "/rentabilite/a-relier", label: "À relier" },
   { href: "/rentabilite/articles", label: "Articles" },
   { href: "/rentabilite/classement", label: "Classement" },
   { href: "/rentabilite/campagnes", label: "Campagnes" },

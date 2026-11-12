@@ -1,6 +1,6 @@
 // Vérification rapide : npx tsx lib/profit/cost.check.ts
 import assert from "node:assert";
-import { pricesAt, resolveCost, type PricePoint } from "./cost";
+import { costTypeOf, pricesAt, resolveCost, type PricePoint } from "./cost";
 import { autoMatch, normBarcode, type LinkState } from "./matching";
 
 // ── Coût selon le type ──
@@ -17,6 +17,13 @@ assert.equal(nc.unitCost, 100, "non classé : prix d'achat");
 assert.equal(nc.flag, "A_CLASSER");
 assert.equal(resolveCost("LOCAL", { prixAchat: 0, prixGros: null }).flag, "SANS_PRIX", "0 = pas de prix");
 assert.equal(resolveCost("IMPORTE", { prixAchat: null, prixGros: null }).unitCost, null);
+
+// ── Type selon le fournisseur de la facture d'achat ──
+assert.equal(costTypeOf({ fournisseur: "HUIRIN", costType: "NON_CLASSE" }), "IMPORTE");
+assert.equal(costTypeOf({ fournisseur: " huirin · GENERAL", costType: "LOCAL" }), "IMPORTE");
+assert.equal(costTypeOf({ fournisseur: "NATURA FUSION", costType: "IMPORTE" }), "LOCAL", "fournisseur local : le choix manuel ne compte pas");
+assert.equal(costTypeOf({ fournisseur: null, costType: "IMPORTE" }), "IMPORTE", "sans fournisseur : choix manuel");
+assert.equal(costTypeOf({ fournisseur: "  ", costType: "NON_CLASSE" }), "NON_CLASSE");
 
 // ── Prix à la date de la commande ──
 const h: PricePoint[] = [

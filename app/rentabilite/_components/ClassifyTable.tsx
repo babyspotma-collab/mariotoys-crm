@@ -12,6 +12,7 @@ export type ClassifyRow = {
   prixAchat: number | null;
   prixGros: number | null;
   costType: "LOCAL" | "IMPORTE" | "NON_CLASSE";
+  auto: boolean; // type déduit du fournisseur, le choix manuel ne s'applique pas
   costLabel: string;
   unitCost: number | null;
   flagged: boolean;
@@ -82,6 +83,7 @@ export default function ClassifyTable({ rows, filter, total }: { rows: ClassifyR
                 </div>
                 <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-1.5 md:col-start-auto">
                   <span className={`inline-block h-6 rounded-md px-2 text-xs font-medium leading-6 ${TYPE_CLASS[r.costType]}`}>{TYPE_LABEL[r.costType]}</span>
+                  {r.auto && <span className="text-xs text-muted">(fournisseur)</span>}
                   <span className={`text-xs ${r.flagged ? "text-pill-amber-fg" : "text-muted"}`}>
                     {dh(r.unitCost)} · {r.costLabel}
                   </span>

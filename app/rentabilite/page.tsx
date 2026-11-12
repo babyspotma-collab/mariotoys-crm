@@ -111,7 +111,7 @@ export default async function ProfitPage({ searchParams }: { searchParams: Recor
             </AlertRow>
           )}
           {alerts.missingCost.length > 0 && (
-            <AlertRow title="Produits vendus sans prix d'achat" count={alerts.missingCost.length} tone="amber" href="/rentabilite/articles?f=sold">
+            <AlertRow title="Produits vendus sans prix d'achat" count={alerts.missingCost.length} tone="amber" href={`/rentabilite/a-relier?${new URLSearchParams(keep)}`}>
               <ul className="flex flex-col gap-1">
                 {alerts.missingCost.slice(0, 10).map((m) => (
                   <li key={m.key} className="flex flex-wrap justify-between gap-x-3">

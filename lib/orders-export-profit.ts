@@ -48,18 +48,3 @@ export function profitCells(orderCa: number, lines: ProfitLine[], returned: bool
     };
   });
 }
-
-/**
- * Totaux comme la page Rentabilité : commandes livrées ou en cours seulement.
- * Une ligne sans coût compte pour 0 dans le coût total (comme la page).
- */
-export function profitTotals(rows: { counted: boolean; cells: ProfitCells }[]): { ca: number; cout: number; marge: number } {
-  let ca = 0;
-  let cout = 0;
-  for (const r of rows) {
-    if (!r.counted) continue;
-    ca += r.cells.ca ?? 0;
-    cout += r.cells.coutTotal ?? 0;
-  }
-  return { ca, cout, marge: ca - cout };
-}

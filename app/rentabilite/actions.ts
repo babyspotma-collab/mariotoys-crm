@@ -3,15 +3,16 @@
 import { revalidatePath } from "next/cache";
 import type { CostType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { articleFilter, COST_TYPES } from "@/lib/profit/article-filter";
+import { articleFilter, COST_TYPES, NO_SUPPLIER } from "@/lib/profit/article-filter";
 import { cityKey, DEFAULT_CITY_KEY } from "@/lib/profit/city-rate";
-import { resolveCost } from "@/lib/profit/cost";
+import { costTypeOf, resolveCost } from "@/lib/profit/cost";
 import { OVERHEAD_TARGET, SITE_TARGET } from "@/lib/profit/compute";
 import { syncMetaSpend } from "@/lib/profit/meta";
 import { saveSetting, type CasaRates, type MetaAccount } from "@/lib/profit/settings";
 import { syncCatalog } from "@/lib/profit/shopify-catalog";
+import { relinkOrderItem } from "@/app/orders/[id]/actions";
 
-const PAGES = ["/rentabilite", "/rentabilite/articles", "/rentabilite/classement", "/rentabilite/campagnes", "/rentabilite/reglages"];
+const PAGES = ["/rentabilite", "/rentabilite/a-relier", "/rentabilite/articles", "/rentabilite/classement", "/rentabilite/campagnes", "/rentabilite/reglages"];
 const refresh = () => PAGES.forEach((p) => revalidatePath(p));
 
 const amount = (v: unknown, max = 1_000_000): number | null => {
@@ -135,7 +136,7 @@ export async function searchArticles(q: string): Promise<ArticleHit[]> {
     orderBy: { designation: "asc" },
   });
   return rows.map((a) => {
-    const c = resolveCost(a.costType, { prixAchat: a.prixAchat === null ? null : Number(a.prixAchat), prixGros: a.prixGros === null ? null : Number(a.prixGros) });
+    const c = resolveCost(costTypeOf(a), { prixAchat: a.prixAchat === null ? null : Number(a.prixAchat), prixGros: a.prixGros === null ? null : Number(a.prixGros) });
     return { code: a.code, designation: a.designation, barcode: a.barcode, fournisseur: a.fournisseur, costLabel: c.label, unitCost: c.unitCost };
   });
 }
@@ -165,18 +166,54 @@ export async function resetLink(variantId: string): Promise<void> {
   refresh();
 }
 
+// ── Ventes sans coût : valider un article suggéré (/rentabilite/a-relier) ───
+/**
+ * Produit Shopify (variantId) : lien manuel vers l'article, valable pour toutes ses ventes.
+ * Lignes tapées à la main (itemIds) : chaque ligne est reliée au catalogue comme avec
+ * « Relier au catalogue » de la fiche commande (même total, titre d'origine gardé) —
+ * via le produit Shopify suggéré s'il y en a un, sinon directement l'article ALBASEET+.
+ */
+export async function linkSuggestion(input: { variantId?: string | null; itemIds?: string[]; code: string; viaVariantId?: string | null }): Promise<{ error: string | null }> {
+  const code = clean(input.code, 100);
+  if (!code || !(await prisma.albaseetArticle.findUnique({ where: { code }, select: { code: true } }))) return { error: "Article ALBASEET+ introuvable." };
+
+  if (input.variantId) {
+    await setManualLink(input.variantId, code);
+    return { error: null };
+  }
+
+  const ids = (input.itemIds ?? []).map((id) => clean(id, 40)).filter(Boolean).slice(0, 200);
+  if (!ids.length) return { error: "Aucune ligne à relier." };
+  const via = input.viaVariantId && (await prisma.articleLink.findFirst({ where: { variantId: input.viaVariantId, albaseetCode: code }, select: { variantId: true } }));
+  const items = await prisma.orderItem.findMany({ where: { id: { in: ids } }, select: { id: true, quantity: true, price: true } });
+  const errors: string[] = [];
+  for (const it of items) {
+    const base = { quantity: it.quantity, price: Number(it.price) };
+    let res = via ? await relinkOrderItem(it.id, [{ ...base, variantId: via.variantId }]) : { error: "direct" };
+    if (res.error) res = await relinkOrderItem(it.id, [{ ...base, albaseetCode: code }]);
+    if (res.error) errors.push(res.error);
+  }
+  refresh();
+  const done = items.length - errors.length;
+  if (!errors.length) return { error: null };
+  return { error: `${done} ligne(s) reliée(s), ${errors.length} non reliée(s) : ${errors[0]}` };
+}
+
 // ── Classement des articles (acheté localement / importé) ──────────────────
 // Le type n'est modifié QUE par ces actions, jamais par la synchro ALBASEET+.
+// Il ne sert que pour les articles sans fournisseur : les autres sont classés
+// d'office par leur fournisseur (costTypeOf).
 export async function classifyArticles(formData: FormData): Promise<void> {
   const type = String(formData.get("type")) as CostType;
   if (!COST_TYPES.includes(type)) return;
   const data = { costType: type, costTypeSetAt: new Date() };
   if (formData.get("scope") === "filter") {
     const p = (k: string) => String(formData.get(k) ?? "") || undefined;
-    await prisma.albaseetArticle.updateMany({ where: articleFilter({ q: p("q"), fournisseur: p("fournisseur"), famille: p("famille"), type: p("filterType") }), data });
+    const where = articleFilter({ q: p("q"), fournisseur: p("fournisseur"), famille: p("famille"), type: p("filterType") });
+    await prisma.albaseetArticle.updateMany({ where: { AND: [where, NO_SUPPLIER] }, data });
   } else {
     const codes = formData.getAll("code").map((c) => String(c)).slice(0, 1000);
-    if (codes.length) await prisma.albaseetArticle.updateMany({ where: { code: { in: codes } }, data });
+    if (codes.length) await prisma.albaseetArticle.updateMany({ where: { AND: [{ code: { in: codes } }, NO_SUPPLIER] }, data });
   }
   refresh();
 }
