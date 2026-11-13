@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
-import { ChartBar, Coins, House, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { Coins, House, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosphor-icons/react/dist/ssr";
 
 // Les pages « Création produits » (/product-jobs) et « Créatives » (/creatives)
 // existent toujours (et le programme local aussi) : seuls leurs liens sont
@@ -17,7 +17,6 @@ const NAV = [
   { href: "/parcels", label: "Colis", short: "Colis", Icon: Package },
   { href: "/livraisons", label: "Livraisons Casa", short: "Casa", Icon: Moped },
   { href: "/billing", label: "Facturation", short: "Factures", Icon: Receipt },
-  { href: "/stats", label: "Statistiques", short: "Stats", Icon: ChartBar },
   { href: "/rentabilite", label: "Rentabilité", short: "Marge", Icon: Coins },
 ];
 

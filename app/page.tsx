@@ -6,7 +6,10 @@ import PeriodFilter from "@/components/PeriodFilter";
 import StatCard from "@/components/StatCard";
 import { periodParams, periodRange } from "@/lib/date-range";
 import { formatDh, formatInt } from "@/lib/format";
+import { getCarrierStats, type CarrierStatRow } from "@/lib/carrier-stats";
+import { prisma } from "@/lib/db";
 import { getHomeStats, type CarrierSummary } from "@/lib/home-stats";
+import { parcelStatusBreakdown, STATUS_BUCKETS, STATUS_COLORS, STATUS_LABELS } from "@/lib/parcel-status-stats";
 import { getAwaitingShipment, getRevenue } from "@/lib/revenue";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +33,26 @@ export default async function HomePage({
 
   const range = periodRange(searchParams);
   const keep = periodParams(range);
-  const [stats, revenue, awaiting] = await Promise.all([getHomeStats(range), getRevenue(range), getAwaitingShipment()]);
+  const [stats, revenue, awaiting, carrierRows, statusTotals, allCities] = await Promise.all([
+    getHomeStats(range),
+    getRevenue(range),
+    getAwaitingShipment(),
+    getCarrierStats(range),
+    parcelStatusBreakdown(range),
+    prisma.order.groupBy({
+      by: ["city"],
+      where: { createdAt: { gte: range.start, lt: range.end } },
+      _count: true,
+      orderBy: { _count: { city: "desc" } },
+      take: 5,
+    }),
+  ]);
   const { orders, shopifyCities, forcelog, ozon, casa } = stats;
+  const carrierRow = (id: CarrierStatRow["id"]) => carrierRows.find((r) => r.id === id);
+  const statusEntries = STATUS_BUCKETS.map((b) => ({ id: b, label: STATUS_LABELS[b], value: statusTotals[b] })).filter((s) => s.value > 0);
+  const statusMax = Math.max(1, ...statusEntries.map((s) => s.value));
+  const statusTotal = statusEntries.reduce((sum, e) => sum + e.value, 0);
+  const allCityMax = Math.max(1, ...allCities.map((c) => c._count));
 
   // Liens vers les pages détaillées, en gardant la période choisie.
   const to = (path: string, extra: Record<string, string> = {}) => {
@@ -149,15 +170,71 @@ export default async function HomePage({
 
       {/* ── Transporteurs ─────────────────────────────────────────── */}
       <section aria-labelledby="h-carriers" className="flex flex-col gap-3">
-        <SectionTitle id="h-carriers" title="Transporteurs" href={to("/stats")} linkLabel="Statistiques détaillées" />
+        <SectionTitle id="h-carriers" title="Transporteurs" href={to("/parcels")} linkLabel="Voir les colis" />
         <div className="grid gap-3 md:grid-cols-2">
-          <CarrierCard name="Forcelog" s={forcelog} href="/parcels" />
-          <CarrierCard name="Ozon Express" s={ozon} href="/parcels" />
+          <CarrierCard name="Forcelog" s={forcelog} extra={carrierRow("forcelog")} href="/parcels" />
+          <CarrierCard name="Ozon Express" s={ozon} extra={carrierRow("ozon")} href="/parcels" />
         </div>
         <p className="text-xs text-muted">
           Colis créés pendant la période ({range.label.toLowerCase()}). « Encaissé » = factures de règlement du transporteur sur la période.
         </p>
       </section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* ── Statut des colis ──────────────────────────────────── */}
+        <section aria-labelledby="h-status" className="flex flex-col gap-3">
+          <SectionTitle id="h-status" title="Statut des colis" />
+          <div className="card flex flex-grow flex-col gap-3 p-4">
+            {statusEntries.length === 0 ? (
+              <EmptyState title="Aucun colis">Rien sur cette période.</EmptyState>
+            ) : (
+              <>
+                {statusEntries.map((s) => (
+                  <div key={s.id} className="flex flex-col gap-1.5">
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="text-body">{s.label}</span>
+                      <span className="tabular-nums">
+                        {formatInt(s.value)} <span className="text-muted">· {Math.round((s.value / statusTotal) * 100)} %</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-cream-dark" aria-hidden="true">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(3, Math.round((s.value / statusMax) * 100))}%`, background: STATUS_COLORS[s.id] }} />
+                    </div>
+                  </div>
+                ))}
+                <p className="mt-auto border-t border-line-soft pt-3 text-xs text-muted">{formatInt(statusTotal)} colis Forcelog et Ozon Express sur la période</p>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ── Top 5 villes, toutes commandes ─────────────────────── */}
+        <section aria-labelledby="h-all-cities" className="flex flex-col gap-3">
+          <SectionTitle id="h-all-cities" title="Top 5 villes · toutes les commandes" />
+          <div className="card flex flex-grow flex-col gap-3 p-4">
+            {allCities.length === 0 ? (
+              <EmptyState title="Aucune commande">Rien sur cette période.</EmptyState>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {allCities.map((c, i) => (
+                  <li key={c.city} className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate font-medium">
+                        <span className="mr-2 tabular-nums text-muted">{i + 1}</span>
+                        {c.city || "Sans ville"}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-body">{formatInt(c._count)}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-cream-dark" aria-hidden="true">
+                      <div className="h-full rounded-full bg-ink" style={{ width: `${Math.max(3, Math.round((c._count / allCityMax) * 100))}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+      </div>
     </>
   );
 }
@@ -188,7 +265,7 @@ function Figure({ label, value, sub, small = false }: { label: string; value: Re
   );
 }
 
-function CarrierCard({ name, s, href }: { name: string; s: CarrierSummary; href: string }) {
+function CarrierCard({ name, s, extra, href }: { name: string; s: CarrierSummary; extra?: CarrierStatRow; href: string }) {
   return (
     <div className="card flex flex-col gap-4 p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -211,6 +288,10 @@ function CarrierCard({ name, s, href }: { name: string; s: CarrierSummary; href:
             <Figure label="Livrés" value={formatInt(s.delivered)} sub={s.deliveryRate === null ? "—" : `${s.deliveryRate} %`} small />
             <Figure label="En cours" value={formatInt(s.ongoing)} small />
             <Figure label="Retours" value={formatInt(s.returns)} sub={s.returnRate === null ? "—" : `${s.returnRate} %`} small />
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-t border-line-soft pt-3">
+            <Figure label="Délai moyen" value={extra?.avgDelayDays != null ? `${extra.avgDelayDays.toFixed(1)} j` : "—"} sub="de l'envoi à la livraison" small />
+            <Figure label="Frais par colis" value={extra?.avgFee != null ? formatDh(extra.avgFee) : "—"} sub="d'après les factures" small />
           </div>
           <div className="flex items-baseline justify-between gap-3 border-t border-line-soft pt-3 text-sm">
             <span className="text-muted">Encaissé (factures)</span>
