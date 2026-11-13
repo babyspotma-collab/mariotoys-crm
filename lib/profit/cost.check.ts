@@ -20,6 +20,7 @@ assert.equal(resolveCost("IMPORTE", { prixAchat: null, prixGros: null }).unitCos
 
 // ── Type selon le fournisseur de la facture d'achat ──
 assert.equal(costTypeOf({ fournisseur: "HUIRIN", costType: "NON_CLASSE" }), "IMPORTE");
+assert.equal(costTypeOf({ fournisseur: "pilsan", costType: "NON_CLASSE" }), "IMPORTE", "Pilsan : prix de gros");
 assert.equal(costTypeOf({ fournisseur: " huirin · GENERAL", costType: "LOCAL" }), "IMPORTE");
 assert.equal(costTypeOf({ fournisseur: "NATURA FUSION", costType: "IMPORTE" }), "LOCAL", "fournisseur local : le choix manuel ne compte pas");
 assert.equal(costTypeOf({ fournisseur: null, costType: "IMPORTE" }), "IMPORTE", "sans fournisseur : choix manuel");

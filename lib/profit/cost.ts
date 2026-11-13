@@ -37,22 +37,31 @@ export const FLAG_LABEL: Record<CostFlag, string> = {
   SANS_PRIX: "sans prix d'achat",
 };
 
-/** Fournisseur des produits importés par Mario Toys (facture d'achat « HUIRIN · GENERAL »). */
-export const IMPORT_SUPPLIER = "HUIRIN";
+/**
+ * Fournisseurs dont la marge se calcule sur le prix de gros (classés « Importé ») :
+ * HUIRIN (nos importations, facture d'achat « HUIRIN · GENERAL ») et PILSAN.
+ * Comparaison sans casse, sur le début du nom.
+ */
+export const GROS_SUPPLIERS = ["HUIRIN", "PILSAN"] as const;
 
 export function hasSupplier(fournisseur: string | null | undefined): boolean {
   return !!fournisseur && fournisseur.trim() !== "";
 }
 
+export function isGrosSupplier(fournisseur: string | null | undefined): boolean {
+  const f = (fournisseur ?? "").trim().toUpperCase();
+  return GROS_SUPPLIERS.some((s) => f.startsWith(s));
+}
+
 /**
  * Type retenu pour le calcul de la marge :
- *   fournisseur HUIRIN   -> IMPORTE (prix de gros)
- *   autre fournisseur    -> LOCAL (prix d'achat)
- *   pas de fournisseur   -> choix manuel (NON_CLASSE par défaut : prix d'achat)
+ *   fournisseur HUIRIN ou PILSAN -> IMPORTE (prix de gros)
+ *   autre fournisseur            -> LOCAL (prix d'achat)
+ *   pas de fournisseur           -> choix manuel (NON_CLASSE par défaut : prix d'achat)
  */
 export function costTypeOf(a: { fournisseur?: string | null; costType: CostTypeName }): CostTypeName {
   if (!hasSupplier(a.fournisseur)) return a.costType;
-  return a.fournisseur!.trim().toUpperCase().startsWith(IMPORT_SUPPLIER) ? "IMPORTE" : "LOCAL";
+  return isGrosSupplier(a.fournisseur) ? "IMPORTE" : "LOCAL";
 }
 
 const price = (v: number | null | undefined): number | null => (v === null || v === undefined || !Number.isFinite(v) || v <= 0 ? null : v);

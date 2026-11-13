@@ -2,14 +2,14 @@
 // « classer tous les résultats du filtre ».
 
 import type { CostType, Prisma } from "@prisma/client";
-import { IMPORT_SUPPLIER } from "./cost";
+import { GROS_SUPPLIERS } from "./cost";
 
 export const COST_TYPES: CostType[] = ["LOCAL", "IMPORTE", "NON_CLASSE"];
 export const NONE = "__none"; // fournisseur / famille vide
 
 /** Articles sans fournisseur : les seuls dont le type vient du choix manuel. */
 export const NO_SUPPLIER: Prisma.AlbaseetArticleWhereInput = { OR: [{ fournisseur: null }, { fournisseur: "" }] };
-const IMPORT: Prisma.AlbaseetArticleWhereInput = { fournisseur: { startsWith: IMPORT_SUPPLIER, mode: "insensitive" } };
+const IMPORT: Prisma.AlbaseetArticleWhereInput = { OR: GROS_SUPPLIERS.map((s) => ({ fournisseur: { startsWith: s, mode: "insensitive" as const } })) };
 
 /** Même règle que costTypeOf (lib/profit/cost.ts), en requête. */
 export function typeWhere(type: CostType): Prisma.AlbaseetArticleWhereInput {

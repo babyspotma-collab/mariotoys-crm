@@ -21,7 +21,7 @@ const TYPES = [
 
 // Classement des articles ALBASEET+ : acheté localement (coût = prix d'achat),
 // importé (coût = prix de gros) ou non classé (prix d'achat + alerte). Le type
-// vient du fournisseur (HUIRIN = importé, autre = local) ; le choix manuel, par
+// vient du fournisseur (HUIRIN ou PILSAN = importé, autre = local) ; le choix manuel, par
 // lot, ne s'applique qu'aux articles sans fournisseur.
 export default async function ClassementPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const filter = {
@@ -95,7 +95,7 @@ export default async function ClassementPage({ searchParams }: { searchParams: R
         </button>
       </form>
       <p className="text-xs text-muted">
-        {formatInt(total)} article(s). Le type vient du fournisseur de la facture d&apos;achat : HUIRIN = importé (coût = prix de gros, prix d&apos;achat s&apos;il manque), tout autre
+        {formatInt(total)} article(s). Le type vient du fournisseur de la facture d&apos;achat : HUIRIN ou PILSAN = importé (coût = prix de gros, prix d&apos;achat s&apos;il manque), tout autre
         fournisseur = acheté localement (coût = prix d&apos;achat). Le classement à la main ne sert que pour les articles sans fournisseur (non classé = prix d&apos;achat).
       </p>
 
