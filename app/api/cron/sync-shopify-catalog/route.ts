@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncCatalog } from "@/lib/profit/shopify-catalog";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -9,8 +10,7 @@ export const maxDuration = 60;
 // association automatique aux articles ALBASEET+. Même garde CRON_SECRET que les
 // autres tâches (Vercel l'envoie tout seul en "Authorization: Bearer …").
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!hasBearerSecret(req, "CRON_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   try {

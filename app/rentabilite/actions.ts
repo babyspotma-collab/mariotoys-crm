@@ -11,6 +11,7 @@ import { syncMetaSpend } from "@/lib/profit/meta";
 import { saveSetting, type CasaRates, type MetaAccount } from "@/lib/profit/settings";
 import { syncCatalog } from "@/lib/profit/shopify-catalog";
 import { relinkOrderItem } from "@/app/orders/[id]/actions";
+import { requireSession } from "@/lib/session";
 
 const PAGES = ["/rentabilite", "/rentabilite/a-relier", "/rentabilite/articles", "/rentabilite/classement", "/rentabilite/campagnes", "/rentabilite/reglages"];
 const refresh = () => PAGES.forEach((p) => revalidatePath(p));
@@ -33,6 +34,7 @@ export type ActionResult = { ok: boolean; message: string } | null;
 
 // ── Actualiser (catalogue Shopify + dépenses Meta) ──────────────────────────
 export async function refreshNow(_prev: ActionResult): Promise<ActionResult> {
+  await requireSession();
   const parts: string[] = [];
   let ok = true;
   try {
@@ -51,6 +53,7 @@ export async function refreshNow(_prev: ActionResult): Promise<ActionResult> {
 
 // ── Réglages ────────────────────────────────────────────────────────────────
 export async function saveGeneral(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireSession();
   const rate = amount(formData.get("usdToMad"), 100);
   const pct = amount(formData.get("damagedReturnPct"), 100);
   if (!rate || rate <= 0) return { ok: false, message: "Taux USD→MAD invalide." };
@@ -62,6 +65,7 @@ export async function saveGeneral(_prev: ActionResult, formData: FormData): Prom
 }
 
 export async function saveReturnFees(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireSession();
   const f = (k: string) => (String(formData.get(k) ?? "").trim() === "" ? null : amount(formData.get(k)));
   await saveSetting("returnFees", { FORCELOG: f("FORCELOG") ?? 0, OZON: f("OZON") });
   refresh();
@@ -69,6 +73,7 @@ export async function saveReturnFees(_prev: ActionResult, formData: FormData): P
 }
 
 export async function saveMetaAccounts(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireSession();
   const accounts: MetaAccount[] = [];
   for (const r of rowsOf(formData)) {
     const id = clean(r.id, 40).replace(/^act_/, "");
@@ -82,6 +87,7 @@ export async function saveMetaAccounts(_prev: ActionResult, formData: FormData):
 }
 
 export async function saveCasa(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireSession();
   const defaultFee = amount(formData.get("defaultFee"));
   if (defaultFee === null) return { ok: false, message: "Tarif par défaut invalide." };
   const couriers: CasaRates["couriers"] = [];
@@ -98,6 +104,7 @@ export async function saveCasa(_prev: ActionResult, formData: FormData): Promise
 }
 
 export async function saveRates(carrier: "FORCELOG" | "OZON", _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireSession();
   const rows = new Map<string, { carrier: "FORCELOG" | "OZON"; city: string; cityKey: string; fee: number }>();
   for (const r of rowsOf(formData)) {
     const city = clean(r.city);
@@ -122,6 +129,7 @@ export async function saveRates(carrier: "FORCELOG" | "OZON", _prev: ActionResul
 export type ArticleHit = { code: string; designation: string; barcode: string | null; fournisseur: string | null; costLabel: string; unitCost: number | null };
 
 export async function searchArticles(q: string): Promise<ArticleHit[]> {
+  await requireSession();
   const words = clean(q, 80).split(" ").filter(Boolean).slice(0, 5);
   if (!words.length) return [];
   const rows = await prisma.albaseetArticle.findMany({
@@ -143,6 +151,7 @@ export async function searchArticles(q: string): Promise<ArticleHit[]> {
 
 /** Lien choisi à la main (code null = « aucun article »). Jamais modifié par l'automatique. */
 export async function setManualLink(variantId: string, code: string | null): Promise<void> {
+  await requireSession();
   const id = clean(variantId, 100);
   if (!id.startsWith("gid://shopify/ProductVariant/")) return;
   if (code !== null && !(await prisma.albaseetArticle.findUnique({ where: { code }, select: { code: true } }))) return;
@@ -156,12 +165,14 @@ export async function setManualLink(variantId: string, code: string | null): Pro
 
 /** « Valider » un lien trouvé par le nom : il devient manuel (définitif). */
 export async function confirmLink(variantId: string): Promise<void> {
+  await requireSession();
   await prisma.articleLink.updateMany({ where: { variantId, method: "NAME" }, data: { method: "MANUAL", score: null } });
   refresh();
 }
 
 /** Rend la variante à l'association automatique (le lien est recalculé à la prochaine synchro). */
 export async function resetLink(variantId: string): Promise<void> {
+  await requireSession();
   await prisma.articleLink.deleteMany({ where: { variantId } });
   refresh();
 }
@@ -174,6 +185,7 @@ export async function resetLink(variantId: string): Promise<void> {
  * via le produit Shopify suggéré s'il y en a un, sinon directement l'article ALBASEET+.
  */
 export async function linkSuggestion(input: { variantId?: string | null; itemIds?: string[]; code: string; viaVariantId?: string | null }): Promise<{ error: string | null }> {
+  await requireSession();
   const code = clean(input.code, 100);
   if (!code || !(await prisma.albaseetArticle.findUnique({ where: { code }, select: { code: true } }))) return { error: "Article ALBASEET+ introuvable." };
 
@@ -204,6 +216,7 @@ export async function linkSuggestion(input: { variantId?: string | null; itemIds
 // Il ne sert que pour les articles sans fournisseur : les autres sont classés
 // d'office par leur fournisseur (costTypeOf).
 export async function classifyArticles(formData: FormData): Promise<void> {
+  await requireSession();
   const type = String(formData.get("type")) as CostType;
   if (!COST_TYPES.includes(type)) return;
   const data = { costType: type, costTypeSetAt: new Date() };
@@ -222,6 +235,7 @@ export async function classifyArticles(formData: FormData): Promise<void> {
 export type TargetHit = { type: "PRODUCT" | "COLLECTION"; id: string; title: string; imageUrl: string | null; detail: string };
 
 export async function searchTargets(q: string): Promise<TargetHit[]> {
+  await requireSession();
   const words = clean(q, 80).split(" ").filter(Boolean).slice(0, 5);
   if (!words.length) return [];
   const [variants, collections] = await Promise.all([
@@ -244,6 +258,7 @@ export async function searchTargets(q: string): Promise<TargetHit[]> {
 }
 
 export async function addCampaignLink(campaignId: string, target: Pick<TargetHit, "type" | "id" | "title">): Promise<void> {
+  await requireSession();
   if (!(await prisma.metaCampaign.findUnique({ where: { id: campaignId }, select: { id: true } }))) return;
   if (target.type !== "PRODUCT" && target.type !== "COLLECTION") return;
   // Un seul type d'association : un produit ou une collection remplace « tout le site » / « frais généraux ».
@@ -260,6 +275,7 @@ export async function addCampaignLink(campaignId: string, target: Pick<TargetHit
 
 /** « Tout le site » ou « Frais généraux » : remplace toutes les autres associations de la campagne. */
 export async function setCampaignScope(campaignId: string, scope: "SITE" | "OVERHEAD"): Promise<void> {
+  await requireSession();
   if (scope !== SITE_TARGET && scope !== OVERHEAD_TARGET) return;
   if (!(await prisma.metaCampaign.findUnique({ where: { id: campaignId }, select: { id: true } }))) return;
   await prisma.$transaction([
@@ -272,6 +288,7 @@ export async function setCampaignScope(campaignId: string, scope: "SITE" | "OVER
 }
 
 export async function removeCampaignLink(id: string): Promise<void> {
+  await requireSession();
   await prisma.campaignLink.deleteMany({ where: { id } });
   refresh();
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Battement de cœur du worker (mariotoys-images-automation). Pour ménager
 // la base, il n'est envoyé que pendant un job : à chaque changement d'étape
@@ -9,7 +10,7 @@ import { prisma } from "@/lib/db";
 const STEPS = ["READING", "GENERATING", "SHOPIFY"];
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.WORKER_SECRET}`) {
+  if (!hasBearerSecret(req, "WORKER_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

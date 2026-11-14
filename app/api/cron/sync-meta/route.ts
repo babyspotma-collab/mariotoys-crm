@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncMetaSpend } from "@/lib/profit/meta";
 import { getInternal } from "@/lib/profit/settings";
 import { syncCatalog } from "@/lib/profit/shopify-catalog";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,8 +12,7 @@ export const maxDuration = 60;
 // du catalogue Shopify restée en attente au passage précédent.
 //   ?since=2026-09-01 : recharge depuis cette date (rattrapage manuel).
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!hasBearerSecret(req, "CRON_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   let catalog: unknown = null;

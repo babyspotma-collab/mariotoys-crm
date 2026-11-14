@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Réservé au worker — appelé une fois que TOUT le pipeline (lecture des
 // infos sur la photo, génération des visuels, création du produit
@@ -14,8 +15,7 @@ import { prisma } from "@/lib/db";
 // (tag "À compléter" côté Shopify) et renvoie `missingFields` non vide —
 // le job passe alors en CREE_A_COMPLETER plutôt que CREE.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.WORKER_SECRET}`) {
+  if (!hasBearerSecret(req, "WORKER_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

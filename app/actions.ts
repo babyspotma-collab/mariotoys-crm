@@ -1,10 +1,17 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { endAllSessions, endSession, requireSession } from "@/lib/session";
 
+/** Déconnexion de cet appareil : la session est révoquée en base. */
 export async function logout() {
-  cookies().delete(SESSION_COOKIE);
+  await endSession();
   redirect("/login");
+}
+
+/** Déconnexion de tous les appareils (téléphone perdu, accès partagé à couper). */
+export async function logoutEverywhere() {
+  await requireSession();
+  await endAllSessions();
+  redirect("/login?all=1");
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchProducts, warmCatalogue } from "@/lib/shopify-admin";
+import { hasSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // premier appel : chargement de tout le catalogue
@@ -8,6 +9,7 @@ export const maxDuration = 60; // premier appel : chargement de tout le catalogu
 // Protégée par la session (middleware) comme le reste du CRM.
 //   ?q=licorn  -> propositions        ?warm=1 -> prépare le catalogue en mémoire
 export async function GET(req: NextRequest) {
+  if (!(await hasSession())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   try {
     if (req.nextUrl.searchParams.get("warm")) {
       await warmCatalogue();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Réservé au worker externe (mariotoys-images-automation, jamais le
 // navigateur) — même garde WORKER_SECRET que les autres endpoints
@@ -12,8 +13,7 @@ import { prisma } from "@/lib/db";
 // tournaient un jour (aucun aujourd'hui, mais coûte rien de le faire
 // correctement dès maintenant).
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.WORKER_SECRET}`) {
+  if (!hasBearerSecret(req, "WORKER_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { changeCourier, removeLocalDelivery, setLocalNote, setLocalStatus } from "@/lib/local-delivery-db";
+import { requireSession } from "@/lib/session";
 
 // Toutes ces actions ne concernent que des commandes en livraison Casa
 // (localDelivery: true, voir lib/local-delivery-db.ts) et sont manuelles :
@@ -15,32 +16,38 @@ function refresh(orderId: string) {
 }
 
 export async function markDelivered(orderId: string) {
+  await requireSession();
   await setLocalStatus(orderId, ["A_LIVRER"], "LIVREE");
   refresh(orderId);
 }
 
 export async function markReturned(orderId: string) {
+  await requireSession();
   await setLocalStatus(orderId, ["A_LIVRER"], "RETOUR");
   refresh(orderId);
 }
 
 // "Remettre chez le livreur" : depuis LIVREE ou RETOUR.
 export async function putBackWithCourier(orderId: string) {
+  await requireSession();
   await setLocalStatus(orderId, ["LIVREE", "RETOUR"], "A_LIVRER");
   refresh(orderId);
 }
 
 export async function reassignCourier(orderId: string, formData: FormData) {
+  await requireSession();
   await changeCourier(orderId, formData.get("courier"));
   refresh(orderId);
 }
 
 export async function saveLocalNote(orderId: string, formData: FormData) {
+  await requireSession();
   await setLocalNote(orderId, formData.get("note"));
   revalidatePath("/livraisons");
 }
 
 export async function removeFromLocalDelivery(orderId: string) {
+  await requireSession();
   await removeLocalDelivery(orderId);
   refresh(orderId);
 }

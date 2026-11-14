@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Réservé au worker — signale l'échec d'un job (ex : CAPTCHA/quota Gemini,
 // erreur réseau). Le job reste visible dans le CRM avec le message
 // d'erreur, rien n'est supprimé — à l'utilisateur de décider (relancer en
 // remettant le statut à EN_ATTENTE, ou ignorer).
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.WORKER_SECRET}`) {
+  if (!hasBearerSecret(req, "WORKER_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

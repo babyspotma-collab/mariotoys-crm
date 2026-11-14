@@ -10,6 +10,7 @@ import { existingParcelCode } from "@/lib/existing-parcel";
 import { tooLongError } from "@/lib/parcel-limits";
 import { cleanPaidMethod } from "@/lib/payment-method";
 import { safeReturnPath } from "@/lib/return-path";
+import { requireSession } from "@/lib/session";
 
 export type ConfirmState = { error: string | null };
 
@@ -20,6 +21,7 @@ export async function createParcel(
   _prevState: ConfirmState,
   formData: FormData
 ): Promise<ConfirmState> {
+  await requireSession();
   const carrier = String(formData.get("carrier") ?? "FORCELOG").trim();
   const receiver = String(formData.get("receiver") ?? "").trim();
   const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());

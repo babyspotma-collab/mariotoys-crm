@@ -7,6 +7,7 @@ import { revenueState } from "@/lib/revenue";
 import { profitCells, type ProfitCells } from "@/lib/orders-export-profit";
 import { lineResolver } from "@/lib/profit/compute";
 import { loadCatalog, loadHistory } from "@/lib/profit/report";
+import { hasSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -27,6 +28,7 @@ const fill = (argb: string): ExcelJS.Fill => ({ type: "pattern", pattern: "solid
 // d'achat et de gros ALBASEET+ en vigueur à la date de la commande.
 // Protégé par la session comme le reste du CRM (middleware).
 export async function GET(req: NextRequest) {
+  if (!(await hasSession())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const month = req.nextUrl.searchParams.get("month");
   const range = monthPeriod(month);
   if (!month || !range) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { applyAutoConfirmations, orderCanMatchParcel } from "@/lib/auto-confirm";
 import { ozonCategoryById } from "@/lib/ozon-categories";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 const DELIVERED_STATUSES = ozonCategoryById("delivered").statuses;
 
@@ -40,8 +41,7 @@ function parseOzonDate(raw: string | null): Date | null {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasBearerSecret(req, "CRON_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

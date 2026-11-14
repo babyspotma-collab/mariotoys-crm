@@ -5,6 +5,7 @@ import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { fixUtf8Filename } from "@/lib/filename";
 import { STUCK_AFTER_MS } from "@/lib/product-jobs";
+import { requireSession } from "@/lib/session";
 
 export type UploadState = { error: string | null };
 
@@ -16,6 +17,7 @@ export async function uploadProductPhotos(
   _prevState: UploadState,
   formData: FormData
 ): Promise<UploadState> {
+  await requireSession();
   const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
 
   if (files.length === 0) {
@@ -44,6 +46,7 @@ export async function uploadProductPhotos(
 
 // Remet un job en file d'attente : en erreur, ou bloqué en cours.
 export async function retryJob(jobId: string) {
+  await requireSession();
   await prisma.productJob.updateMany({
     where: {
       id: jobId,

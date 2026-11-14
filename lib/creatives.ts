@@ -1,7 +1,5 @@
-import { cookies } from "next/headers";
 import { timingSafeEqual } from "node:crypto";
 import type { CreativeRequestStatus } from "@prisma/client";
-import { SESSION_COOKIE, isValidSessionToken } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { UPLOAD_PATH_PREFIX } from "@/lib/creative-upload";
 
@@ -29,11 +27,9 @@ export function isWorkerAuthorized(req: Request): boolean {
 }
 
 // Garde des routes navigateur (jeton Blob, statut) : le middleware exige déjà
-// la session, mais ces routes la revérifient elles-mêmes (défense en
-// profondeur, surtout pour la délivrance de jetons d'upload).
-export async function hasSession(): Promise<boolean> {
-  return isValidSessionToken(cookies().get(SESSION_COOKIE)?.value);
-}
+// la session, mais ces routes la revérifient elles-mêmes, en base (session
+// non révoquée) — voir lib/session.ts.
+export { hasSession } from "@/lib/session";
 
 // Une URL de photo source ne doit venir que de notre store Blob, sous le
 // préfixe des uploads de Créatives — jamais d'une URL arbitraire que le

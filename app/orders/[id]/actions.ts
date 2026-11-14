@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { resolveCatalogLines } from "@/lib/order-lines";
+import { requireSession } from "@/lib/session";
 
 /**
  * Relie après coup une ligne de commande au catalogue (pour le coût d'achat de la
@@ -14,6 +15,7 @@ import { resolveCatalogLines } from "@/lib/order-lines";
  * le CA, ni les colis.
  */
 export async function relinkOrderItem(itemId: string, rows: unknown): Promise<{ error: string | null }> {
+  await requireSession();
   const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
   if (!item) return { error: "Ligne introuvable." };
   if (!(await isRelinkable(item))) return { error: "Cette ligne est déjà reliée au catalogue." };

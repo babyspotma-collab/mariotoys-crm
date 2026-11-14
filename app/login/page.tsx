@@ -3,8 +3,9 @@ import { login } from "./actions";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: { error?: string; wait?: string; all?: string };
 }) {
+  const wait = Number(searchParams.wait);
   return (
     <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-6">
       <img
@@ -22,7 +23,13 @@ export default function LoginPage({
             Mot de passe
           </label>
           <input id="password" name="password" type="password" required autoFocus className="input" />
-          {searchParams.error && <p className="mt-2 text-sm text-pill-red-fg">Mot de passe incorrect.</p>}
+          {wait > 0 ? (
+            <p className="mt-2 text-sm text-pill-red-fg">Trop d&apos;essais. Réessaie dans {Math.min(wait, 15)} min.</p>
+          ) : searchParams.error ? (
+            <p className="mt-2 text-sm text-pill-red-fg">Mot de passe incorrect.</p>
+          ) : searchParams.all ? (
+            <p className="mt-2 text-sm text-muted">Tous les appareils ont été déconnectés.</p>
+          ) : null}
         </div>
 
         <button type="submit" className="btn-primary w-full">

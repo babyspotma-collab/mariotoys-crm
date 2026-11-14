@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { normalizeMoroccanPhone } from "@/lib/phone";
 import { gql } from "@/lib/shopify-admin";
 import { isPaidByCard } from "@/lib/shopify-payment";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Réimporte les commandes Shopify absentes du CRM (base repartie de zéro
 // après la migration vers Neon du 07/10/2026 : l'ancienne base n'a pas pu
@@ -50,7 +51,7 @@ const QUERY = `
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasBearerSecret(req, "CRON_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   const since = req.nextUrl.searchParams.get("since") ?? "";

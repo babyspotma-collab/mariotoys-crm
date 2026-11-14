@@ -5,11 +5,13 @@ import { prisma } from "@/lib/db";
 import { startLocalDelivery as startLocalDeliveryDb } from "@/lib/local-delivery-db";
 import { cancelOrderRecord } from "@/lib/order-cancel";
 import { detachParcelFromOrder } from "@/lib/parcel-detach";
+import { requireSession } from "@/lib/session";
 
 // Annule la commande (NOUVELLE ou CONFIRMEE). Ne touche pas au colis éventuel
 // chez le transporteur ; retire la commande de Livraisons Casa si besoin
 // (voir lib/order-cancel.ts).
 export async function cancelOrder(orderId: string) {
+  await requireSession();
   await cancelOrderRecord(orderId);
   revalidatePath("/");
   revalidatePath("/orders");
@@ -21,6 +23,7 @@ export async function cancelOrder(orderId: string) {
 // statistiques). Aucun appel transporteur : le colis se crée ensuite, à
 // part, depuis "Créer le colis" (app/orders/[id]/confirm).
 export async function confirmOrder(orderId: string) {
+  await requireSession();
   await prisma.order.updateMany({
     where: { id: orderId, status: "NOUVELLE" },
     data: { status: "CONFIRMEE" },
@@ -34,6 +37,7 @@ export async function confirmOrder(orderId: string) {
 // "Confirmée sans colis". Ne change QUE le CRM : le colis chez le transporteur
 // doit être annulé là-bas (voir lib/parcel-detach.ts).
 export async function detachParcel(orderId: string) {
+  await requireSession();
   await detachParcelFromOrder(orderId);
   revalidatePath("/");
   revalidatePath("/orders");
@@ -46,6 +50,7 @@ export async function detachParcel(orderId: string) {
 // Aucun appel Forcelog/Ozon, aucun colis. Refusée si la commande n'est pas
 // NOUVELLE/CONFIRMEE ou a déjà un colis (voir lib/local-delivery-db.ts).
 export async function startLocalDelivery(orderId: string, formData: FormData) {
+  await requireSession();
   await startLocalDeliveryDb(orderId, formData.get("courier"));
   revalidatePath("/");
   revalidatePath("/orders");

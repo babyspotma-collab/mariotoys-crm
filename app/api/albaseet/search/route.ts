@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export type AlbaseetSuggestion = { code: string; designation: string; prixVente:
 // Recherche d'un article ALBASEET+ (produit absent de Shopify) par code ou par
 // mots de la désignation. Protégée par la session (middleware).
 export async function GET(req: NextRequest) {
+  if (!(await hasSession())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 80);
   if (q.length < 2) return NextResponse.json({ articles: [] });
   const words = q.split(/\s+/).filter(Boolean).slice(0, 6);

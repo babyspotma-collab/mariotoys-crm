@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { logout } from "@/app/actions";
+import { logout, logoutEverywhere } from "@/app/actions";
 import MoreMenu from "@/components/MoreMenu";
 import { Coins, House, Moped, Package, Receipt, ShoppingBag, SignOut } from "@phosphor-icons/react/dist/ssr";
 
@@ -80,6 +80,11 @@ export default function Sidebar() {
             Se déconnecter
           </button>
         </form>
+        <form action={logoutEverywhere}>
+          <button type="submit" className="w-full px-3 pb-1 text-left text-xs text-muted transition-colors hover:text-ink">
+            Déconnecter tous les appareils
+          </button>
+        </form>
       </nav>
 
       {/* Mobile : barre supérieure (logo + menu compte) */}
@@ -90,6 +95,11 @@ export default function Sidebar() {
             <button type="submit" className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink hover:bg-cream">
               <SignOut size={16} aria-hidden="true" />
               Se déconnecter
+            </button>
+          </form>
+          <form action={logoutEverywhere}>
+            <button type="submit" className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-muted hover:bg-cream hover:text-ink">
+              Déconnecter tous les appareils
             </button>
           </form>
         </MoreMenu>

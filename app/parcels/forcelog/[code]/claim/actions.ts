@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClaim, replyClaim } from "@/lib/forcelog";
+import { requireSession } from "@/lib/session";
 
 export type ClaimState = { error: string | null };
 
@@ -10,6 +11,7 @@ export async function submitCreateClaim(
   _prevState: ClaimState,
   formData: FormData
 ): Promise<ClaimState> {
+  await requireSession();
   const typeId = Number(formData.get("typeId"));
   const message = String(formData.get("message") ?? "").trim();
 
@@ -41,6 +43,7 @@ export async function submitReply(
   _prevState: ClaimState,
   formData: FormData
 ): Promise<ClaimState> {
+  await requireSession();
   const message = String(formData.get("message") ?? "").trim();
   if (!message) return { error: "Le message est obligatoire." };
 

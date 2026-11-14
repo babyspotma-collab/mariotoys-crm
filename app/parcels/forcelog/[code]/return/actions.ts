@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requestReturn } from "@/lib/forcelog";
 import { normalizeMoroccanPhone } from "@/lib/phone";
+import { requireSession } from "@/lib/session";
 
 export type ReturnState = { error: string | null };
 
@@ -11,6 +12,7 @@ export async function submitReturn(
   _prevState: ReturnState,
   formData: FormData
 ): Promise<ReturnState> {
+  await requireSession();
   const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());
   const quarter = String(formData.get("quarter") ?? "").trim();
   const city = String(formData.get("city") ?? "").trim();

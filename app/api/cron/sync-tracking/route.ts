@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getParcels, getTracking, type ParcelSummary } from "@/lib/forcelog";
+import { hasBearerSecret } from "@/lib/bearer-secret";
 
 // Forcelog n'a pas de webhooks : ce statut est synchronisé par appel
 // périodique à cet endpoint. Déclenché par GitHub Actions toutes les 2h
@@ -47,8 +48,7 @@ async function collectKnownParcels(): Promise<{ byCode: Map<string, ParcelSummar
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasBearerSecret(req, "CRON_SECRET")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

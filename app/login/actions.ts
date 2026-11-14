@@ -1,24 +1,23 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, checkPassword, createSessionToken } from "@/lib/auth";
+import { checkPassword } from "@/lib/auth";
+import { clearLoginFailures, clientIp, loginBlockedMinutes, recordLoginFailure, startSession } from "@/lib/session";
 
+// Connexion : 5 essais ratés par adresse IP sur 15 minutes (et 50 toutes
+// adresses confondues), puis attente. Un essai bloqué ne teste même pas le mot de passe.
 export async function login(formData: FormData) {
-  const password = String(formData.get("password") ?? "");
+  const ip = clientIp();
+  const wait = await loginBlockedMinutes(ip);
+  if (wait > 0) redirect(`/login?wait=${wait}`);
 
-  if (!checkPassword(password)) {
+  const password = String(formData.get("password") ?? "").slice(0, 200);
+  if (!(await checkPassword(password))) {
+    await recordLoginFailure(ip);
     redirect("/login?error=1");
   }
 
-  const token = await createSessionToken();
-  cookies().set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 jours
-  });
-
+  await clearLoginFailures(ip);
+  await startSession();
   redirect("/");
 }

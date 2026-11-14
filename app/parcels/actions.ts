@@ -6,10 +6,12 @@ import { prisma } from "@/lib/db";
 import { createPickupRequest, relaunchParcel } from "@/lib/forcelog";
 import { addDeliveryNote, addParcelToDeliveryNote, saveDeliveryNote } from "@/lib/ozon";
 import { eligibleOzonCodes } from "@/lib/delivery-notes";
+import { requireSession } from "@/lib/session";
 
 export type RelaunchState = { error: string | null; success: boolean };
 
 export async function relaunch(code: string): Promise<RelaunchState> {
+  await requireSession();
   try {
     await relaunchParcel(code);
   } catch (err) {
@@ -24,6 +26,7 @@ export async function relaunch(code: string): Promise<RelaunchState> {
 const back = (params: Record<string, string>) => `/parcels?${new URLSearchParams({ carrier: "ozon", ...params })}`;
 
 export async function createOzonDeliveryNote(formData: FormData) {
+  await requireSession();
   const codes = [...new Set(formData.getAll("codes").map(String))];
   if (codes.length === 0) redirect(back({ error: "Sélectionnez au moins un colis." }));
 
@@ -65,6 +68,7 @@ function pickupFields(formData: FormData) {
 
 // Forcelog : envoi réel par l'API, résultat enregistré dans l'historique.
 export async function sendForcelogPickup(_prev: PickupState, formData: FormData): Promise<PickupState> {
+  await requireSession();
   const f = pickupFields(formData);
   const stickers = formData.get("stickers") === "on";
   if (!f.phone || !f.city || !f.address) return { ok: false, message: "Téléphone, ville et adresse sont obligatoires." };
@@ -88,6 +92,7 @@ export async function sendForcelogPickup(_prev: PickupState, formData: FormData)
 
 // Ozon : pas d'API, la demande se fait sur leur site ; on la note ici.
 export async function declareOzonPickup(_prev: PickupState, formData: FormData): Promise<PickupState> {
+  await requireSession();
   const f = pickupFields(formData);
   if (!f.address) return { ok: false, message: "Indiquez l'adresse de ramassage donnée à Ozon." };
   await prisma.pickupRequest.create({

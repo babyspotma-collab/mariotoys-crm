@@ -6,6 +6,7 @@ import { normalizeMoroccanPhone } from "@/lib/phone";
 import { cleanPaidMethod } from "@/lib/payment-method";
 import { SHIPPING_OPTIONS } from "@/lib/shipping-options";
 import { resolveCatalogLines } from "@/lib/order-lines";
+import { requireSession } from "@/lib/session";
 
 export type NewOrderState = { error: string | null };
 
@@ -15,6 +16,7 @@ export async function createManualOrder(
   _prevState: NewOrderState,
   formData: FormData
 ): Promise<NewOrderState> {
+  await requireSession();
   const customerName = String(formData.get("customerName") ?? "").trim();
   const phone = normalizeMoroccanPhone(String(formData.get("phone") ?? "").trim());
   const city = String(formData.get("city") ?? "").trim();

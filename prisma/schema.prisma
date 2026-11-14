@@ -565,3 +565,28 @@ model ShippingRate {
 
   @@unique([carrier, cityKey])
 }
+
+// ── Sécurité de la connexion ──
+// Session : une ligne par connexion réussie. Le cookie porte l'id signé
+// (lib/auth.ts) ; la session est refusée si elle est révoquée ou expirée
+// (lib/session.ts). Créée par prisma/sql/2026-11-14-securite-connexion.sql.
+model Session {
+  id        String    @id // 32 caractères hexadécimaux aléatoires
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+
+  @@index([expiresAt])
+}
+
+// Essai de connexion raté, pour limiter les essais (5 par adresse IP sur 15 minutes).
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+  @@index([createdAt])
+}
